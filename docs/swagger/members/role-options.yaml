@@ -1,0 +1,46 @@
+tags: [Members]
+summary: 角色下拉選項
+description: |
+  帳號建立/編輯 Modal 的「角色」下拉用，只回傳啟用中的角色（status=true）。
+  需要 `BACKEND:ACCOUNT:VIEW` 權限。
+  需要 JWT Bearer Token 認證。
+
+security:
+  - bearerAuth: []
+
+responses:
+  '200':
+    description: 查詢成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              description: 啟用中的角色清單
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: 角色 ID
+                  name:
+                    type: string
+                    description: 角色名稱（顯示用）
+                    example: 管理者
+            timestamp:
+              type: string
+              format: date-time
+
+  '401':
+    $ref: '../openapi.yaml#/components/responses/NoToken'
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'
+  '500':
+    $ref: '../openapi.yaml#/components/responses/InternalServerError'

@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "deny": ["Bash(git commit*)", "Bash(git push*)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; echo \"$f\" | grep -qE '\\.ts$' && npx tsc --noEmit 2>&1 | tail -5; } 2>/dev/null || true",
+            "statusMessage": "TypeScript 型別檢查中..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; echo \"$f\" | grep -q 'schema.prisma' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"schema.prisma 已修改。記得執行：(1) npm run db:migrate；(2) npm run db:generate。\"}}'; } 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; echo \"$f\" | grep -q 'domain/exception' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"新增了 domain/exception 檔案。記得在 GlobalExceptionFilter.ts 加上對應的 instanceof 分支 + HttpStatus + code。\"}}'; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": []
+  }
+}

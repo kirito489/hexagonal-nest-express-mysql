@@ -1,0 +1,48 @@
+tags: [Security]
+summary: 解鎖帳號
+description: 解除因登入失敗次數超過閾值而被鎖定的帳號（僅限 ADMIN）。
+
+security:
+  - bearerAuth: []
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [email]
+        properties:
+          email:
+            type: string
+            format: email
+            description: 要解鎖的帳號 Email
+            example: user@example.com
+
+responses:
+  '200':
+    description: 解鎖成功
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+        example:
+          success: true
+          data:
+            message: 帳號 user@example.com 已解鎖
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '400':
+    $ref: '../openapi.yaml#/components/responses/BadRequest'
+
+  '401':
+    $ref: '../openapi.yaml#/components/responses/NoToken'
+
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'
+
+  '404':
+    $ref: '../openapi.yaml#/components/responses/NotFound'
+
+  '500':
+    $ref: '../openapi.yaml#/components/responses/InternalServerError'

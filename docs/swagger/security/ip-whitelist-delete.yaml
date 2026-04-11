@@ -1,0 +1,28 @@
+tags: [Security]
+summary: 移除 IP 白名單
+description: 將指定 IP 從白名單移除（僅限 ADMIN）。
+
+security:
+  - bearerAuth: []
+
+parameters:
+  - in: path
+    name: ip
+    required: true
+    schema:
+      type: string
+    description: 要移除的 IP 位址
+    example: 192.168.1.1
+
+responses:
+  '204':
+    description: 移除成功（無回應內容）
+
+  '401':
+    $ref: '../openapi.yaml#/components/responses/NoToken'
+
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'
+
+  '500':
+    $ref: '../openapi.yaml#/components/responses/InternalServerError'

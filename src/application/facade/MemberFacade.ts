@@ -1,0 +1,93 @@
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  LIST_MEMBERS_USE_CASE,
+  ListMembersQuery,
+  ListMembersResult,
+  ListMembersUseCase,
+} from '../port/in/member/ListMembersUseCase';
+import {
+  GET_MEMBER_USE_CASE,
+  GetMemberUseCase,
+  MemberDetail,
+} from '../port/in/member/GetMemberUseCase';
+import {
+  CREATE_MEMBER_USE_CASE,
+  CreateMemberCommand,
+  CreateMemberResult,
+  CreateMemberUseCase,
+} from '../port/in/member/CreateMemberUseCase';
+import {
+  UPDATE_MEMBER_USE_CASE,
+  UpdateMemberCommand,
+  UpdateMemberUseCase,
+} from '../port/in/member/UpdateMemberUseCase';
+import {
+  DELETE_MEMBER_USE_CASE,
+  DeleteMemberCommand,
+  DeleteMemberUseCase,
+} from '../port/in/member/DeleteMemberUseCase';
+import {
+  LIST_ROLE_OPTIONS_USE_CASE,
+  ListRoleOptionsUseCase,
+  RoleOptionItem,
+} from '../port/in/member/ListRoleOptionsUseCase';
+import {
+  LOAD_MEMBER_CONTEXT_PORT,
+  LoadMemberContextPort,
+} from '../port/out/member/LoadMemberContextPort';
+
+export interface ProfileDetail extends MemberDetail {
+  permissionCodes: string[];
+}
+
+@Injectable()
+export class MemberFacade {
+  constructor(
+    @Inject(LIST_MEMBERS_USE_CASE)
+    private readonly listMembersUseCase: ListMembersUseCase,
+    @Inject(GET_MEMBER_USE_CASE)
+    private readonly getMemberUseCase: GetMemberUseCase,
+    @Inject(CREATE_MEMBER_USE_CASE)
+    private readonly createMemberUseCase: CreateMemberUseCase,
+    @Inject(UPDATE_MEMBER_USE_CASE)
+    private readonly updateMemberUseCase: UpdateMemberUseCase,
+    @Inject(DELETE_MEMBER_USE_CASE)
+    private readonly deleteMemberUseCase: DeleteMemberUseCase,
+    @Inject(LIST_ROLE_OPTIONS_USE_CASE)
+    private readonly listRoleOptionsUseCase: ListRoleOptionsUseCase,
+    @Inject(LOAD_MEMBER_CONTEXT_PORT)
+    private readonly loadMemberContextPort: LoadMemberContextPort,
+  ) {}
+
+  listMembers(query: ListMembersQuery): Promise<ListMembersResult> {
+    return this.listMembersUseCase.execute(query);
+  }
+
+  getMember(id: string): Promise<MemberDetail> {
+    return this.getMemberUseCase.execute(id);
+  }
+
+  createMember(command: CreateMemberCommand): Promise<CreateMemberResult> {
+    return this.createMemberUseCase.execute(command);
+  }
+
+  updateMember(command: UpdateMemberCommand): Promise<void> {
+    return this.updateMemberUseCase.execute(command);
+  }
+
+  deleteMember(command: DeleteMemberCommand): Promise<void> {
+    return this.deleteMemberUseCase.execute(command);
+  }
+
+  listRoleOptions(): Promise<RoleOptionItem[]> {
+    return this.listRoleOptionsUseCase.execute();
+  }
+
+  async getMyProfile(id: string): Promise<ProfileDetail> {
+    const [detail, context] = await Promise.all([
+      this.getMemberUseCase.execute(id),
+      this.loadMemberContextPort.loadMemberContext(id),
+    ]);
+    return { ...detail, permissionCodes: context?.permissions ?? [] };
+  }
+}

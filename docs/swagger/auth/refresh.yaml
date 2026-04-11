@@ -1,0 +1,50 @@
+tags: [Auth]
+summary: 更新 Access Token
+description: |
+  使用 Refresh Token 取得新的 Access Token。
+  Refresh Token 採絕對效期，不旋轉。
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [refreshToken]
+        properties:
+          refreshToken:
+            type: string
+            description: Refresh Token
+            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+responses:
+  '200':
+    description: 更新成功
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+        example:
+          success: true
+          data:
+            accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            accessTokenExpiresIn: 900
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '401':
+    description: Refresh Token 無效或已失效
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        example:
+          success: false
+          message: Refresh Token 無效
+          code: INVALID_REFRESH_TOKEN
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'
+
+  '500':
+    $ref: '../openapi.yaml#/components/responses/InternalServerError'

@@ -1,0 +1,524 @@
+import bcrypt from 'bcrypt';
+import request from 'supertest';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { createE2EApp, createMockRedis } from './test-app';
+
+// ──────────────────────────────────────────────
+// Mock 資料
+// ──────────────────────────────────────────────
+const TEST_PASSWORD = 'TestPass123!';
+const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);
+
+// Zod v4 的 z.string().uuid() 要求合法的 RFC 4122 格式（含版本位元 + 變體位元）
+const AUTH_UUID = '00000000-0000-4000-8000-000000000001';
+const TARGET_UUID = '00000000-0000-4000-8000-000000000002';
+const ROLE_UUID = '00000000-0000-4000-8000-000000000010';
+const NO_PERM_UUID = '00000000-0000-4000-8000-000000000099';
+const NO_PERM_ROLE_UUID = '00000000-0000-4000-8000-000000000020';
+
+const makeDate = () => new Date('2024-01-01T00:00:00.000Z');
+
+const AUTH_MEMBER_DB = {
+  id: AUTH_UUID,
+  email: 'auth@example.com',
+  member: 'Auth User',
+  password: TEST_HASH,
+  roleId: ROLE_UUID,
+  status: true,
+  isDefault: true,
+  lastPasswordChange: null,
+  createdAt: makeDate(),
+  updatedAt: makeDate(),
+  lastLoginAt: null,
+  role: {
+    name: 'admin',
+    permissions: [
+      { permission: { permissionCode: 'BACKEND:ACCOUNT:VIEW', status: true } },
+      { permission: { permissionCode: 'BACKEND:ACCOUNT:EDIT', status: true } },
+    ],
+  },
+};
+
+const TARGET_MEMBER_DB = {
+  id: TARGET_UUID,
+  email: 'target@example.com',
+  member: 'Target User',
+  password: 'hashed',
+  roleId: ROLE_UUID,
+  status: true,
+  isDefault: false,
+  lastPasswordChange: null,
+  createdAt: makeDate(),
+  updatedAt: makeDate(),
+  lastLoginAt: null,
+  role: { name: 'admin', permissions: [] },
+};
+
+const NO_PERM_MEMBER_DB = {
+  id: NO_PERM_UUID,
+  email: 'noperm@example.com',
+  member: 'No Perm',
+  password: TEST_HASH,
+  roleId: NO_PERM_ROLE_UUID,
+  status: true,
+  isDefault: false,
+  lastPasswordChange: null,
+  createdAt: makeDate(),
+  updatedAt: makeDate(),
+  lastLoginAt: null,
+  role: { name: 'guest', permissions: [] },
+};
+
+const mockPrisma = {
+  $connect: jest.fn(),
+  $disconnect: jest.fn(),
+  $transaction: jest.fn().mockImplementation((arg: unknown) => {
+    if (typeof arg === 'function')
+      return (arg as (tx: unknown) => unknown)(mockPrisma);
+    return Promise.all(arg as Promise<unknown>[]);
+  }),
+  memberRecord: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
+    create: jest.fn().mockResolvedValue({}),
+    upsert: jest.fn().mockResolvedValue({}),
+    update: jest.fn().mockResolvedValue({}),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+  role: {
+    findFirstOrThrow: jest.fn().mockResolvedValue({
+      id: ROLE_UUID,
+      name: 'admin',
+      isDefault: true,
+      status: true,
+    }),
+    findFirst: jest.fn().mockResolvedValue({ id: ROLE_UUID, name: 'admin' }),
+    findMany: jest.fn().mockResolvedValue([{ id: ROLE_UUID, name: 'admin' }]),
+  },
+};
+
+const mockRedis = createMockRedis();
+
+async function loginAndGetToken(app: NestExpressApplication): Promise<string> {
+  mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(AUTH_MEMBER_DB);
+  const res = await request(app.getHttpServer())
+    .post('/api/auth/login')
+    .send({ email: 'auth@example.com', password: TEST_PASSWORD });
+  return (res.body as { data: { accessToken: string } }).data.accessToken;
+}
+
+async function loginAsNoPerm(app: NestExpressApplication): Promise<string> {
+  mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(NO_PERM_MEMBER_DB);
+  const res = await request(app.getHttpServer())
+    .post('/api/auth/login')
+    .send({ email: 'noperm@example.com', password: TEST_PASSWORD });
+  return (res.body as { data: { accessToken: string } }).data.accessToken;
+}
+
+// ──────────────────────────────────────────────
+// E2E Test Suite
+// ──────────────────────────────────────────────
+describe('Member E2E', () => {
+  let app: NestExpressApplication;
+
+  beforeAll(async () => {
+    ({ app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis }));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.isTokenBlacklisted.mockResolvedValue(false);
+    mockRedis.throttleIncrement.mockResolvedValue(1);
+    mockPrisma.memberRecord.findUnique.mockResolvedValue(AUTH_MEMBER_DB);
+    mockPrisma.memberRecord.findFirst.mockResolvedValue(AUTH_MEMBER_DB);
+    mockPrisma.memberRecord.findMany.mockResolvedValue([]);
+    mockPrisma.memberRecord.count.mockResolvedValue(0);
+    mockPrisma.memberRecord.create.mockResolvedValue({});
+    mockPrisma.memberRecord.upsert.mockResolvedValue({});
+    mockPrisma.memberRecord.update.mockResolvedValue({});
+    mockPrisma.memberRecord.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.role.findFirst.mockResolvedValue({
+      id: ROLE_UUID,
+      name: 'admin',
+    });
+    mockPrisma.role.findMany.mockResolvedValue([
+      { id: ROLE_UUID, name: 'admin' },
+    ]);
+    mockPrisma.$transaction.mockImplementation((arg: unknown) => {
+      if (typeof arg === 'function')
+        return (arg as (tx: unknown) => unknown)(mockPrisma);
+      return Promise.all(arg as Promise<unknown>[]);
+    });
+  });
+
+  // ── GET /api/members ───────────────────────
+
+  describe('GET /api/members', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).get('/api/members');
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + VIEW 權限 → 200 + 列表', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findMany.mockResolvedValue([TARGET_MEMBER_DB]);
+      mockPrisma.memberRecord.count.mockResolvedValue(1);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as { data: { list: unknown[]; meta: unknown } };
+      expect(body.data.list).toHaveLength(1);
+    });
+
+    it('無 ACCOUNT:VIEW 權限 → 403', async () => {
+      const token = await loginAsNoPerm(app);
+      mockPrisma.memberRecord.findFirst.mockResolvedValue(NO_PERM_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ── GET /api/members/role/options ──────────
+
+  describe('GET /api/members/role/options', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).get(
+        '/api/members/role/options',
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + EDIT 權限 → 200 + 角色清單', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members/role/options')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as { data: unknown[] };
+      expect(Array.isArray(body.data)).toBe(true);
+    });
+
+    it('無 EDIT 權限 → 403', async () => {
+      const token = await loginAsNoPerm(app);
+      mockPrisma.memberRecord.findFirst.mockResolvedValue(NO_PERM_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members/role/options')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ── POST /api/members ──────────────────────
+
+  describe('POST /api/members', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).post('/api/members').send({
+        email: 'new@example.com',
+        member: 'New',
+        password: 'StrongPass123!',
+        roleId: ROLE_UUID,
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + EDIT，有效資料 → 201', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'new@example.com',
+          member: 'New User',
+          password: 'StrongPass123!',
+          roleId: ROLE_UUID,
+        });
+
+      expect(res.status).toBe(201);
+      expect(mockPrisma.memberRecord.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('email 已存在 → 409', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.count.mockResolvedValue(1);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'existing@example.com',
+          member: 'Dup',
+          password: 'StrongPass123!',
+          roleId: ROLE_UUID,
+        });
+
+      expect(res.status).toBe(409);
+    });
+
+    it('無效 email → 400', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'bad-email',
+          member: 'X',
+          password: 'StrongPass123!',
+          roleId: ROLE_UUID,
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('無 ACCOUNT:EDIT 權限 → 403', async () => {
+      const token = await loginAsNoPerm(app);
+      mockPrisma.memberRecord.findFirst.mockResolvedValue(NO_PERM_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'new@example.com',
+          member: 'X',
+          password: 'StrongPass123!',
+          roleId: ROLE_UUID,
+        });
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ── GET /api/members/:id ───────────────────
+
+  describe('GET /api/members/:id', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).get(
+        `/api/members/${TARGET_UUID}`,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + VIEW，member 存在 → 200', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as { data: { email: string } };
+      expect(body.data.email).toBe('target@example.com');
+    });
+
+    it('member 不存在 → 404', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  // ── PATCH /api/members/:id ─────────────────
+
+  describe('PATCH /api/members/:id', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .send({
+          email: 'target@example.com',
+          member: 'Updated',
+          roleId: ROLE_UUID,
+          status: true,
+        });
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + EDIT，有效資料 → 204', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'target@example.com',
+          member: 'Updated Name',
+          roleId: ROLE_UUID,
+          status: true,
+        });
+
+      expect(res.status).toBe(204);
+    });
+
+    it('member 不存在 → 404', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'target@example.com',
+          member: 'X',
+          roleId: ROLE_UUID,
+          status: true,
+        });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('預設帳號不可編輯 → 409 DEFAULT_MEMBER_NOT_EDITABLE', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue({
+        ...TARGET_MEMBER_DB,
+        isDefault: true,
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'target@example.com',
+          member: 'Updated',
+          roleId: ROLE_UUID,
+          status: true,
+        });
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe(
+        'DEFAULT_MEMBER_NOT_EDITABLE',
+      );
+    });
+
+    it('成功後清除 MemberContext 快取', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+      mockRedis.del.mockClear();
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'target@example.com',
+          member: 'Role Changed',
+          roleId: ROLE_UUID,
+          status: true,
+        });
+
+      expect(res.status).toBe(204);
+      const delCalls = mockRedis.del.mock.calls.flat() as string[];
+      expect(delCalls.some((key) => key.includes(TARGET_UUID))).toBe(true);
+    });
+
+    it('將自己停用 → 409 CANNOT_DISABLE_SELF', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${AUTH_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'auth@example.com',
+          member: 'Auth',
+          roleId: ROLE_UUID,
+          status: false,
+        });
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('CANNOT_DISABLE_SELF');
+    });
+  });
+
+  // ── 停用帳號的 JWT 被拒 ─────────────────────
+
+  describe('停用帳號的 JWT 被拒', () => {
+    it('status=false 的帳號 → 403 ACCOUNT_DISABLED', async () => {
+      const token = await loginAndGetToken(app);
+      // 模擬：下一個請求時 DB 已把該帳號停用
+      mockPrisma.memberRecord.findFirst.mockResolvedValueOnce({
+        ...AUTH_MEMBER_DB,
+        status: false,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+      expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
+    });
+  });
+
+  // ── DELETE /api/members/:id ────────────────
+
+  describe('DELETE /api/members/:id', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).delete(
+        `/api/members/${TARGET_UUID}`,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('有 JWT + EDIT → 204', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(204);
+    });
+
+    it('刪除自己 → 409 CANNOT_DELETE_SELF', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(AUTH_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/members/${AUTH_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('CANNOT_DELETE_SELF');
+    });
+
+    it('預設帳號不可刪除 → 409 DEFAULT_MEMBER_NOT_DELETABLE', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue({
+        ...TARGET_MEMBER_DB,
+        isDefault: true,
+      });
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+      const body = res.body as { code: string };
+      expect(body.code).toBe('DEFAULT_MEMBER_NOT_DELETABLE');
+    });
+  });
+});

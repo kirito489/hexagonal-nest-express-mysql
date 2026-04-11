@@ -1,0 +1,48 @@
+tags: [Security]
+summary: 新增 IP 至黑名單
+description: 將指定 IP 加入黑名單（僅限 ADMIN）。
+
+security:
+  - bearerAuth: []
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [ip]
+        properties:
+          ip:
+            type: string
+            description: IP 位址
+            example: 10.0.0.1
+          reason:
+            type: string
+            description: 封鎖原因
+            example: 異常登入嘗試
+
+responses:
+  '201':
+    description: 新增成功
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+        example:
+          success: true
+          data:
+            message: IP 10.0.0.1 已加入黑名單
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '400':
+    $ref: '../openapi.yaml#/components/responses/BadRequest'
+
+  '401':
+    $ref: '../openapi.yaml#/components/responses/NoToken'
+
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'
+
+  '500':
+    $ref: '../openapi.yaml#/components/responses/InternalServerError'
