@@ -21,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { apiFetch, ApiError } from '@/api/fetch'
+import { useApiMutation } from '@/api/client'
 import { tokenStorage } from '@/lib/storage'
 
 const loginSchema = z.object({
@@ -31,14 +31,6 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
-type LoginResponse = {
-  accessToken: string
-  refreshToken: string
-  accessTokenExpiresIn: number
-  refreshTokenExpiresIn: number
-  member: { id: string }
-}
-
 type LocationState = {
   from?: { pathname: string }
 }
@@ -47,6 +39,8 @@ export const LoginPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const loginMutation = useApiMutation('POST', '/auth/login')
 
   const form = useForm<LoginForm>({
     resolver: standardSchemaResolver(loginSchema),
@@ -61,19 +55,16 @@ export const LoginPage = () => {
   const onSubmit = async (values: LoginForm) => {
     setSubmitError(null)
     try {
-      const res = await apiFetch<LoginResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(values),
-      })
-      tokenStorage.set(res.accessToken)
-      const from = (location.state as LocationState | null)?.from?.pathname ?? '/'
-      navigate(from, { replace: true })
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setSubmitError(err.message || '登入失敗，請稍後再試')
-      } else {
-        setSubmitError('網路異常，請稍後再試')
+      const res = await loginMutation.mutateAsync({ body: values })
+      if (res?.accessToken) {
+        tokenStorage.set(res.accessToken)
+        const from = (location.state as LocationState | null)?.from?.pathname ?? '/'
+        navigate(from, { replace: true })
       }
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message || '登入失敗，請稍後再試' : '登入失敗，請稍後再試',
+      )
     }
   }
 
@@ -131,9 +122,9 @@ export const LoginPage = () => {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={form.formState.isSubmitting}
+                disabled={loginMutation.isPending || form.formState.isSubmitting}
               >
-                {form.formState.isSubmitting ? '登入中…' : '登入'}
+                {loginMutation.isPending ? '登入中…' : '登入'}
               </Button>
             </form>
           </Form>

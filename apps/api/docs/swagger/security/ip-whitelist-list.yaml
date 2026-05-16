@@ -11,12 +11,49 @@ responses:
     content:
       application/json:
         schema:
-          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              description: IP 白名單清單
+              items:
+                type: object
+                required: [id, ipAddress, createdAt]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: 紀錄 ID
+                  ipAddress:
+                    type: string
+                    description: IP 位址
+                  description:
+                    type: string
+                    nullable: true
+                    description: 備註說明
+                  createdBy:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: 建立者帳號 ID
+                  createdAt:
+                    type: string
+                    format: date-time
+                    description: 建立時間（UTC）
+            timestamp:
+              type: string
+              format: date-time
         example:
           success: true
           data:
-            - ip: 192.168.1.1
+            - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+              ipAddress: 192.168.1.1
               description: 辦公室 IP
+              createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
               createdAt: '2024-01-01T00:00:00.000Z'
           timestamp: '2024-01-01T00:00:00.000Z'
 

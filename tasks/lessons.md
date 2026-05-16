@@ -50,6 +50,8 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **新增 endpoint 後要重新 `npm run swagger:bundle`**：`main.ts` 讀的是 bundle 檔，忘了 bundle Swagger UI 不更新。bundle 同時也會驗證所有 `$ref`。
 
+- **成功回應不要用 `$ref: SuccessResponse`，每個 endpoint 自己 inline 寫 `{success, data: <具體 shape>, timestamp}`**：SuccessResponse 的 `data` 是 generic `type: object, nullable: true`，前端 openapi-typescript 推導出來只會是 `Record<string, unknown> | null`，型別完全沒幫助。每個 endpoint 在 200/201 response 直接 inline 整個外殼 + data 具體 properties（參照 `profile/get-me.yaml`、`auth/login.yaml`）。**Why:** 2026-05-16 setup-monorepo-frontend 階段三補強 9 個 yaml 時確認此 convention。**How to apply:** 新增 endpoint yaml 時不要 `$ref` 到 SuccessResponse，直接 inline；如果該 endpoint 真的沒 data，inline 結構仍要寫 `data: { type: null }` 或對應的 message 型別。
+
 ## Seeds / Scripts
 
 - **`seed-runner.ts` 必須擋 production**：`if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_PROD_SEED) process.exit(1)`，避免誤把測試資料 upsert 到生產庫。

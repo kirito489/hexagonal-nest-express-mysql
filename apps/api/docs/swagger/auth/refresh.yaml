@@ -23,7 +23,26 @@ responses:
     content:
       application/json:
         schema:
-          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              description: 更新後的 Access Token
+              required: [accessToken, accessTokenExpiresIn]
+              properties:
+                accessToken:
+                  type: string
+                  description: 新的 Access Token
+                accessTokenExpiresIn:
+                  type: integer
+                  description: Access Token 絕對有效期（秒）
+            timestamp:
+              type: string
+              format: date-time
         example:
           success: true
           data:

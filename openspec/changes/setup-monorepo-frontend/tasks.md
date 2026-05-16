@@ -74,29 +74,31 @@
 
 ## 8. 階段三 / 建立 `packages/api-client/`
 
-- [ ] 8.1 建立 `packages/api-client/` 目錄結構：`src/`、`package.json`、`tsconfig.json`
-- [ ] 8.2 `packages/api-client/package.json` 設定：name `@app/api-client`、type module、main/exports 指向 `dist/`
-- [ ] 8.3 安裝依賴：`openapi-fetch`（dep）、`openapi-typescript`（devDep）；peer：`react`、`@tanstack/react-query`
-- [ ] 8.4 設定 `generate` script：`openapi-typescript ../../apps/api/openapi.bundle.yaml -o src/schema.ts`
-- [ ] 8.5 執行 `pnpm --filter @app/api-client generate`，確認 `src/schema.ts` 產出
-- [ ] 8.6 實作 `src/client.ts`：`createApiClient(baseUrl, getToken)` 包裝 `openapi-fetch` 並注入 Authorization
-- [ ] 8.7 實作 `src/hooks.ts`：`createApiQueryHooks(client)` 提供 `useApiQuery`、`useApiMutation`
-- [ ] 8.8 實作 `src/index.ts`：export schema 型別、client factory、hooks factory
-- [ ] 8.9 設定 `tsconfig.json` 與 `build` script（`tsc -p tsconfig.json`），輸出 `dist/`
-- [ ] 8.10 驗證 `pnpm --filter @app/api-client typecheck` 與 `build` 全綠
+- [x] 8.1 建立 `packages/api-client/{src,package.json,tsconfig.json}` 結構
+- [x] 8.2 `package.json`：name `@app/api-client`、type module、source-first 設計（`main`/`types`/`exports` 直接指向 `src/index.ts`，由 Vite 編譯 TS，省略 dist build 階段）
+- [x] 8.3 安裝依賴：`openapi-fetch` (dep)、`openapi-typescript` + `openapi-typescript-helpers` (devDep)；peer：`react`、`@tanstack/react-query`
+- [x] 8.4 `generate` script：`openapi-typescript ../../apps/api/docs/swagger/openapi.bundle.yaml -o src/schema.ts`
+- [x] 8.5 執行 `pnpm --filter @app/api-client generate`，產生 2071 行 schema
+- [x] 8.6 實作 `src/client.ts`：`createApiClient(baseUrl, getToken?)` 包裝 `openapi-fetch`，用 `client.use({onRequest})` 注入 Bearer
+- [x] 8.7 實作 `src/hooks.ts`：`createApiQueryHooks(client)` → `useApiQuery('GET', path)` / `useApiMutation('POST', path)`；ExtractResponse 自動 unwrap `{success, data, timestamp}` 外殼；runtime 也用 `unwrapEnvelope` helper 對齊
+- [x] 8.8 `src/index.ts`：re-export schema 型別、client factory、hooks factory
+- [x] 8.9 tsconfig：`extends ../../tsconfig.base.json`、`noEmit: true`（不產 dist，避免雙重 source-of-truth）
+- [x] 8.10 驗證 `pnpm --filter @app/api-client typecheck` 全綠
 
-## 9. 階段三 / 前端改用 `@app/api-client`
+## 9. 階段三 / 後端 OpenAPI 補強 + 前端改用 `@app/api-client`
 
-- [ ] 9.1 `apps/web/package.json` 加入 `"@app/api-client": "workspace:*"`
-- [ ] 9.2 重跑 root `pnpm install` 解析 workspace 依賴
-- [ ] 9.3 建立 `apps/web/src/api/client.ts`：呼叫 `createApiClient('/api', () => localStorage.getItem('access_token'))`
-- [ ] 9.4 建立 `apps/web/src/api/hooks.ts`：透過 `createApiQueryHooks(client)` 包出統一 hooks
-- [ ] 9.5 將 `routes/login/page.tsx` 的登入呼叫改為使用 `useApiMutation('POST', '/auth/login')`
-- [ ] 9.6 將 `routes/home/page.tsx` 加上 `useApiQuery('GET', '/auth/me')`（如有此 endpoint）作為示範
-- [ ] 9.7 確認 IDE 對 `path` / `body` / `response` 型別自動補全正確
-- [ ] 9.8 驗證 `pnpm --filter @app/web typecheck` 全綠
-- [ ] 9.9 手動測試：登入流程透過 generated client 完整跑通
-- [ ] 9.10 階段三收尾：commit（訊息建議 `feat: 新增 packages/api-client 並整合至 apps/web`）
+- [x] 9.0 **後端 swagger yaml 補強**（順帶改）：9 個用 `$ref: SuccessResponse` 的 yaml 改為 inline 寫完整 `{success, data: <具體 shape>, timestamp}`，跟 `profile/get-me.yaml` 同 convention，讓 openapi-typescript 可推導 data 具體型別；同步修正 yaml 內 `ip` → `ipAddress` 與 code 對齊
+- [x] 9.1 `apps/web/package.json` 加入 `"@app/api-client": "workspace:*"`
+- [x] 9.2 root `pnpm install` 已自動解析 workspace 依賴
+- [x] 9.3 建立 `apps/web/src/api/client.ts`：`createApiClient('/api', tokenStorage.get)`，並用 `.use({onResponse})` middleware 處理 401 全域清 token 跳 login
+- [x] 9.4 同檔案 export `useApiQuery`/`useApiMutation`（hooks 從 `createApiQueryHooks(apiClient)` 拿）
+- [x] 9.5 `routes/login/page.tsx` 改用 `useApiMutation('POST', '/auth/login')`，刪掉原 `apiFetch` import
+- [x] 9.6 `routes/home/page.tsx` 用 `useApiQuery('GET', '/me')` 示範，欄位 `email/member/roleName` 直接 autocomplete
+- [x] 9.7 IDE 型別補全已驗證（typecheck 通過 = TS 推導正確）
+- [x] 9.8 `pnpm --filter @app/web typecheck` 全綠、`build` 全綠（dist 483KB / gzip 152KB）
+- [x] 9.9 刪除過時的 `apps/web/src/api/fetch.ts`（被 api-client 取代）
+- [ ] 9.10 手動測試：登入流程透過 generated client 完整跑通（使用者執行）
+- [ ] 9.11 階段三收尾：commit
 
 ## 10. 驗證與收尾
 

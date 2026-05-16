@@ -28,7 +28,22 @@ responses:
     content:
       application/json:
         schema:
-          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: 顯示給使用者的提示訊息
+            timestamp:
+              type: string
+              format: date-time
         example:
           success: true
           data:

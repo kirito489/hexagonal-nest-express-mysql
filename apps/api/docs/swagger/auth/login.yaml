@@ -28,7 +28,56 @@ responses:
     content:
       application/json:
         schema:
-          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              description: 登入結果
+              required:
+                - accessToken
+                - refreshToken
+                - accessTokenExpiresIn
+                - refreshTokenExpiresIn
+                - member
+              properties:
+                accessToken:
+                  type: string
+                  description: Access Token
+                refreshToken:
+                  type: string
+                  description: Refresh Token
+                accessTokenExpiresIn:
+                  type: integer
+                  description: Access Token 絕對有效期（秒）
+                refreshTokenExpiresIn:
+                  type: integer
+                  description: Refresh Token 絕對有效期（秒）
+                member:
+                  type: object
+                  description: 帳號摘要
+                  required: [id, email, member, roleName]
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      description: 帳號 ID
+                    email:
+                      type: string
+                      format: email
+                      description: Email
+                    member:
+                      type: string
+                      description: 名稱
+                    roleName:
+                      type: string
+                      description: 所屬角色名稱
+            timestamp:
+              type: string
+              format: date-time
         example:
           success: true
           data:

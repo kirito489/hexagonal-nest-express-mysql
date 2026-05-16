@@ -198,7 +198,63 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    description: 登入結果
+                    required:
+                      - accessToken
+                      - refreshToken
+                      - accessTokenExpiresIn
+                      - refreshTokenExpiresIn
+                      - member
+                    properties:
+                      accessToken:
+                        type: string
+                        description: Access Token
+                      refreshToken:
+                        type: string
+                        description: Refresh Token
+                      accessTokenExpiresIn:
+                        type: integer
+                        description: Access Token 絕對有效期（秒）
+                      refreshTokenExpiresIn:
+                        type: integer
+                        description: Refresh Token 絕對有效期（秒）
+                      member:
+                        type: object
+                        description: 帳號摘要
+                        required:
+                          - id
+                          - email
+                          - member
+                          - roleName
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            description: 帳號 ID
+                          email:
+                            type: string
+                            format: email
+                            description: Email
+                          member:
+                            type: string
+                            description: 名稱
+                          roleName:
+                            type: string
+                            description: 所屬角色名稱
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -280,7 +336,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    description: 更新後的 Access Token
+                    required:
+                      - accessToken
+                      - accessTokenExpiresIn
+                    properties:
+                      accessToken:
+                        type: string
+                        description: 新的 Access Token
+                      accessTokenExpiresIn:
+                        type: integer
+                        description: Access Token 絕對有效期（秒）
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -330,7 +410,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+                        description: 顯示給使用者的提示訊息
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -373,7 +472,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+                        description: 顯示給使用者的提示訊息
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -1524,12 +1642,55 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    description: IP 白名單清單
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - ipAddress
+                        - createdAt
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          description: 紀錄 ID
+                        ipAddress:
+                          type: string
+                          description: IP 位址
+                        description:
+                          type: string
+                          nullable: true
+                          description: 備註說明
+                        createdBy:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: 建立者帳號 ID
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: 建立時間（UTC）
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
-                  - ip: 192.168.1.1
+                  - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    ipAddress: 192.168.1.1
                     description: 辦公室 IP
+                    createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
                     createdAt: '2024-01-01T00:00:00.000Z'
                 timestamp: '2024-01-01T00:00:00.000Z'
         '401':
@@ -1568,7 +1729,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+                        description: 顯示給使用者的提示訊息
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -1621,12 +1801,60 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    description: IP 黑名單清單
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - ipAddress
+                        - isAutoBlock
+                        - createdAt
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          description: 紀錄 ID
+                        ipAddress:
+                          type: string
+                          description: IP 位址
+                        reason:
+                          type: string
+                          nullable: true
+                          description: 封鎖原因
+                        isAutoBlock:
+                          type: boolean
+                          description: 是否為系統自動封鎖
+                        createdBy:
+                          type: string
+                          format: uuid
+                          nullable: true
+                          description: 建立者帳號 ID
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: 建立時間（UTC）
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
-                  - ip: 10.0.0.1
+                  - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    ipAddress: 10.0.0.1
                     reason: 異常登入嘗試
+                    isAutoBlock: false
+                    createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
                     createdAt: '2024-01-01T00:00:00.000Z'
                 timestamp: '2024-01-01T00:00:00.000Z'
         '401':
@@ -1665,7 +1893,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+                        description: 顯示給使用者的提示訊息
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
@@ -1732,7 +1979,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+                        description: 顯示給使用者的提示訊息
+                  timestamp:
+                    type: string
+                    format: date-time
               example:
                 success: true
                 data:
