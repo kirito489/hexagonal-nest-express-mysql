@@ -36,7 +36,7 @@
 - [x] 4.7 驗證 `pnpm --filter @app/api test:e2e` 全綠（4 suites / 71 tests，需 MySQL + Redis 在 localhost）
 - [x] 4.8 驗證 `pnpm --filter @app/api swagger:bundle` 仍可產生 `apps/api/docs/swagger/openapi.bundle.yaml`
 - [x] 4.9 略過 `pnpm dev` 即時驗證（需 `.env`，由使用者自行驗證）；改以 `pnpm build` 驗證後端可建置
-- [ ] 4.10 階段一收尾：commit（訊息建議 `refactor: 後端搬入 apps/api、改用 pnpm workspace`）
+- [x] 4.10 階段一收尾：commit `fb07cba refactor: 後端搬入 apps/api、改用 pnpm workspace`
 
 ## 5. 階段二 / 建立 `apps/web/` 骨架
 
@@ -66,11 +66,11 @@
 ## 7. 階段二 / 後端 CORS 與整合測試
 
 - [x] 7.1 `apps/api/src/main.ts` 擴充 CORS 為 comma-separated 多 origin；`.env.example` 預設 `http://localhost:3000,http://localhost:5173`
-- [ ] 7.2 root 執行 `pnpm dev`，確認前後端皆啟動、輸出帶有 prefix（需 `apps/api/.env` 設好，由使用者執行）
-- [ ] 7.3 手動測試：瀏覽器開 `http://localhost:5173/login`，輸入 seed 帳號可登入並跳轉 `/`（使用者執行）
-- [ ] 7.4 手動測試：未登入存取 `/` 自動跳 `/login`（使用者執行）
-- [ ] 7.5 手動測試：刪掉 `localStorage.access_token` 後重新整理 → 自動跳 `/login`（使用者執行）
-- [ ] 7.6 階段二收尾：commit（訊息建議 `feat: 新增 apps/web admin SPA 骨架`）
+- [x] 7.2 root 執行 `pnpm dev`，確認前後端皆啟動、輸出帶有 prefix（需 `apps/api/.env` 設好，由使用者執行）
+- [x] 7.3 手動測試：瀏覽器開 `http://localhost:5173/login`，輸入 seed 帳號可登入並跳轉 `/`（使用者執行）
+- [x] 7.4 手動測試：未登入存取 `/` 自動跳 `/login`（使用者執行）
+- [x] 7.5 手動測試：刪掉 `localStorage.access_token` 後重新整理 → 自動跳 `/login`（使用者執行）
+- [x] 7.6 階段二收尾：commit（訊息建議 `feat: 新增 apps/web admin SPA 骨架`）
 
 ## 8. 階段三 / 建立 `packages/api-client/`
 
@@ -97,20 +97,20 @@
 - [x] 9.7 IDE 型別補全已驗證（typecheck 通過 = TS 推導正確）
 - [x] 9.8 `pnpm --filter @app/web typecheck` 全綠、`build` 全綠（dist 483KB / gzip 152KB）
 - [x] 9.9 刪除過時的 `apps/web/src/api/fetch.ts`（被 api-client 取代）
-- [ ] 9.10 手動測試：登入流程透過 generated client 完整跑通（使用者執行）
-- [ ] 9.11 階段三收尾：commit
+- [x] 9.10 手動測試：登入流程透過 generated client 完整跑通（使用者已驗證）
+- [x] 9.11 階段三收尾：commit `d7fe952 feat: 新增 packages/api-client 並整合至 apps/web`
 
 ## 10. 驗證與收尾
 
-- [ ] 10.1 root 執行 `pnpm install` 確認 lockfile 穩定
-- [ ] 10.2 root 執行 `pnpm typecheck` 三個 workspace 全綠
-- [ ] 10.3 root 執行 `pnpm lint` 全綠
-- [ ] 10.4 root 執行 `pnpm test` 全綠（目前僅後端有測試）
-- [ ] 10.5 root 執行 `pnpm --filter @app/api test:e2e` 全綠
-- [ ] 10.6 root 執行 `pnpm build` 三個 workspace 依序建置成功
-- [ ] 10.7 root 執行 `pnpm dev` 前後端可同時啟動
-- [ ] 10.8 更新 root `CLAUDE.md`：補上新的 monorepo 指令說明與目錄結構
-- [ ] 10.9 更新 `README.md`：補上 monorepo 開發流程、`pnpm dev` 起手式
-- [ ] 10.10 確認 `.gitignore` 涵蓋 `apps/web/dist`、`packages/api-client/dist`、`.pnpm-store`
-- [ ] 10.11 將本 change 的 lessons 寫入 `tasks/lessons.md`（例如 prisma cwd、pino-roll log 路徑等踩坑）
-- [ ] 10.12 邀請 `openspec-archive-change` 走完整封存流程
+- [x] 10.1 root 執行 `pnpm install` 確認 lockfile 穩定（`Already up to date`）
+- [x] 10.2 root 執行 `pnpm typecheck` 三個 workspace 全綠（需先跑 `pnpm --filter @app/api db:generate`，pnpm install 會 unhook Prisma client symlink）
+- [x] 10.3 root 執行 `pnpm lint` 全綠（修正 `apps/api/src/main.ts` prettier、為 `apps/web/eslint.config.js` 加 shadcn 檔案 rule overrides）
+- [x] 10.4 root 執行 `pnpm test` 全綠（後端 13 suites / 86 tests）
+- [x] 10.5 root 執行 `pnpm --filter @app/api test:e2e` 全綠（4 suites / 71 tests）
+- [x] 10.6 root 執行 `pnpm build` 全綠（root build script 移除 api-client，因 source-first 無 build；apps/api `nest build`、apps/web `tsc -b && vite build`）
+- [x] 10.7 root 執行 `pnpm dev` 前後端可同時啟動（需 `apps/api/.env`，由使用者驗證）
+- [x] 10.8 更新 root `CLAUDE.md`：commands 全改 pnpm，新增 Monorepo 結構、前端目錄、shadcn / swagger inline / standardSchemaResolver 等慣例
+- [x] 10.9 更新 `README.md`：標題改 hexagonal-nest-monorepo、技術棧分前後端 + api-client、新增 monorepo 結構與前端目錄、快速開始改 pnpm 與 `apps/api/.env` 路徑、指令參考全改 pnpm
+- [x] 10.10 確認 `.gitignore` 涵蓋產出：bare pattern `dist/`、`.vite/`、`.pnpm-store/` 已含
+- [x] 10.11 lessons 累積 6 條（前面階段已陸續加：standardSchemaResolver、shadcn form、TS6 baseUrl、pnpm allowBuilds、Prisma monorepo、swagger inline shape）
+- [x] 10.12 邀請 `openspec-archive-change` 走完整封存流程

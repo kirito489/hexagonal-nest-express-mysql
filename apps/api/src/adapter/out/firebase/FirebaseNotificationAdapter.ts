@@ -23,7 +23,7 @@ export class FirebaseNotificationAdapter
     } = env;
 
     if (!clientEmail || !privateKey || !projectId) {
-      this.logger.warn('[FCM] 憑證未設定，推播功能將無法使用');
+      this.logger.debug('[FCM] 憑證未設定，推播功能將無法使用');
       return;
     }
 
@@ -35,7 +35,7 @@ export class FirebaseNotificationAdapter
           projectId,
         }),
       });
-      this.logger.log('[FCM] Firebase Admin 初始化完成');
+      this.logger.debug('[FCM] Firebase Admin 初始化完成');
     } catch (error) {
       this.logger.error('[FCM] Firebase Admin 初始化失敗', error);
     }

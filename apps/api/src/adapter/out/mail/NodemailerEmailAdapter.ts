@@ -18,7 +18,7 @@ export class NodemailerEmailAdapter implements SendEmailPort, OnModuleInit {
     const { SMTP_HOST: host, SMTP_USER: user, SMTP_PASS: pass } = env;
 
     if (!host || !user || !pass) {
-      this.logger.warn('[Email] SMTP 憑證未設定，寄信功能將無法使用');
+      this.logger.debug('[Email] SMTP 憑證未設定，寄信功能將無法使用');
       return;
     }
 
@@ -30,7 +30,7 @@ export class NodemailerEmailAdapter implements SendEmailPort, OnModuleInit {
       auth: { user, pass },
     });
 
-    this.logger.log('[Email] Nodemailer 初始化完成');
+    this.logger.debug('[Email] Nodemailer 初始化完成');
   }
 
   async sendMail(payload: EmailPayload): Promise<void> {

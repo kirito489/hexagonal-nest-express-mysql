@@ -16,6 +16,7 @@ const NOISY_BOOT_CONTEXTS = new Set([
   'InstanceLoader',
   'RoutesResolver',
   'RouterExplorer',
+  'NestApplication',
 ]);
 
 class BootFilteredLogger implements LoggerService {
@@ -90,7 +91,10 @@ const bootstrap = async (): Promise<void> => {
           .map((s) => s.trim())
           .filter(Boolean);
   app.enableCors({
-    origin: Array.isArray(corsOrigins) && corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin:
+      Array.isArray(corsOrigins) && corsOrigins.length === 1
+        ? corsOrigins[0]
+        : corsOrigins,
     credentials: true,
   });
 

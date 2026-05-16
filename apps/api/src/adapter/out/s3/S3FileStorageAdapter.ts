@@ -29,7 +29,7 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
     this.bucket = env.AWS_S3_BUCKET ?? null;
 
     if (!region || !accessKeyId || !secretAccessKey || !this.bucket) {
-      this.logger.warn('[S3] AWS 憑證未設定，檔案上傳功能將無法使用');
+      this.logger.debug('[S3] AWS 憑證未設定，檔案上傳功能將無法使用');
       return;
     }
 
@@ -39,7 +39,7 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
       credentials: { accessKeyId, secretAccessKey },
     });
 
-    this.logger.log('[S3] S3 Client 初始化完成');
+    this.logger.debug('[S3] S3 Client 初始化完成');
   }
 
   async upload(options: UploadFileOptions): Promise<string> {

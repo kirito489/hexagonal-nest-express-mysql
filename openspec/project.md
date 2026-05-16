@@ -1,61 +1,577 @@
-# Project: hexagonal-nest-express-mysql (Starter)
+# Project: hexagonal-nest-monorepo (Starter)
 
-Backend REST API starter template based on NestJS + Express + Prisma (MariaDB), Hexagonal Architecture.
-
-This project serves as the base starter pack aligned with atago-nest-api conventions.
+NestJS + React + shadcn 全端 monorepo 初始包。後端採六角架構（Hexagonal Architecture），前端為 admin SPA，API 契約透過 OpenAPI 共享。本檔為架構與慣例的**單一事實來源**，README 與 CLAUDE.md 只連結過來，不重複寫架構細節。
 
 ---
 
-## Purpose
+## 目的
 
-Backend REST API (admin-only) covering:
-
-- **Implemented**: authentication (login / logout / refresh / forgot-password / reset-password), member management, role & permission management, security management (IP whitelist / blacklist / account unlock), health check.
-- **Planned**: extend as needed per project.
+- **後端 admin REST API**：認證（登入 / 登出 / refresh / 忘記密碼 / 重設密碼）、會員管理、角色與權限管理、安全管理（IP 白名單 / 黑名單 / 帳號解鎖）、健康檢查。
+- **前端 admin SPA**：對應後端 endpoint 的 UI；登入、權限保護、會員 / 角色 / 安全等管理頁面。
+- **共用 API client**：從後端 OpenAPI bundle 自動產生型別 + TanStack Query hooks，後端 controller 改動時前端編譯期捕捉。
 
 ---
 
-## Tech Stack
+## Monorepo 結構
 
-| Layer           | Choice                                                                          |
+```
+hexagonal-nest-express-mysql/
+├── apps/
+│   ├── api/                  # NestJS 後端
+│   └── web/                  # React 19 + Vite admin SPA
+├── packages/
+│   └── api-client/           # 由 openapi.bundle.yaml 產生的型別安全 client
+├── openspec/                 # 規格驅動開發產物（本檔 + changes/ + specs/）
+├── tasks/                    # lessons.md + todo.md
+├── pr/                       # code review 報告
+├── pnpm-workspace.yaml       # workspace + allowBuilds 宣告
+├── pnpm-lock.yaml
+├── tsconfig.base.json        # 三個 workspace 共用 TS 設定（strict / target / ...）
+└── package.json              # root scripts + 共用 devDeps（concurrently、openspec CLI）
+```
+
+- 套件管理：**pnpm 11+**，corepack 透過 `packageManager` 欄位鎖版本。
+- workspace 之間互引用使用 `workspace:*` 協定。
+- 各 workspace 命名統一 `@app/*` scope（fork 後可整批替換）。
+- `apps/web` 透過 Vite proxy（`/api` → `http://localhost:3000`）與後端通訊；`@app/api-client` 採 **source-first**（exports 直接指 `src/index.ts`，由 Vite / tsc 直接吃 TS，**無 dist build 階段**）。
+
+---
+
+## 技術棧
+
+### 後端 `apps/api`
+
+| 分類            | 套件                                                                            |
 | --------------- | ------------------------------------------------------------------------------- |
 | Runtime         | Node.js 20+                                                                     |
 | Framework       | NestJS 11 + Express 5                                                           |
-| Language        | TypeScript 5 (strict)                                                           |
-| ORM             | Prisma 7 with `@prisma/adapter-mariadb`                                         |
-| Database        | MySQL / MariaDB, timezone enforced to UTC at driver level                       |
-| Validation      | Zod 4 (request DTOs) + `ParseUUIDPipe` (route params)                           |
-| Auth            | JWT (`@nestjs/jwt`) + Redis-backed token blacklist + Redis member-context cache |
-| Logging         | Pino + `pino-roll` (file rotation) + DB via `SaveSystemLogPort`                 |
+| Language        | TypeScript 5（strict）                                                          |
+| ORM             | Prisma 7 + `@prisma/adapter-mariadb`                                            |
+| Database        | MySQL / MariaDB（driver 層強制 UTC）                                            |
+| Validation      | Zod 4（DTO）+ `ParseUUIDPipe`（route param）                                    |
+| Auth            | JWT（`@nestjs/jwt`）+ Redis token blacklist + Redis member-context cache        |
+| Logging         | Pino + `pino-roll`（檔案輪替）+ DB via `SaveSystemLogPort`                      |
 | Rate limit      | `@nestjs/throttler`                                                             |
 | Mail            | Nodemailer                                                                      |
-| Files           | AWS S3 (`@aws-sdk/client-s3`, presigned URLs)                                   |
+| Files           | AWS S3（`@aws-sdk/client-s3`、presigned URL）                                   |
 | Push            | Firebase Admin SDK                                                              |
-| API Docs        | Swagger 3, split into per-endpoint yaml + bundled via `swagger-cli`             |
-| Testing         | Jest 29 (unit + e2e via `supertest`)                                            |
-| Package manager | npm                                                                             |
+| API Docs        | Swagger 3：分檔 yaml + `swagger-cli bundle`                                     |
+| Testing         | Jest 29（unit + supertest e2e）                                                 |
+
+### 前端 `apps/web`
+
+| 分類      | 套件                                                              |
+| --------- | ----------------------------------------------------------------- |
+| 建構工具  | Vite 8                                                            |
+| UI 框架   | React 19 + TypeScript 6（strict）                                 |
+| 樣式      | Tailwind CSS v4（`@import 'tailwindcss';`，無 PostCSS config）    |
+| 元件庫    | shadcn/ui（Nova preset、neutral 配色、Geist 字體）                |
+| 路由      | React Router v7（declarative mode）                               |
+| 資料層    | TanStack Query v5（搭配 `@app/api-client` 的 hooks factory）      |
+| 表單      | react-hook-form + zod + **`standardSchemaResolver`**              |
+| 表格      | TanStack Table v8                                                 |
+| 圖示      | lucide-react                                                      |
+
+### 共用 `packages/api-client`
+
+| 分類           | 套件                                                |
+| -------------- | --------------------------------------------------- |
+| 型別產生       | `openapi-typescript`（將 OpenAPI yaml → `paths` 型別） |
+| Runtime client | `openapi-fetch`                                     |
+| 整合方式       | 包成 TanStack Query 風格 hooks，自動 unwrap 後端外殼 |
+| 對外 API       | `createApiClient(baseUrl, getToken?)`、`createApiQueryHooks(client)` → `useApiQuery` / `useApiMutation` |
 
 ---
 
-## Architecture — Hexagonal (Ports & Adapters)
+## 後端架構：六角（Ports & Adapters）
 
 ```
-src/
+apps/api/src/
 ├── adapter/
-│   ├── in/web/        # Controllers, DTOs (per-module subdirectory), guards, filters
-│   └── out/           # Persistence (Prisma), redis, firebase, mail, s3 adapters
+│   ├── in/web/        # Controller、DTO（per-module 子目錄）、Guard、Filter、Decorator
+│   └── out/           # Prisma、Redis、Firebase、Mail、S3 等實作
 ├── application/
-│   ├── facade/        # Public API of application layer (one per domain area)
+│   ├── facade/        # Application 層公開 API（每個 domain area 一個 *Facade）
 │   ├── port/
-│   │   ├── in/{domain}/   # Use case interfaces (auth/ member/)
-│   │   └── out/{domain}/  # Repository / service interfaces (auth/ member/ security/)
-│   └── service/       # Use case implementations (auth/ member/ subdirectories)
+│   │   ├── in/{domain}/   # Use case 介面（auth/、member/、role/、security/）
+│   │   └── out/{domain}/  # Repository / 外部服務介面
+│   └── service/       # Use case 實作
 ├── domain/
-│   ├── model/         # Domain entities
-│   ├── value-object/  # Value objects
-│   └── exception/     # Domain exceptions (plain Error subclasses)
-├── infrastructure/
-│   ├── prisma/        # PrismaModule, PrismaService
-│   └── redis/         # Redis setup
-└── modules/           # NestJS module wiring
+│   ├── model/         # 領域實體（private constructor + static factory）
+│   ├── value-object/  # 值物件
+│   └── exception/     # 領域例外（plain Error 子類）
+├── infrastructure/    # PrismaModule / PrismaService、Redis、ZodValidationPipe、Logger
+└── modules/           # NestJS DI 接線（Port Token → 實作）
+```
+
+**依賴方向**：`adapter/in` → `application` → `port/out` ← `adapter/out`。`application` 與 `domain` 層**從不**引入 `adapter`。
+
+### 後端慣例
+
+- **Module naming**：Controller + DTO → `adapter/in/web/<module>/`；Prisma repository → `adapter/out/persistence/<module>/`；service → `application/service/<module>/`。Guard / Filter / Decorator 等共用 infrastructure 放各自頂層目錄。
+- **Facade**：每個 domain area 對外只暴露 `*Facade`（如 `AuthFacade`、`MemberFacade`），Controller 透過 facade 操作，不直接打 service。
+- **Domain exception → HTTP**：domain exception 是 plain `Error` 子類；HTTP 狀態映射在 `src/adapter/in/web/filter/GlobalExceptionFilter.ts`，新增 exception 必須同步加 `instanceof` 分支與 `code`（SCREAMING_SNAKE_CASE）。
+- **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。
+- **Controller 回傳**：原始值即可，`TransformInterceptor` 會包成 `{ success, data, timestamp }`；**不要**自行包 `{ data }`，否則前端要挖兩層。
+- **時區**：DB 一律 UTC（Prisma driver 層 `timezone: 'Z'`），JS `Date` 直接寫入 / 讀回。
+- **Repository P2002**：Prisma `unique constraint violation` 在 Repository 層 try/catch 轉成 domain exception，service 層不感知 Prisma。
+
+### Swagger yaml 慣例
+
+- **分檔 + `$ref`**：`docs/swagger/openapi.yaml` 只放 `components` / `servers` / `info` 與 `paths` 索引；每個 endpoint 一個獨立 yaml。
+- **成功回應自己 inline 寫**：**不要** `$ref: SuccessResponse`。每個 endpoint 在 200 / 201 直接 inline 寫整個 `{ success, data: <具體 shape>, timestamp }`。原因：`SuccessResponse.data` 是 generic `type: object`，前端 `openapi-typescript` 推導出來只會是 `Record<string, unknown> | null`，型別失去意義。範例見 `apps/api/docs/swagger/auth/login.yaml`、`profile/get-me.yaml`。
+- **新增 endpoint 後**：執行 `pnpm --filter @app/api swagger:bundle` 重新打包 bundle；前端執行 `pnpm --filter @app/api-client generate` 同步型別。
+
+---
+
+## 前端架構（apps/web/src/）
+
+```
+apps/web/src/
+├── api/
+│   ├── client.ts        # apiClient singleton + 401 onResponse middleware；export useApiQuery / useApiMutation
+│   └── query-client.ts  # 共用 QueryClient（admin 工具用 refetchOnWindowFocus: false）
+├── components/
+│   ├── ui/              # shadcn 元件落地處（由 components.json 管）
+│   └── RequireAuth.tsx  # 路由保護 guard，未登入導向 /login
+├── routes/
+│   ├── _layout.tsx      # Sidebar 共用 layout
+│   ├── login/page.tsx
+│   └── home/page.tsx
+├── lib/                 # cn()、tokenStorage 等 utils
+├── App.tsx              # Router + QueryClientProvider + TooltipProvider
+├── main.tsx
+└── index.css            # Tailwind v4 + shadcn theme tokens
+```
+
+### 前端慣例
+
+- **路徑別名**：`@/*` → `src/*`（在 `tsconfig.app.json` 的 `paths` 與 `vite.config.ts` 的 `resolve.alias` 雙邊設定）。
+- **API 呼叫**：一律走 `import { useApiQuery, useApiMutation } from '@/api/client'`；不要自己寫 `fetch` 或 axios。型別由 `@app/api-client` 從 OpenAPI 推導，IDE 自動補全。
+- **表單**：react-hook-form + zod + **`standardSchemaResolver`**（從 `@hookform/resolvers/standard-schema` 引入，**不要**用 `zodResolver`，與 zod 4.1+ 型別簽章衝突）。
+- **token 儲存**：admin 工具，access token 存 `localStorage`，key = `access_token`；統一從 `@/lib/storage` 的 `tokenStorage` 存取，**不要**散在各檔案。
+- **401 處理**：`apiClient.use({ onResponse })` 全域 middleware 處理（清 token → 跳 `/login`），page 元件不需要再 catch。
+- **shadcn 元件**：執行 `cd apps/web && pnpm dlx shadcn@latest add <name>` 加入。`form` 元件目前 nova preset 缺貨，**已自寫**於 `src/components/ui/form.tsx`（標準 shadcn 模板），更新 shadcn 時注意保留。
+- **UI 文字**：一律繁體中文 hardcode，**不導入 i18n 框架**。註解亦只用繁體中文。
+- **Lint exception**：`src/components/ui/**` 與 `src/hooks/use-mobile.ts` 是 shadcn 直接 copy 的官方範本，與專案 lint 規則不同的部分（hook 與元件同檔、effect 內 setState）在 `eslint.config.js` 集中 disable。
+
+---
+
+## API client（packages/api-client/）
+
+- **Source-first 設計**：`package.json` 的 `exports.types` / `exports.default` 直接指 `src/index.ts`。Vite / tsc 直接吃 TS，**無 dist build**。
+- **產生流程**：
+  1. 後端改 controller / Swagger yaml。
+  2. `pnpm --filter @app/api swagger:bundle` 重新打包 `apps/api/docs/swagger/openapi.bundle.yaml`。
+  3. `pnpm --filter @app/api-client generate` 讀 bundle 產生 `src/schema.ts`。
+- `schema.ts` **進 git**：API 變動會在 PR diff 中可見，CI 可比對是否與 bundle 同步。
+- **自動 unwrap**：`createApiQueryHooks` 內部會剝開後端的 `{ success, data, timestamp }` 外殼，page 元件直接拿 `data`。
+
+---
+
+## 認證流程
+
+- **登入**：POST `/auth/login` → 後端回 `{ accessToken, refreshToken, accessTokenExpiresIn, refreshTokenExpiresIn, member }` → 前端存 `localStorage.access_token` → 導向 `/`。
+- **每次請求**：`apiClient` 的 onRequest middleware 自動帶 `Authorization: Bearer <token>`，token 由 `tokenStorage.get()` 即時讀（**不快取**，更新後立即生效）。
+- **JwtAuthGuard 安全檢查**：payload 必須有 `type: 'access'`，否則拒絕（防止 refresh token 當 access 用）。
+- **快取一致性**：變更 member `status` / `roleId` / 密碼後必須呼叫 `clearMemberContext(memberId)`，否則最長延遲 `PERMISSION_CACHE_TTL` 秒（預設 300s）。
+- **401 處理**：前端 apiClient 統一清 token + 跳 login（middleware 處理）。
+
+---
+
+## 環境變數
+
+- 後端：`apps/api/.env`（範本 `apps/api/.env.example`）。
+- 前端：若需要走 Vite 環境變數，鍵名以 `VITE_` 開頭，放 `apps/web/.env`。目前無前端環境變數需求。
+- **CORS_ORIGIN**：支援逗號分隔多 origin，預設 `http://localhost:3000,http://localhost:5173`。
+- **`*` 在生產環境會擋下**：validate-env 強制要求明確指定 origin。
+
+---
+
+## 後端模組功能參考
+
+### API 端點總覽
+
+所有端點以 `/api` 為前綴。需要互動式查詢請打開 Swagger UI（`http://localhost:3000/api/docs`）。
+
+| 群組     | 路徑                                | 權限                                     |
+| -------- | ----------------------------------- | ---------------------------------------- |
+| Auth     | `/api/auth/{login,refresh,logout,forgot-password,reset-password}` | 公開（含 reCAPTCHA） |
+| Me       | `GET /api/me`                       | JWT                                      |
+| Members  | `GET/POST/PATCH/DELETE /api/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
+| Roles    | `GET/POST/PATCH/DELETE /api/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
+| Security | `/api/security/ip-{whitelist,blacklist}*`、`/api/security/unlock-account` | JWT + ADMIN 角色 |
+| Health   | `GET /api/health`                   | 公開（不計入速率限制）                   |
+
+### RBAC 權限系統
+
+資料表：
+
+- `roles` — 角色；`isDefault = true` 的角色為新帳號的預設角色
+- `permissions` — 權限代碼
+- `role_permissions` — 多對多關聯
+
+| PermissionCode 常數    | 代碼字串               |
+| ---------------------- | ---------------------- |
+| `BACKEND_ACCOUNT_VIEW` | `BACKEND:ACCOUNT:VIEW` |
+| `BACKEND_ACCOUNT_EDIT` | `BACKEND:ACCOUNT:EDIT` |
+| `BACKEND_ROLE_VIEW`    | `BACKEND:ROLE:VIEW`    |
+| `BACKEND_ROLE_EDIT`    | `BACKEND:ROLE:EDIT`    |
+
+Seed 預設建立一個角色（`roleCode: SUPERADMIN`，`isDefault: true`）並指派所有權限。
+
+**JWT Payload 設計**：只存 `sub`（memberId）與 `type`（`access` / `refresh`）。每次請求由 `JwtAuthGuard` 以 `sub` 從 Redis 快取或 DB 載入使用者完整資訊（含 email、roleName、permissions），附加至 `request.member`。
+
+**快取 TTL**：取 `min(JWT 剩餘效期, PERMISSION_CACHE_TTL)`，確保 Token 過期後快取同步失效。
+
+**Redis 降級**：Redis 不可用時，`JwtAuthGuard` 自動降級為每次請求直接查 DB，並在日誌中印出警告。服務不中斷，但效能下降。
+
+#### Guard 用法
+
+```typescript
+// 只需登入
+@UseGuards(JwtAuthGuard)
+
+// 需要特定 Role
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleName.ADMIN)
+
+// 需要特定 Permission
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Permissions(PermissionCode.BACKEND_ACCOUNT_EDIT)
+```
+
+#### 取得當前使用者
+
+```typescript
+@Get('me')
+@UseGuards(JwtAuthGuard)
+getMe(@CurrentMember() member: MemberContext) {
+  // member.sub / member.email / member.roleName / member.permissions
+}
+```
+
+`MemberContext` 定義於 `apps/api/src/adapter/in/web/decorator/current-member.decorator.ts`，欄位為 `sub`（memberId）、`email`、`roleName`、`permissions`、`status`、`lastPasswordChange`。
+
+### 全域中介層
+
+以下 Provider 在 `apps/api/src/app.module.ts` 全域註冊，**所有端點自動套用，無需手動加裝飾器**：
+
+| Provider          | 類別                    | 作用                                                                                                   |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `APP_GUARD`       | `ThrottlerGuard`        | 速率限制（Redis 滑動視窗）；全域預設由 env 配置，各端點可用 `@Throttle()` 覆蓋；Redis 不可用時自動停用 |
+| `APP_GUARD`       | `IpBlacklistGuard`      | IP 黑名單檢查（FeatureFlag 控制，關閉時跳過）                                                          |
+| `APP_GUARD`       | `IpWhitelistGuard`      | IP 白名單檢查（FeatureFlag 控制，關閉時跳過）                                                          |
+| `APP_GUARD`       | `SessionIdleGuard`      | 閒置登出檢查（FeatureFlag 控制，關閉時跳過）                                                           |
+| `APP_FILTER`      | `GlobalExceptionFilter` | 統一例外格式，並寫入 System Log                                                                        |
+| `APP_INTERCEPTOR` | `LoggingInterceptor`    | 成功請求寫入 System Log（FeatureFlag 控制，fire-and-forget）                                           |
+| `APP_INTERCEPTOR` | `TransformInterceptor`  | 成功回應包裝為 `{ success, data, timestamp }`                                                          |
+
+### API 回應格式
+
+**成功回應**：
+
+```json
+{ "success": true, "data": { ... }, "timestamp": "2026-04-05T06:00:00.000Z" }
+```
+
+**錯誤回應**：
+
+```json
+{ "success": false, "message": "帳號或密碼錯誤", "code": "UNAUTHORIZED", "timestamp": "..." }
+```
+
+`code` 欄位由例外的 class name 自動轉換為 SCREAMING_SNAKE_CASE（例如 `EmailAlreadyExistsException` → `EMAIL_ALREADY_EXISTS`）。
+
+前端 `@app/api-client` 的 hooks 會自動 unwrap `data` 外殼。
+
+### 功能開關（Feature Flags）
+
+所有安全功能皆受 `FeatureFlagService` 控制，透過環境變數開關，**預設全部關閉**（除 `APPLICATION_ADMIN_ROLE_ENABLED`）。
+
+```typescript
+constructor(private readonly featureFlags: FeatureFlagService) {}
+if (this.featureFlags.isEnabled('accountLockEnabled')) { ... }
+```
+
+| Flag 名稱                | 環境變數                               | 控制範圍                                         |
+| ------------------------ | -------------------------------------- | ------------------------------------------------ |
+| `adminRoleEnabled`       | `APPLICATION_ADMIN_ROLE_ENABLED`       | `RolesGuard` 角色檢查                            |
+| `authLogEnabled`         | `APPLICATION_AUTH_LOG_ENABLED`         | 登入/登出/密碼重設日誌寫入 `auth_logs`           |
+| `ipWhitelistEnabled`     | `APPLICATION_IP_WHITELIST_ENABLED`     | `IpWhitelistGuard` 全域白名單                    |
+| `ipBlacklistEnabled`     | `APPLICATION_IP_BLACKLIST_ENABLED`     | `IpBlacklistGuard` 全域黑名單 + 登入失敗自動封鎖 |
+| `accountLockEnabled`     | `APPLICATION_ACCOUNT_LOCK_ENABLED`     | 登入失敗計數 + 帳號鎖定                          |
+| `passwordChangeEnabled`  | `APPLICATION_PASSWORD_CHANGE_ENABLED`  | `JwtAuthGuard` 密碼過期檢查                      |
+| `sessionIdleEnabled`     | `APPLICATION_SESSION_IDLE_ENABLED`     | `SessionIdleGuard` 閒置登出                      |
+| `googleRecaptchaEnabled` | `APPLICATION_GOOGLE_RECAPTCHA_ENABLED` | 登入時 reCAPTCHA 驗證                            |
+| `apiLogEnabled`          | `APPLICATION_API_LOG_ENABLED`          | `LoggingInterceptor` System Log 寫入             |
+| `operationLogEnabled`    | `APPLICATION_OPERATION_LOG_ENABLED`    | 操作日誌                                         |
+
+### 安全功能細節
+
+- **帳號鎖定**：連續登入失敗達 `APPLICATION_ACCOUNT_LOCK_THRESHOLD` 次後，帳號自動鎖定（DB `lockedAt` 欄位）。失敗計數使用 Redis INCR（30 分鐘 TTL），Redis 不可用時 graceful degradation（不計數，但 DB 鎖定仍有效）。登入成功自動重置計數。
+- **IP 黑白名單**：`IpBlacklistGuard` / `IpWhitelistGuard` 全域攔截。IP 連續登入失敗達 `APPLICATION_IP_BLOCK_THRESHOLD` 次自動加入黑名單。資料表：`ip_whitelist`、`ip_blacklist`（後者含 `isAutoBlock` 標記）。
+- **密碼策略**：`PasswordPolicyService` 依角色套用不同複雜度（0–3）。複雜度 3 = 大小寫 + 數字 + 特殊符號 + 禁止 18 組常見弱密碼。ADMIN 預設 3、其他角色預設 1。
+- **密碼定期更換**：`passwordChangeEnabled` + `APPLICATION_PASSWORD_CHANGE_PERIOD > 0` 時，`JwtAuthGuard` 檢查 `lastPasswordChange`；超期回 `403 { code: 'PASSWORD_CHANGE_REQUIRED' }`。
+- **閒置自動登出**：`SessionIdleGuard` 用 Redis TTL；每次認證請求刷新 TTL，超過 `APPLICATION_SESSION_IDLE_TIMEOUT` 分鐘未活動 key 自動消失，回 `401`。Redis 不可用時視為活躍。
+- **Google reCAPTCHA**：`GoogleRecaptchaAdapter` 支援 v2 / v3。非正式環境（`GOOGLE_RECAPTCHA_IS_PRODUCTION=false`）永遠通過；v3 需通過 0.5 分數門檻。啟用時登入必須附帶 `recaptchaToken`。
+- **登入日誌**：`LOGIN_SUCCESS` / `LOGIN_FAILURE` / `LOGOUT` / `PASSWORD_RESET` 寫入 `auth_logs`（含 IP / UA / detail）。fire-and-forget，不影響主流程。
+- **密碼重設**：`POST /api/auth/forgot-password` 不論 email 是否存在皆回成功（防列舉），token 存 `password_reset_tokens` 表；`POST /api/auth/reset-password` 驗證 → 策略檢查 → 更新 → 條件式強制登出。
+
+### 日誌系統
+
+使用 `nestjs-pino` + `pino-http`：
+
+- 開發：`pino-pretty` 彩色輸出至 stdout
+- 生產：`pino-roll` 寫檔，每檔 5MB 自動輪轉
+  - `apps/api/logs/combined.log` — 所有等級
+  - `apps/api/logs/error.log` — 僅 error
+- 測試：關閉 pino-roll
+
+每筆請求自動帶 `requestId`（`randomUUID()`），可用於跨日誌追蹤。
+
+**敏感欄位自動脫敏**：`password`、`passwordHash`、`token`、`secret`、`authorization`、`cookie`、`api_key`、`apiKey` 的值替換為 `[REDACTED]`。
+
+### 資料脫敏
+
+`apps/api/src/infrastructure/sanitize.ts` 提供多層脫敏，自動套用於 System Log 的 request / response：
+
+| 場景                                           | 行為                    |
+| ---------------------------------------------- | ----------------------- |
+| 物件欄位名稱含敏感關鍵字                       | 值替換為 `[REDACTED]`   |
+| Base64 圖片資料（`data:image/...`）            | 替換為 `[BASE64_IMAGE]` |
+| URL Query String 中的 `email`、`phone`、`name` | 替換為 `[REDACTED]`     |
+
+### Zod 驗證
+
+DTO 使用 `ZodValidationPipe` 搭配 Zod schema，於 route 層級套用：
+
+```typescript
+// dto/CreateXxxRequest.ts
+export const createXxxSchema = z.object({ name: z.string().min(1) });
+export type CreateXxxRequest = z.infer<typeof createXxxSchema>;
+
+// XxxController.ts
+@Post()
+create(@Body(new ZodValidationPipe(createXxxSchema)) dto: CreateXxxRequest) {}
+```
+
+驗證失敗會 throw `BadRequestException`，由 `GlobalExceptionFilter` 包裝回 `{ code: 'BAD_REQUEST' }`。
+
+### 日期工具
+
+`apps/api/src/infrastructure/date.ts` 提供預設時區與中文語系的 dayjs 實例（時區由 `APP_TIMEZONE` 控制）：
+
+```typescript
+import dayjs, { formatDate, formatYMD, formatDateWithDay } from '../infrastructure/date';
+
+formatDate(new Date());        // "2026-04-05"
+formatYMD(2026, 4, 5);         // "2026年04月05日"
+formatDateWithDay(new Date()); // "2026-04-05 (日)"
+```
+
+### Seed 管理
+
+Seed 檔案放在 `apps/api/seeds/`，timestamp 前綴確保執行順序，透過 `SeedHistoryRecord` 做冪等控制：
+
+```
+apps/api/seeds/
+├── 20260101000001-seed-permissions.ts   # 初始化 Permission 代碼
+├── 20260101000002-seed-roles.ts         # 初始化角色（SUPERADMIN）
+├── 20260101000003-seed-test-members.ts  # 建立預設管理員帳號
+└── YYYYMMDDHHMMSS-seed-xxx.ts
+```
+
+新增 seed：
+
+```typescript
+// seeds/YYYYMMDDHHMMSS-seed-xxx.ts
+import { PrismaClient } from '@prisma/client';
+
+export default async function seed(prisma: PrismaClient): Promise<void> {
+  await prisma.xxx.upsert({ ... });
+}
+```
+
+執行：`pnpm --filter @app/api db:seed`。**production 環境會被擋下**（除非設定 `ALLOW_PROD_SEED=1`）。
+
+### 測試結構
+
+```
+apps/api/src/
+├── domain/{model,value-object}/*.spec.ts
+├── application/service/*.spec.ts
+└── adapter/in/web/{guard,filter,interceptor}/*.spec.ts
+
+apps/api/test/
+├── test-app.ts            # createE2EApp()、createMockRedis() 工廠
+├── setup-env.ts           # 測試用環境變數
+├── auth.e2e-spec.ts
+├── member.e2e-spec.ts
+├── role.e2e-spec.ts
+└── security.e2e-spec.ts
+```
+
+E2E 範例：
+
+```typescript
+import { createE2EApp, createMockRedis } from './test-app';
+
+const mockRedis = createMockRedis();
+const mockPrisma = {
+  $connect: jest.fn(),
+  $disconnect: jest.fn(),
+  memberRecord: { findUnique: jest.fn(), findFirst: jest.fn() },
+  role: { findFirstOrThrow: jest.fn() },
+};
+
+const { app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis });
+```
+
+### System Log
+
+`apps/api/src/modules/system-log.module.ts` 透過 `SaveSystemLogPort` 將請求記錄寫入 DB（`PrismaSystemLogRepository`）。欄位：
+
+| 欄位                           | 說明                            |
+| ------------------------------ | ------------------------------- |
+| `userId`                       | 登入使用者 ID（未登入為空）     |
+| `action`                       | 動作描述                        |
+| `method`                       | HTTP 方法                       |
+| `url`                          | 請求路徑（query string 已脫敏） |
+| `statusCode`                   | HTTP 狀態碼                     |
+| `execTime`                     | 執行時間（ms）                  |
+| `requestTime` / `responseTime` | 請求與回應時間                  |
+
+成功路徑由 `LoggingInterceptor` 處理，錯誤路徑由 `GlobalExceptionFilter` 處理，共用 `system-log-helper.ts` 的 `buildSystemLogData()`。
+
+### 分頁
+
+`apps/api/src/infrastructure/pagination.ts`：
+
+```typescript
+import { getPagination, buildPaginationMeta } from '../infrastructure/pagination';
+
+const { page, limit, offset } = getPagination(query);
+const meta = buildPaginationMeta(page, limit, totalCount);
+// { page, limit, total, totalPages }
+```
+
+`page` 最小 1；`limit` 預設來自 `DEFAULT_PAGE_LIMIT`，上限 100。
+
+### 新增 Domain Module 範本
+
+以新增 `Order` 模組為例：
+
+```
+1.  apps/api/prisma/schema.prisma                                        # 加 OrderRecord model → db:migrate
+2.  apps/api/src/domain/model/Order.ts                                   # 領域實體
+3.  apps/api/src/domain/exception/OrderNotFoundException.ts              # 領域例外
+4.  apps/api/src/application/port/in/order/CreateOrderUseCase.ts         # Inbound Port
+5.  apps/api/src/application/port/out/order/SaveOrderPort.ts             # Outbound Port
+6.  apps/api/src/application/service/order/CreateOrderService.ts         # Use Case 實作
+7.  apps/api/src/application/facade/OrderFacade.ts                       # Facade
+8.  apps/api/src/adapter/out/persistence/order/PrismaOrderRepository.ts
+9.  apps/api/src/adapter/in/web/order/CreateOrderRequest.ts              # Zod schema + DTO
+10. apps/api/src/adapter/in/web/order/OrderController.ts
+11. apps/api/src/modules/order.module.ts                                 # DI 接線（含 JwtModule import）
+12. apps/api/src/app.module.ts                                           # 引入 OrderModule
+13. apps/api/src/adapter/in/web/filter/GlobalExceptionFilter.ts          # 新增例外對應
+14. apps/api/docs/swagger/orders/create-order.yaml                       # Swagger 文件（inline shape，不用 SuccessResponse $ref）
+15. apps/api/test/order.e2e-spec.ts                                      # E2E 測試
+```
+
+> 若 Controller 使用 `JwtAuthGuard`，記得在對應 Module 的 `imports` 加入 `JwtModule`。
+>
+> 以下模組標記為 `@Global()`，全域可注入，新模組**不需要** import：
+> - `RedisModule` — `TOKEN_BLACKLIST_PORT`、`CLEAR_MEMBER_CONTEXT_PORT`、`MEMBER_CONTEXT_CACHE_PORT`、`SESSION_ACTIVITY_PORT`
+> - `FeatureFlagModule` — `FeatureFlagService`
+> - `AuthLogModule` — `SAVE_AUTH_LOG_PORT`
+> - `SecurityModule` — `ACCOUNT_LOCK_PORT`、`IP_BLOCK_PORT`、`IP_LIST_PORT`
+> - `RecaptchaModule` — `RECAPTCHA_VERIFY_PORT`
+
+---
+
+## 慣例參考索引
+
+| 主題                       | 詳細位置                                         |
+| -------------------------- | ------------------------------------------------ |
+| 過去踩過的坑與決定         | `tasks/lessons.md`                               |
+| 跨 change 待辦             | `tasks/todo.md`                                  |
+| 進行中 change 提案         | `openspec/changes/<name>/`                       |
+| 已封存 change              | `openspec/changes/archive/<日期>-<name>/`        |
+| 已批准的能力規格           | `openspec/specs/<capability>/spec.md`            |
+| Claude 行為與 workflow     | `CLAUDE.md`（英文）                              |
+| 人類 onboarding            | `README.md`                                      |
+
+---
+
+## 完整指令參考
+
+套件管理：**pnpm 11+**（root 透過 `packageManager` 欄位 + corepack 自動鎖版本）。
+
+### Root 跨 workspace
+
+```bash
+pnpm install                 # 一次裝完所有 workspace 依賴
+pnpm dev                     # concurrently 啟動 apps/api + apps/web
+pnpm build                   # 依序 build apps/api → apps/web（api-client source-first，無 build）
+pnpm typecheck               # 三個 workspace 全部 tsc --noEmit
+pnpm lint                    # 三個 workspace 全部 eslint
+pnpm test                    # 跑各 workspace 的 test script
+```
+
+### 後端 `apps/api`
+
+```bash
+# 開發
+pnpm --filter @app/api dev               # watch 模式
+pnpm --filter @app/api start:debug       # debug + watch
+pnpm --filter @app/api build             # nest build → apps/api/dist
+pnpm --filter @app/api start:prod        # 啟動 build 產物
+
+# 程式碼品質
+pnpm --filter @app/api lint
+pnpm --filter @app/api lint:fix
+pnpm --filter @app/api format
+
+# 測試
+pnpm --filter @app/api test              # 單元測試 (*.spec.ts)
+pnpm --filter @app/api test:watch
+pnpm --filter @app/api test:cov
+pnpm --filter @app/api test:e2e          # E2E（需 MySQL + Redis）
+
+# 資料庫（一律在 apps/api 工作目錄執行）
+pnpm --filter @app/api db:create
+pnpm --filter @app/api db:drop
+pnpm --filter @app/api db:migrate              # 開發環境（含 generate）
+pnpm --filter @app/api db:migrate:deploy       # 生產環境部署
+pnpm --filter @app/api db:generate             # 僅產生 Prisma client（搬 monorepo 後第一次 typecheck 必跑）
+pnpm --filter @app/api db:seed
+pnpm --filter @app/api db:studio
+
+# Swagger
+pnpm --filter @app/api swagger:bundle    # 合併分檔 yaml → openapi.bundle.yaml
+```
+
+### 前端 `apps/web`
+
+```bash
+pnpm --filter @app/web dev               # Vite dev server (5173, proxy /api → :3000)
+pnpm --filter @app/web build             # tsc -b && vite build → apps/web/dist
+pnpm --filter @app/web typecheck
+pnpm --filter @app/web lint
+pnpm --filter @app/web preview           # 預覽生產 build
+
+# 加 shadcn 元件（要在 apps/web 工作目錄）
+cd apps/web && pnpm dlx shadcn@latest add <component>
+```
+
+### API client `packages/api-client`
+
+```bash
+# 後端 controller / Swagger 改動後同步型別
+pnpm --filter @app/api swagger:bundle
+pnpm --filter @app/api-client generate   # openapi.bundle.yaml → src/schema.ts
+
+pnpm --filter @app/api-client typecheck  # source-first，無 build
 ```
