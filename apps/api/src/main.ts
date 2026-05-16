@@ -82,8 +82,15 @@ const bootstrap = async (): Promise<void> => {
 
   app.use(cookieParser(env.COOKIE_SECRET));
 
+  // 支援多 origin（以逗號分隔），方便同時放後端、前端 dev、staging 等多個來源
+  const corsOrigins =
+    env.CORS_ORIGIN === '*'
+      ? '*'
+      : env.CORS_ORIGIN.split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
   app.enableCors({
-    origin: env.CORS_ORIGIN,
+    origin: Array.isArray(corsOrigins) && corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   });
 

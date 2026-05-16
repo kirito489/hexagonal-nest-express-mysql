@@ -40,36 +40,36 @@
 
 ## 5. 階段二 / 建立 `apps/web/` 骨架
 
-- [ ] 5.1 用 `pnpm create vite apps/web --template react-ts` 初始化前端
-- [ ] 5.2 `apps/web/package.json` 改 `name` 為 `@app/web`、加 `private: true`
-- [ ] 5.3 `apps/web/tsconfig.json` 改為 `"extends": "../../tsconfig.base.json"`
-- [ ] 5.4 設定 Tailwind CSS v4（依官方 Vite 教學，安裝 `tailwindcss`、`@tailwindcss/vite`）
-- [ ] 5.5 設定 shadcn：執行 `pnpm dlx shadcn@latest init`，選 New York 風格、繁中專案
-- [ ] 5.6 確認 `apps/web/components.json`、`apps/web/src/lib/utils.ts`、`apps/web/src/components/ui/` 結構建立完成
-- [ ] 5.7 安裝核心依賴：`react-router-dom@7`、`@tanstack/react-query`、`@tanstack/react-query-devtools`、`@tanstack/react-table`、`react-hook-form`、`@hookform/resolvers`、`zod`、`lucide-react`
-- [ ] 5.8 設定 `apps/web/vite.config.ts` 的 `server.proxy['/api']` 指向 `http://localhost:3000`
+- [x] 5.1 用 `pnpm create vite apps/web --template react-ts` 初始化前端
+- [x] 5.2 `apps/web/package.json` 改 `name` 為 `@app/web`、加 `private: true`、加 `typecheck` script
+- [x] 5.3 `apps/web/tsconfig.app.json` 與 `tsconfig.node.json` 改為 `"extends": "../../tsconfig.base.json"`（root tsconfig 保持 Vite 預設的 project references 結構）
+- [x] 5.4 設定 Tailwind CSS v4（`tailwindcss` + `@tailwindcss/vite` 外掛、`@import 'tailwindcss';` 載入）
+- [x] 5.5 設定 shadcn：`pnpm dlx shadcn@latest init -t vite -b radix -p nova --no-monorepo --no-reinstall --force --yes`（base color: neutral）
+- [x] 5.6 確認 `apps/web/components.json`、`apps/web/src/lib/utils.ts`、`apps/web/src/components/ui/button.tsx` 已建立
+- [x] 5.7 安裝核心依賴：`react-router-dom@7`、`@tanstack/react-query`、`@tanstack/react-query-devtools`、`@tanstack/react-table`、`react-hook-form`、`@hookform/resolvers`、`zod`、`lucide-react`（最後一項由 shadcn 安裝）
+- [x] 5.8 設定 `apps/web/vite.config.ts`：path alias `@/*`、Tailwind plugin、`server.proxy['/api']` → `http://localhost:3000`
 
 ## 6. 階段二 / 前端基本結構與頁面
 
-- [ ] 6.1 建立 `apps/web/src/lib/` 工具目錄（含 `cn.ts`、`storage.ts` 等）
-- [ ] 6.2 建立 `apps/web/src/api/fetch.ts`：全域 fetch wrapper（注入 token、處理 401）
-- [ ] 6.3 建立 `apps/web/src/api/query-client.ts`：`QueryClient` 與全域錯誤處理
-- [ ] 6.4 建立 `apps/web/src/routes/_layout.tsx`：登入後 layout（含 Sidebar 骨架）
-- [ ] 6.5 建立 `apps/web/src/routes/login/page.tsx`：登入頁（react-hook-form + zod，繁中文案）
-- [ ] 6.6 建立 `apps/web/src/routes/home/page.tsx`：登入後預設首頁
-- [ ] 6.7 建立 `apps/web/src/components/RequireAuth.tsx`：路由保護 guard
-- [ ] 6.8 設定 `apps/web/src/App.tsx`：React Router routes 與 QueryClientProvider
-- [ ] 6.9 用 shadcn 加入 `button`、`input`、`label`、`form`、`card`、`sidebar` 等元件
-- [ ] 6.10 驗證 `pnpm --filter @app/web typecheck` 全綠
-- [ ] 6.11 驗證 `pnpm --filter @app/web build` 全綠
+- [x] 6.1 建立 `apps/web/src/lib/storage.ts`（tokenStorage 封裝 localStorage 存取，shadcn 已產 `utils.ts`）
+- [x] 6.2 建立 `apps/web/src/api/fetch.ts`：全域 fetch wrapper（注入 Bearer token、處理 401、剝 `{ success, data, timestamp }` 外殼、自訂 `ApiError`）
+- [x] 6.3 建立 `apps/web/src/api/query-client.ts`：共用 `QueryClient`（admin 工具用 `refetchOnWindowFocus: false`）
+- [x] 6.4 建立 `apps/web/src/routes/_layout.tsx`：Sidebar 骨架（首頁項 + 登出按鈕）
+- [x] 6.5 建立 `apps/web/src/routes/login/page.tsx`：登入頁，react-hook-form + zod，繁中文案
+- [x] 6.6 建立 `apps/web/src/routes/home/page.tsx`：登入後預設首頁（Card 提示文）
+- [x] 6.7 建立 `apps/web/src/components/RequireAuth.tsx`：路由保護 guard，把 from path 放進 location.state
+- [x] 6.8 設定 `apps/web/src/App.tsx`：React Router + QueryClientProvider + TooltipProvider，dev 載入 React Query Devtools
+- [x] 6.9 用 shadcn 加入 `input`、`label`、`card`、`sidebar`（含 `sheet`、`separator`、`tooltip`、`skeleton`、`use-mobile` hook）；`form` registry 缺檔，自寫 form.tsx（標準 shadcn 模板）
+- [x] 6.10 驗證 `pnpm --filter @app/web typecheck` 全綠
+- [x] 6.11 驗證 `pnpm --filter @app/web build` 全綠（dist 470KB / gzip 147KB）
 
 ## 7. 階段二 / 後端 CORS 與整合測試
 
-- [ ] 7.1 `apps/api/src/main.ts` 確認 CORS 設定允許 `http://localhost:5173`（dev 用）
-- [ ] 7.2 root 執行 `pnpm dev`，確認前後端皆啟動、輸出帶有 prefix
-- [ ] 7.3 手動測試：瀏覽器開 `http://localhost:5173/login`，輸入 seed 帳號可登入並跳轉 `/`
-- [ ] 7.4 手動測試：未登入存取 `/` 自動跳 `/login`
-- [ ] 7.5 手動測試：刪掉 `localStorage.access_token` 後重新整理 → 自動跳 `/login`
+- [x] 7.1 `apps/api/src/main.ts` 擴充 CORS 為 comma-separated 多 origin；`.env.example` 預設 `http://localhost:3000,http://localhost:5173`
+- [ ] 7.2 root 執行 `pnpm dev`，確認前後端皆啟動、輸出帶有 prefix（需 `apps/api/.env` 設好，由使用者執行）
+- [ ] 7.3 手動測試：瀏覽器開 `http://localhost:5173/login`，輸入 seed 帳號可登入並跳轉 `/`（使用者執行）
+- [ ] 7.4 手動測試：未登入存取 `/` 自動跳 `/login`（使用者執行）
+- [ ] 7.5 手動測試：刪掉 `localStorage.access_token` 後重新整理 → 自動跳 `/login`（使用者執行）
 - [ ] 7.6 階段二收尾：commit（訊息建議 `feat: 新增 apps/web admin SPA 骨架`）
 
 ## 8. 階段三 / 建立 `packages/api-client/`

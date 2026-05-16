@@ -8,5 +8,6 @@ allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
   bcrypt: true
+  msw: false
   prisma: true
   protobufjs: true
