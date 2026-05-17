@@ -1,7 +1,11 @@
 # frontend-admin Specification
 
 ## Purpose
-TBD - created by archiving change setup-monorepo-frontend. Update Purpose after archive.
+
+定義 `apps/web/` 後台前端的跨頁共通基礎：技術棧、目錄結構、認證 / 路由保護、
+API client、表單與資料層 convention、全域 UI 元件（toast / sidebar）、URL state
+同步原則。個別模組（如會員管理、角色管理）的 UI 行為由各自的 capability spec 規範。
+
 ## Requirements
 ### Requirement: 前端技術棧
 

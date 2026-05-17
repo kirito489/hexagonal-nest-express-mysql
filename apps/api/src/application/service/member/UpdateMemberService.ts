@@ -55,25 +55,52 @@ export class UpdateMemberService implements UpdateMemberUseCase {
 
     if (member.isDefault) throw new DefaultMemberNotEditableException();
 
-    if (await this.loadMember.existsByEmail(command.email, command.id)) {
+    // email 唯一性檢查僅在實際提供時做
+    if (
+      command.email !== undefined &&
+      (await this.loadMember.existsByEmail(command.email, command.id))
+    ) {
       throw new EmailAlreadyExistsException();
     }
-    const role = await this.loadRole.findRoleById(command.roleId);
-    if (!role) throw new RoleNotFoundException();
 
-    // 密碼政策驗證在 DB 寫入前完成，確保任一驗證失敗時不留下部分更新狀態
+    // role 存在性檢查僅在實際提供時做
+    let roleCodeForPolicy: string | null | undefined;
+    if (command.roleId !== undefined) {
+      const role = await this.loadRole.findRoleById(command.roleId);
+      if (!role) throw new RoleNotFoundException();
+      roleCodeForPolicy = role.roleCode;
+    }
+
+    // 密碼政策驗證在 DB 寫入前完成，確保任一驗證失敗時不留下部分更新狀態。
+    // 若改密碼但未換角色，需用 member 現況 roleId 查 roleCode 套對應強度規則
     let passwordHash: string | undefined;
     if (typeof command.password === 'string' && command.password.length > 0) {
-      this.passwordPolicy.validateOrThrow(command.password, role.roleCode);
+      if (roleCodeForPolicy === undefined) {
+        const currentRole = await this.loadRole.findRoleById(member.roleId);
+        roleCodeForPolicy = currentRole?.roleCode ?? null;
+      }
+      this.passwordPolicy.validateOrThrow(command.password, roleCodeForPolicy);
       passwordHash = await bcrypt.hash(command.password, this.bcryptRounds);
     }
 
-    member.changeEmail(Email.of(command.email));
-    member.updateProfile(command.member, command.roleId);
-    if (command.status) {
-      member.activate();
-    } else {
-      member.deactivate();
+    if (command.email !== undefined) {
+      member.changeEmail(Email.of(command.email));
+    }
+
+    // member / roleId 共用 updateProfile：缺哪一個就用 domain 現況補
+    if (command.member !== undefined || command.roleId !== undefined) {
+      member.updateProfile(
+        command.member ?? member.member,
+        command.roleId ?? member.roleId,
+      );
+    }
+
+    if (command.status !== undefined) {
+      if (command.status) {
+        member.activate();
+      } else {
+        member.deactivate();
+      }
     }
 
     if (passwordHash !== undefined) {

@@ -1477,7 +1477,9 @@ export interface paths {
         head?: never;
         /**
          * 更新帳號
-         * @description 更新帳號。password 為選填（空白 / 未指定表示不改）。
+         * @description 更新帳號（PATCH 真 partial）：所有欄位皆選填，僅送出有變動的欄位即可，
+         *     避免為了改一欄而回傳整列被併發寫入互相覆蓋。
+         *     password 空白 / 未指定表示不改。
          *     需要 `BACKEND:ACCOUNT:EDIT` 權限。
          *     需要 JWT Bearer Token 認證。
          */
@@ -1498,18 +1500,18 @@ export interface paths {
                          * Format: email
                          * @description Email
                          */
-                        email: string;
+                        email?: string;
                         /** @description 名稱 */
-                        member: string;
+                        member?: string;
                         /** @description 密碼（空白 / 未指定表示不改） */
                         password?: string;
                         /**
                          * Format: uuid
                          * @description 所屬角色 ID
                          */
-                        roleId: string;
+                        roleId?: string;
                         /** @description 啟用狀態 */
-                        status: boolean;
+                        status?: boolean;
                     };
                 };
             };

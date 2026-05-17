@@ -1463,7 +1463,9 @@ paths:
         - Members
       summary: 更新帳號
       description: |
-        更新帳號。password 為選填（空白 / 未指定表示不改）。
+        更新帳號（PATCH 真 partial）：所有欄位皆選填，僅送出有變動的欄位即可，
+        避免為了改一欄而回傳整列被併發寫入互相覆蓋。
+        password 空白 / 未指定表示不改。
         需要 `BACKEND:ACCOUNT:EDIT` 權限。
         需要 JWT Bearer Token 認證。
       security:
@@ -1482,11 +1484,6 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - member
-                - roleId
-                - status
               properties:
                 email:
                   type: string

@@ -79,20 +79,20 @@ export const MemberFormDialog = ({
     defaultValues: { ...DEFAULT_VALUES, ...initialValues },
   })
 
-  // dialog 開啟或 initialValues 變更時重置表單
+  // dialog 開啟或 initialValues 變更時重置表單。
+  // 父層需以 useMemo 穩定 initialValues 參考（MembersPage 已做），避免每次 render 都觸發 reset
   useEffect(() => {
     if (open) {
       form.reset({ ...DEFAULT_VALUES, ...initialValues })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, JSON.stringify(initialValues)])
+  }, [open, initialValues, form])
 
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values)
   })
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>

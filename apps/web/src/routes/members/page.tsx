@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import type { paths } from '@app/api-client'
 
 import { Button } from '@/components/ui/button'
 import { DataTablePagination } from '@/components/data-table/DataTablePagination'
@@ -20,6 +21,11 @@ import type { CreateMemberForm } from './lib/member-form-schema'
 
 const PERM_VIEW = 'BACKEND:ACCOUNT:VIEW'
 const PERM_EDIT = 'BACKEND:ACCOUNT:EDIT'
+
+// 從 generated schema 推出 GET /members 的 data 形狀，optimistic update 不再走 escape hatch
+type MembersData = NonNullable<
+  paths['/members']['get']['responses'][200]['content']['application/json']['data']
+>
 
 export const MembersPage = () => {
   // 所有 hook 都先 unconditional 呼叫，再做條件 return（守 react-hooks/rules-of-hooks）
@@ -49,26 +55,60 @@ export const MembersPage = () => {
     { enabled: editEnabled },
   )
 
-  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState
+  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState。
+  // closeEdit 已由 useMembersUrlState 以 useCallback 穩定，可安全進 deps
+  const { closeEdit } = url
   useEffect(() => {
     if (editEnabled && editQuery.isError) {
       toast.error('找不到該會員或無權限存取')
-      url.closeEdit()
+      closeEdit()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editEnabled, editQuery.isError])
+  }, [editEnabled, editQuery.isError, closeEdit])
 
   const editInitialValues = useMemo(() => {
-    const d = editQuery.data
-    if (!d) return undefined
+    const data = editQuery.data
+    if (!data) return undefined
     return {
-      email: d.email ?? '',
-      member: d.member ?? '',
+      email: data.email ?? '',
+      member: data.member ?? '',
       password: '',
-      roleId: d.roleId ?? '',
-      status: d.status ?? true,
+      roleId: data.roleId ?? '',
+      status: data.status ?? true,
     }
   }, [editQuery.data])
+
+  const handleToggleStatus = useCallback(
+    async (member: MemberRow, nextStatus: boolean) => {
+      if (!member.id) return
+      // optimistic：把所有 GET /members 變體中對應 row 的 status 翻轉
+      queryClient.setQueriesData<MembersData>(
+        { queryKey: ['GET', '/members'] },
+        (old) => mutateRowStatus(old, member.id!, nextStatus),
+      )
+      try {
+        // 真 partial PATCH：只送翻轉的欄位，避免覆蓋其他併發寫入
+        await mutations.update.mutateAsync({
+          params: { path: { id: member.id } },
+          body: { status: nextStatus },
+        })
+      } catch {
+        // mutation hook 自己已 toast.error；invalidate 重抓回正確狀態
+        void queryClient.invalidateQueries({ queryKey: ['GET', '/members'] })
+      }
+    },
+    [mutations.update, queryClient],
+  )
+
+  const handleEdit = useCallback(
+    (member: MemberRow) => {
+      if (member.id) url.openEdit(member.id)
+    },
+    [url],
+  )
+
+  const handleDeleteRequest = useCallback((member: MemberRow) => {
+    setDeleteTarget(member)
+  }, [])
 
   // 條件 return 放在所有 hook 之後
   if (!canView && !meLoading) {
@@ -81,29 +121,6 @@ export const MembersPage = () => {
     limit: url.limit,
     total: 0,
     totalPages: 1,
-  }
-
-  const handleToggleStatus = async (member: MemberRow, nextStatus: boolean) => {
-    if (!member.id) return
-    // optimistic：把所有 GET /members 變體中對應 row 的 status 翻轉
-    queryClient.setQueriesData<MembersData>(
-      { queryKey: ['GET', '/members'] },
-      (old) => mutateRowStatus(old, member.id!, nextStatus),
-    )
-    try {
-      await mutations.update.mutateAsync({
-        params: { path: { id: member.id } },
-        body: {
-          email: member.email ?? '',
-          member: member.member ?? '',
-          roleId: member.roleId ?? '',
-          status: nextStatus,
-        },
-      })
-    } catch {
-      // mutation hook 自己已 toast.error；invalidate 重抓回正確狀態
-      void queryClient.invalidateQueries({ queryKey: ['GET', '/members'] })
-    }
   }
 
   const handleCreateSubmit = async (values: CreateMemberForm) => {
@@ -164,8 +181,8 @@ export const MembersPage = () => {
         isLoading={membersQuery.isLoading}
         currentSub={sub}
         canEdit={canEdit}
-        onEdit={(m) => m.id && url.openEdit(m.id)}
-        onDelete={(m) => setDeleteTarget(m)}
+        onEdit={handleEdit}
+        onDelete={handleDeleteRequest}
         onToggleStatus={handleToggleStatus}
       />
 
@@ -204,16 +221,11 @@ export const MembersPage = () => {
   )
 }
 
-type MembersData = {
-  list?: Array<{ id?: string; status?: boolean; [k: string]: unknown }>
-  meta?: unknown
-} | undefined
-
 const mutateRowStatus = (
-  data: MembersData,
+  data: MembersData | undefined,
   id: string,
   nextStatus: boolean,
-): MembersData => {
+): MembersData | undefined => {
   if (!data?.list) return data
   return {
     ...data,

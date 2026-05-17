@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,10 +24,16 @@ export const MembersSearchBar = ({
   const debouncedName = useDebouncedValue(nameInput, 300)
   const debouncedEmail = useDebouncedValue(emailInput, 300)
 
+  // mount 首次的 debounced 值等於 initialName/Email（即 URL 現況），不需要再 push 一次
+  // 否則會多走 setSearchParams replace + 連帶 url 上不需要的回呼
+  const isFirstRun = useRef(true)
   useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      return
+    }
     onSearch(debouncedName, debouncedEmail)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedName, debouncedEmail])
+  }, [debouncedName, debouncedEmail, onSearch])
 
   return (
     <div className="flex flex-wrap items-end gap-3">

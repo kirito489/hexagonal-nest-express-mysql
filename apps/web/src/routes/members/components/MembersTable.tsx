@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
@@ -53,100 +54,114 @@ export const MembersTable = ({
   onDelete,
   onToggleStatus,
 }: MembersTableProps) => {
-  const columns: ColumnDef<MemberRow>[] = [
-    {
-      accessorKey: 'member',
-      header: '名稱',
-      cell: ({ row }) => (
-        <div className="font-medium">{row.original.member ?? '—'}</div>
-      ),
-    },
-    {
-      accessorKey: 'email',
-      header: 'Email',
-      cell: ({ row }) => (
-        <div className="text-muted-foreground">{row.original.email ?? '—'}</div>
-      ),
-    },
-    {
-      accessorKey: 'roleName',
-      header: '角色',
-      cell: ({ row }) => row.original.roleName ?? '—',
-    },
-    {
-      accessorKey: 'status',
-      header: '狀態',
-      cell: ({ row }) => {
-        const isSelf = row.original.id === currentSub
-        const disabled = !canEdit || isSelf
-        const reason = !canEdit ? '無編輯權限' : isSelf ? '不能停用自己的帳號' : ''
-        const switchNode = (
-          <Switch
-            checked={row.original.status ?? false}
-            disabled={disabled}
-            onCheckedChange={(v) => onToggleStatus(row.original, v)}
-          />
-        )
-        if (!disabled) return switchNode
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-block">{switchNode}</span>
-            </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              className="bg-foreground text-background rounded-md px-2 py-1 text-xs"
-            >
-              {reason}
-            </TooltipContent>
-          </Tooltip>
-        )
+  // memo columns：父層 callbacks 已用 useCallback 穩定，這層只在權限 / 自身 id 變動時重算
+  const columns = useMemo<ColumnDef<MemberRow>[]>(
+    () => [
+      {
+        accessorKey: 'member',
+        header: '名稱',
+        cell: ({ row }) => (
+          <div className="font-medium">{row.original.member ?? '—'}</div>
+        ),
       },
-    },
-    {
-      accessorKey: 'lastLoginAt',
-      header: '最後登入',
-      cell: ({ row }) => {
-        const v = row.original.lastLoginAt
-        if (!v) return <span className="text-muted-foreground">—</span>
-        return (
-          <span title={new Date(v).toISOString()}>{formatRelativeTime(v)}</span>
-        )
-      },
-    },
-    {
-      id: 'actions',
-      header: () => <div className="text-right">操作</div>,
-      cell: ({ row }) => {
-        if (!canEdit) return null
-        return (
-          <div className="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm">
-                  <MoreHorizontal />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => onEdit(row.original)}>
-                  <Pencil />
-                  編輯
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  disabled={row.original.isDefault}
-                  onSelect={() => onDelete(row.original)}
-                >
-                  <Trash2 />
-                  刪除
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      {
+        accessorKey: 'email',
+        header: 'Email',
+        cell: ({ row }) => (
+          <div className="text-muted-foreground">
+            {row.original.email ?? '—'}
           </div>
-        )
+        ),
       },
-    },
-  ]
+      {
+        accessorKey: 'roleName',
+        header: '角色',
+        cell: ({ row }) => row.original.roleName ?? '—',
+      },
+      {
+        accessorKey: 'status',
+        header: '狀態',
+        cell: ({ row }) => {
+          const isSelf = row.original.id === currentSub
+          const disabled = !canEdit || isSelf
+          const reason = !canEdit
+            ? '無編輯權限'
+            : isSelf
+              ? '不能停用自己的帳號'
+              : ''
+          const switchNode = (
+            <Switch
+              checked={row.original.status ?? false}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onToggleStatus(row.original, checked)
+              }
+            />
+          )
+          if (!disabled) return switchNode
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-block">{switchNode}</span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="bg-foreground text-background rounded-md px-2 py-1 text-xs"
+              >
+                {reason}
+              </TooltipContent>
+            </Tooltip>
+          )
+        },
+      },
+      {
+        accessorKey: 'lastLoginAt',
+        header: '最後登入',
+        cell: ({ row }) => {
+          const value = row.original.lastLoginAt
+          if (!value) return <span className="text-muted-foreground">—</span>
+          return (
+            <span title={new Date(value).toISOString()}>
+              {formatRelativeTime(value)}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <div className="text-right">操作</div>,
+        cell: ({ row }) => {
+          if (!canEdit) return null
+          return (
+            <div className="text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-sm">
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => onEdit(row.original)}>
+                    <Pencil />
+                    編輯
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={row.original.isDefault}
+                    onSelect={() => onDelete(row.original)}
+                  >
+                    <Trash2 />
+                    刪除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+    ],
+    [currentSub, canEdit, onEdit, onDelete, onToggleStatus],
+  )
 
   return (
     <DataTable

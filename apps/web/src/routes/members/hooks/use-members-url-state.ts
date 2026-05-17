@@ -73,12 +73,32 @@ export const useMembersUrlState = (): MembersUrlState & {
     [setSearchParams],
   )
 
+  // setter 一律包 useCallback：給呼叫端的 useEffect deps 用，避免被迫 disable exhaustive-deps
+  const setPage = useCallback((page: number) => update({ page }), [update])
+  const setLimit = useCallback(
+    (limit: number) => update({ limit, page: DEFAULT_PAGE }),
+    [update],
+  )
+  const setSearch = useCallback(
+    (name: string, email: string) =>
+      update({ name, email, page: DEFAULT_PAGE }),
+    [update],
+  )
+  const openEdit = useCallback(
+    (id: string) => update({ edit: id }),
+    [update],
+  )
+  const closeEdit = useCallback(
+    () => update({ edit: undefined }),
+    [update],
+  )
+
   return {
     ...state,
-    setPage: (page) => update({ page }),
-    setLimit: (limit) => update({ limit, page: DEFAULT_PAGE }),
-    setSearch: (name, email) => update({ name, email, page: DEFAULT_PAGE }),
-    openEdit: (id) => update({ edit: id }),
-    closeEdit: () => update({ edit: undefined }),
+    setPage,
+    setLimit,
+    setSearch,
+    openEdit,
+    closeEdit,
   }
 }

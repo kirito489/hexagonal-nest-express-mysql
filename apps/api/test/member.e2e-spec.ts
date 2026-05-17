@@ -450,6 +450,35 @@ describe('Member E2E', () => {
       expect(res.status).toBe(409);
       expect((res.body as { code: string }).code).toBe('CANNOT_DISABLE_SELF');
     });
+
+    it('partial body 只送 { status } → 204，不檢查 email 唯一 / 不查 role', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+      mockPrisma.memberRecord.count.mockClear();
+      mockPrisma.role.findFirst.mockClear();
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: false });
+
+      expect(res.status).toBe(204);
+      // 沒給 email → 不應走 existsByEmail（memberRecord.count）；沒給 roleId 也沒換密碼 → 不查 role
+      expect(mockPrisma.memberRecord.count).not.toHaveBeenCalled();
+      expect(mockPrisma.role.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('partial body 只送 { member } → 204，沿用現況 roleId', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(TARGET_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/members/${TARGET_UUID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ member: 'Only Name Changed' });
+
+      expect(res.status).toBe(204);
+    });
   });
 
   // ── 停用帳號的 JWT 被拒 ─────────────────────
