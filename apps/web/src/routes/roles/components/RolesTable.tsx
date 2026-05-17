@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,7 @@ type RolesTableProps = {
   isLoading?: boolean
   /** 是否有 BACKEND:ROLE:EDIT 權限 */
   canEdit: boolean
+  onView: (role: RoleRow) => void
   onEdit: (role: RoleRow) => void
   onDelete: (role: RoleRow) => void
   onToggleStatus: (role: RoleRow, nextStatus: boolean) => void
@@ -43,6 +44,7 @@ export const RolesTable = ({
   data,
   isLoading,
   canEdit,
+  onView,
   onEdit,
   onDelete,
   onToggleStatus,
@@ -118,7 +120,8 @@ export const RolesTable = ({
         id: 'actions',
         header: () => <div className="text-right">操作</div>,
         cell: ({ row }) => {
-          if (!canEdit) return null
+          // VIEW 權限既然能到頁面就一定能看 → 至少顯示「檢視」
+          // EDIT 權限再加「編輯」「刪除」
           const isDefault = row.original.isDefault === true
           const memberCount = row.original.memberCount ?? 0
           const editReason = isDefault ? '預設角色不可編輯' : ''
@@ -129,26 +132,6 @@ export const RolesTable = ({
               : ''
           const deleteDisabled = isDefault || memberCount > 0
 
-          const editItem = (
-            <DropdownMenuItem
-              disabled={isDefault}
-              onSelect={() => onEdit(row.original)}
-            >
-              <Pencil />
-              編輯
-            </DropdownMenuItem>
-          )
-          const deleteItem = (
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={deleteDisabled}
-              onSelect={() => onDelete(row.original)}
-            >
-              <Trash2 />
-              刪除
-            </DropdownMenuItem>
-          )
-
           return (
             <div className="text-right">
               <DropdownMenu>
@@ -158,8 +141,33 @@ export const RolesTable = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DisabledHint reason={editReason}>{editItem}</DisabledHint>
-                  <DisabledHint reason={deleteReason}>{deleteItem}</DisabledHint>
+                  <DropdownMenuItem onSelect={() => onView(row.original)}>
+                    <Eye />
+                    檢視
+                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DisabledHint reason={editReason}>
+                        <DropdownMenuItem
+                          disabled={isDefault}
+                          onSelect={() => onEdit(row.original)}
+                        >
+                          <Pencil />
+                          編輯
+                        </DropdownMenuItem>
+                      </DisabledHint>
+                      <DisabledHint reason={deleteReason}>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={deleteDisabled}
+                          onSelect={() => onDelete(row.original)}
+                        >
+                          <Trash2 />
+                          刪除
+                        </DropdownMenuItem>
+                      </DisabledHint>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -167,7 +175,7 @@ export const RolesTable = ({
         },
       },
     ],
-    [canEdit, onEdit, onDelete, onToggleStatus],
+    [canEdit, onView, onEdit, onDelete, onToggleStatus],
   )
 
   return (

@@ -97,7 +97,7 @@ const mockPrisma = {
     findFirst: jest.fn().mockResolvedValue({ id: ROLE_UUID, name: 'admin' }),
     findMany: jest
       .fn()
-      .mockResolvedValue([{ id: ROLE_UUID, name: 'admin', isDefault: false }]),
+      .mockResolvedValue([{ id: ROLE_UUID, name: 'admin', roleCode: null }]),
     count: jest.fn().mockResolvedValue(1),
   },
 };
@@ -152,7 +152,7 @@ describe('Member E2E', () => {
       name: 'admin',
     });
     mockPrisma.role.findMany.mockResolvedValue([
-      { id: ROLE_UUID, name: 'admin', isDefault: false },
+      { id: ROLE_UUID, name: 'admin', roleCode: null },
     ]);
     mockPrisma.role.count.mockResolvedValue(1);
     mockPrisma.$transaction.mockImplementation((arg: unknown) => {
@@ -216,7 +216,7 @@ describe('Member E2E', () => {
       expect(res.status).toBe(200);
       const body = res.body as {
         data: {
-          list: Array<{ id: string; name: string; isDefault: boolean }>;
+          list: Array<{ id: string; name: string; isAssignable: boolean }>;
           meta: {
             page: number;
             limit: number;
@@ -231,7 +231,26 @@ describe('Member E2E', () => {
       expect(body.data.meta.total).toBe(1);
       expect(body.data.meta.totalPages).toBe(1);
       expect(body.data.list[0]).toEqual(
-        expect.objectContaining({ isDefault: false }),
+        expect.objectContaining({ isAssignable: true }),
+      );
+    });
+
+    it('roleCode=SUPERADMIN → 回 isAssignable: false', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.role.findMany.mockResolvedValue([
+        { id: ROLE_UUID, name: '管理者', roleCode: 'SUPERADMIN' },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members/role/options')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        data: { list: Array<{ isAssignable: boolean }> };
+      };
+      expect(body.data.list[0]).toEqual(
+        expect.objectContaining({ isAssignable: false }),
       );
     });
 
@@ -287,12 +306,12 @@ describe('Member E2E', () => {
       expect(res.status).toBe(401);
     });
 
-    it('找到啟用角色 → 200 + { id, name, isDefault }', async () => {
+    it('找到啟用角色 → 200 + { id, name, isAssignable }', async () => {
       const token = await loginAndGetToken(app);
       mockPrisma.role.findFirst.mockResolvedValueOnce({
         id: ROLE_UUID,
         name: 'admin',
-        isDefault: false,
+        roleCode: null,
       });
 
       const res = await request(app.getHttpServer())
@@ -301,12 +320,12 @@ describe('Member E2E', () => {
 
       expect(res.status).toBe(200);
       const body = res.body as {
-        data: { id: string; name: string; isDefault: boolean };
+        data: { id: string; name: string; isAssignable: boolean };
       };
       expect(body.data).toEqual({
         id: ROLE_UUID,
         name: 'admin',
-        isDefault: false,
+        isAssignable: true,
       });
     });
 

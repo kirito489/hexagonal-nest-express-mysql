@@ -1306,10 +1306,10 @@ export interface paths {
                                      */
                                     name?: string;
                                     /**
-                                     * @description 系統角色旗標；前端顯示但 disabled，不可由一般帳號指派
-                                     * @example false
+                                     * @description 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（如 roleCode='SUPERADMIN' 的系統管理者角色）
+                                     * @example true
                                      */
-                                    isDefault?: boolean;
+                                    isAssignable?: boolean;
                                 }[];
                                 meta: {
                                     /** @example 1 */
@@ -1379,8 +1379,11 @@ export interface paths {
                                 id?: string;
                                 /** @example 一般使用者 */
                                 name?: string;
-                                /** @example false */
-                                isDefault?: boolean;
+                                /**
+                                 * @description 是否可被一般帳號指派；roleCode='SUPERADMIN' 為 false
+                                 * @example true
+                                 */
+                                isAssignable?: boolean;
                             };
                             /** Format: date-time */
                             timestamp: string;

@@ -46,27 +46,29 @@ export const MembersPage = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<MemberRow | null>(null)
 
-  // 編輯 dialog 由 URL ?edit=<uuid> 控制，重整能恢復
+  // edit / view dialog 都由 URL 控制，重整能恢復；兩個 query 共用同一 endpoint，
+  // 但用 enabled 控制誰實際發 request，避免兩個 GET 同時打
   const editEnabled = Boolean(url.edit)
-  const editQuery = useApiQuery(
+  const viewEnabled = Boolean(url.view) && !editEnabled
+  const detailId = url.edit ?? url.view ?? ''
+  const detailQuery = useApiQuery(
     'GET',
     '/members/{id}',
-    { params: { path: { id: url.edit ?? '' } } },
-    { enabled: editEnabled },
+    { params: { path: { id: detailId } } },
+    { enabled: editEnabled || viewEnabled },
   )
 
-  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState。
-  // closeEdit 已由 useMembersUrlState 以 useCallback 穩定，可安全進 deps
-  const { closeEdit } = url
+  // 404 / 403 → 關掉對應 dialog + toast
+  const { closeEdit, closeView } = url
   useEffect(() => {
-    if (editEnabled && editQuery.isError) {
-      toast.error('找不到該會員或無權限存取')
-      closeEdit()
-    }
-  }, [editEnabled, editQuery.isError, closeEdit])
+    if (!detailQuery.isError) return
+    toast.error('找不到該會員或無權限存取')
+    if (editEnabled) closeEdit()
+    if (viewEnabled) closeView()
+  }, [detailQuery.isError, editEnabled, viewEnabled, closeEdit, closeView])
 
-  const editInitialValues = useMemo(() => {
-    const data = editQuery.data
+  const detailInitialValues = useMemo(() => {
+    const data = detailQuery.data
     if (!data) return undefined
     return {
       email: data.email ?? '',
@@ -75,7 +77,7 @@ export const MembersPage = () => {
       roleId: data.roleId ?? '',
       status: data.status ?? true,
     }
-  }, [editQuery.data])
+  }, [detailQuery.data])
 
   const handleToggleStatus = useCallback(
     async (member: MemberRow, nextStatus: boolean) => {
@@ -102,6 +104,13 @@ export const MembersPage = () => {
   const handleEdit = useCallback(
     (member: MemberRow) => {
       if (member.id) url.openEdit(member.id)
+    },
+    [url],
+  )
+
+  const handleView = useCallback(
+    (member: MemberRow) => {
+      if (member.id) url.openView(member.id)
     },
     [url],
   )
@@ -181,6 +190,7 @@ export const MembersPage = () => {
         isLoading={membersQuery.isLoading}
         currentSub={sub}
         canEdit={canEdit}
+        onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteRequest}
         onToggleStatus={handleToggleStatus}
@@ -203,12 +213,21 @@ export const MembersPage = () => {
       />
 
       <MemberFormDialog
-        open={editEnabled && !editQuery.isLoading && !!editInitialValues}
+        open={editEnabled && !detailQuery.isLoading && !!detailInitialValues}
         mode="edit"
-        initialValues={editInitialValues}
+        initialValues={detailInitialValues}
         isSubmitting={mutations.update.isPending}
         onClose={url.closeEdit}
         onSubmit={handleUpdateSubmit}
+      />
+
+      <MemberFormDialog
+        open={viewEnabled && !detailQuery.isLoading && !!detailInitialValues}
+        mode="view"
+        initialValues={detailInitialValues}
+        isSubmitting={false}
+        onClose={url.closeView}
+        onSubmit={() => {}}
       />
 
       <DeleteMemberDialog

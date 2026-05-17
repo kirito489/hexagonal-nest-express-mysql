@@ -34,7 +34,7 @@ export const DeleteRoleDialog = ({
               {' '}
               {role?.name ?? '—'}{' '}
             </span>
-            （目前使用人數：{role?.memberCount ?? 0}）。後端為軟刪除，可由管理員恢復；確認繼續嗎？
+            （目前使用人數：{role?.memberCount ?? 0}）。確認繼續嗎？
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -11,6 +11,8 @@ export type MembersUrlState = {
   email: string
   /** 編輯中 member 的 uuid；undefined 表示 dialog 關閉 */
   edit: string | undefined
+  /** 檢視中 member 的 uuid（唯讀 dialog）；與 edit 互斥 */
+  view: string | undefined
 }
 
 const parseInt = (v: string | null, fallback: number): number => {
@@ -28,6 +30,8 @@ export const useMembersUrlState = (): MembersUrlState & {
   setSearch: (name: string, email: string) => void
   openEdit: (id: string) => void
   closeEdit: () => void
+  openView: (id: string) => void
+  closeView: () => void
 } => {
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -37,11 +41,9 @@ export const useMembersUrlState = (): MembersUrlState & {
     name: searchParams.get('name') ?? '',
     email: searchParams.get('email') ?? '',
     edit: searchParams.get('edit') ?? undefined,
+    view: searchParams.get('view') ?? undefined,
   }
 
-  /**
-   * 寫入 query string 時保留現有其他參數；空值 / 預設值會被剝掉讓 URL 乾淨
-   */
   const update = useCallback(
     (mut: Partial<MembersUrlState>) => {
       setSearchParams(
@@ -65,6 +67,7 @@ export const useMembersUrlState = (): MembersUrlState & {
           if ('name' in mut) apply('name', mut.name, () => false)
           if ('email' in mut) apply('email', mut.email, () => false)
           if ('edit' in mut) apply('edit', mut.edit, () => false)
+          if ('view' in mut) apply('view', mut.view, () => false)
           return next
         },
         { replace: true },
@@ -84,14 +87,17 @@ export const useMembersUrlState = (): MembersUrlState & {
       update({ name, email, page: DEFAULT_PAGE }),
     [update],
   )
+  // edit / view 互斥：開一個就關掉另一個，避免 dialog 疊在一起
   const openEdit = useCallback(
-    (id: string) => update({ edit: id }),
+    (id: string) => update({ edit: id, view: undefined }),
     [update],
   )
-  const closeEdit = useCallback(
-    () => update({ edit: undefined }),
+  const closeEdit = useCallback(() => update({ edit: undefined }), [update])
+  const openView = useCallback(
+    (id: string) => update({ view: id, edit: undefined }),
     [update],
   )
+  const closeView = useCallback(() => update({ view: undefined }), [update])
 
   return {
     ...state,
@@ -100,5 +106,7 @@ export const useMembersUrlState = (): MembersUrlState & {
     setSearch,
     openEdit,
     closeEdit,
+    openView,
+    closeView,
   }
 }

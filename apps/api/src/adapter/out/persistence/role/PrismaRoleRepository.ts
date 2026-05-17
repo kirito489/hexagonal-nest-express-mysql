@@ -16,6 +16,22 @@ import {
 } from '../../../../application/port/out/role/RoleRepositoryPort';
 import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
 
+/**
+ * roleCode === 'SUPERADMIN' 的系統角色不可被一般帳號指派。
+ * 規則集中在 repo 層，未來新增「不可指派 roleCode」清單只改這一處
+ */
+const NON_ASSIGNABLE_ROLE_CODES = new Set(['SUPERADMIN']);
+
+const toRoleOption = (row: {
+  id: string;
+  name: string;
+  roleCode: string | null;
+}): RoleOptionItem => ({
+  id: row.id,
+  name: row.name,
+  isAssignable: !row.roleCode || !NON_ASSIGNABLE_ROLE_CODES.has(row.roleCode),
+});
+
 @Injectable()
 export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   constructor(private readonly prisma: PrismaService) {}
@@ -42,32 +58,33 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   async listActiveRoles(
     params: ListActiveRolesParams,
   ): Promise<ListActiveRolesResult> {
-    // 仍回傳 isDefault=true 的系統角色（前端 disabled 顯示）；分頁 + 名稱模糊搜尋
+    // 仍回傳系統角色（前端 disabled 顯示）；分頁 + 名稱模糊搜尋
     const where = {
       status: true,
       deletedAt: null,
       ...(params.search ? { name: { contains: params.search } } : {}),
     };
-    const [list, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.role.findMany({
         where,
-        select: { id: true, name: true, isDefault: true },
+        // 抓 roleCode 用來推 isAssignable，最後不暴露給 caller
+        select: { id: true, name: true, roleCode: true },
         orderBy: { createdAt: 'asc' },
         skip: (params.page - 1) * params.limit,
         take: params.limit,
       }),
       this.prisma.role.count({ where }),
     ]);
-    return { list, total };
+    return { list: rows.map((r) => toRoleOption(r)), total };
   }
 
   async findActiveRoleOption(id: string): Promise<RoleOptionItem | null> {
     // 編輯帶入 fallback：軟刪除或停用都回 null（前端顯示「（已停用 / 不可用）」）
     const role = await this.prisma.role.findFirst({
       where: { id, status: true, deletedAt: null },
-      select: { id: true, name: true, isDefault: true },
+      select: { id: true, name: true, roleCode: true },
     });
-    return role ?? null;
+    return role ? toRoleOption(role) : null;
   }
 
   // ── RoleRepositoryPort ────────────────────────

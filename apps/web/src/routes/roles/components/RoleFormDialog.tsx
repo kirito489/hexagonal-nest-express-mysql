@@ -27,10 +27,12 @@ import { PermissionsField } from './PermissionsField'
 
 type RoleFormDialogProps = {
   open: boolean
-  mode: 'create' | 'edit'
+  /** view = 唯讀檢視（欄位 disabled、隱藏 submit）；edit / create = 可編輯 */
+  mode: 'create' | 'edit' | 'view'
   initialValues?: Partial<RoleFormValues>
   isSubmitting: boolean
   onClose: () => void
+  /** view 模式不會呼叫 onSubmit */
   onSubmit: (values: RoleFormValues) => Promise<void> | void
 }
 
@@ -48,6 +50,7 @@ export const RoleFormDialog = ({
   onClose,
   onSubmit,
 }: RoleFormDialogProps) => {
+  const isView = mode === 'view'
   const permissionOptions = usePermissionOptionsQuery()
 
   const form = useForm<RoleFormValues>({
@@ -72,12 +75,14 @@ export const RoleFormDialog = ({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? '新增角色' : '編輯角色'}
+            {mode === 'create' ? '新增角色' : mode === 'edit' ? '編輯角色' : '檢視角色'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
               ? '建立角色並指派可用權限'
-              : '更新角色名稱、權限或啟用狀態'}
+              : mode === 'edit'
+                ? '更新角色名稱、權限或啟用狀態'
+                : '檢視角色資料（唯讀）'}
           </DialogDescription>
         </DialogHeader>
 
@@ -90,7 +95,7 @@ export const RoleFormDialog = ({
                 <FormItem>
                   <FormLabel>名稱</FormLabel>
                   <FormControl>
-                    <Input placeholder="角色名稱" {...field} />
+                    <Input placeholder="角色名稱" disabled={isView} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -109,6 +114,7 @@ export const RoleFormDialog = ({
                       onChange={field.onChange}
                       items={permissionOptions.data}
                       isLoading={permissionOptions.isLoading}
+                      disabled={isView}
                     />
                   </FormControl>
                   <FormMessage />
@@ -131,6 +137,7 @@ export const RoleFormDialog = ({
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      disabled={isView}
                     />
                   </FormControl>
                 </FormItem>
@@ -139,15 +146,17 @@ export const RoleFormDialog = ({
 
             <DialogFooter className="mt-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                取消
+                {isView ? '關閉' : '取消'}
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? '儲存中…'
-                  : mode === 'create'
-                    ? '新增'
-                    : '儲存'}
-              </Button>
+              {!isView && (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? '儲存中…'
+                    : mode === 'create'
+                      ? '新增'
+                      : '儲存'}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>

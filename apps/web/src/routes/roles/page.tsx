@@ -38,7 +38,7 @@ export const RolesPage = () => {
   const queryClient = useQueryClient()
 
   const url = useRolesUrlState()
-  const { openEdit, closeEdit } = url
+  const { openEdit, closeEdit, openView, closeView } = url
   const rolesQuery = useRolesQuery({
     page: url.page,
     limit: url.limit,
@@ -49,33 +49,34 @@ export const RolesPage = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<RoleRow | null>(null)
 
-  // 編輯 dialog 由 URL ?edit=<uuid> 控制，重整能恢復
+  // edit / view 共用同一支 GET endpoint；用 enabled 控制誰實際發 request
   const editEnabled = Boolean(url.edit)
-  const editQuery = useApiQuery(
+  const viewEnabled = Boolean(url.view) && !editEnabled
+  const detailId = url.edit ?? url.view ?? ''
+  const detailQuery = useApiQuery(
     'GET',
     '/roles/{id}',
-    { params: { path: { id: url.edit ?? '' } } },
-    { enabled: editEnabled },
+    { params: { path: { id: detailId } } },
+    { enabled: editEnabled || viewEnabled },
   )
 
-  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState。
-  // closeEdit 已由 useRolesUrlState 以 useCallback 穩定，可安全進 deps
+  // 404 / 403 → 關掉對應 dialog
   useEffect(() => {
-    if (editEnabled && editQuery.isError) {
-      toast.error('找不到該角色或無權限存取')
-      closeEdit()
-    }
-  }, [editEnabled, editQuery.isError, closeEdit])
+    if (!detailQuery.isError) return
+    toast.error('找不到該角色或無權限存取')
+    if (editEnabled) closeEdit()
+    if (viewEnabled) closeView()
+  }, [detailQuery.isError, editEnabled, viewEnabled, closeEdit, closeView])
 
-  const editInitialValues = useMemo<RoleFormValues | undefined>(() => {
-    const data = editQuery.data
+  const detailInitialValues = useMemo<RoleFormValues | undefined>(() => {
+    const data = detailQuery.data
     if (!data) return undefined
     return {
       name: data.name ?? '',
       permissionCodes: data.permissionCodes ?? [],
       status: data.status ?? true,
     }
-  }, [editQuery.data])
+  }, [detailQuery.data])
 
   const handleToggleStatus = useCallback(
     async (role: RoleRow, nextStatus: boolean) => {
@@ -104,6 +105,13 @@ export const RolesPage = () => {
       if (role.id) openEdit(role.id)
     },
     [openEdit],
+  )
+
+  const handleView = useCallback(
+    (role: RoleRow) => {
+      if (role.id) openView(role.id)
+    },
+    [openView],
   )
 
   const handleDeleteRequest = useCallback((role: RoleRow) => {
@@ -180,6 +188,7 @@ export const RolesPage = () => {
         data={list}
         isLoading={rolesQuery.isLoading}
         canEdit={canEdit}
+        onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDeleteRequest}
         onToggleStatus={handleToggleStatus}
@@ -202,12 +211,21 @@ export const RolesPage = () => {
       />
 
       <RoleFormDialog
-        open={editEnabled && !editQuery.isLoading && !!editInitialValues}
+        open={editEnabled && !detailQuery.isLoading && !!detailInitialValues}
         mode="edit"
-        initialValues={editInitialValues}
+        initialValues={detailInitialValues}
         isSubmitting={mutations.update.isPending}
         onClose={closeEdit}
         onSubmit={handleUpdateSubmit}
+      />
+
+      <RoleFormDialog
+        open={viewEnabled && !detailQuery.isLoading && !!detailInitialValues}
+        mode="view"
+        initialValues={detailInitialValues}
+        isSubmitting={false}
+        onClose={closeView}
+        onSubmit={() => {}}
       />
 
       <DeleteRoleDialog

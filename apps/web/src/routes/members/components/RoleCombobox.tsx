@@ -30,7 +30,7 @@ type RoleOptionRaw = NonNullable<
 type RoleOption = {
   id: string
   name: string
-  isDefault: boolean
+  isAssignable: boolean
 }
 
 type RoleComboboxProps = {
@@ -48,10 +48,10 @@ type RoleComboboxProps = {
  * 任一必要欄位缺失就回 null，呼叫端用 filter 排除
  */
 const toRoleOption = (raw: RoleOptionRaw | undefined): RoleOption | null => {
-  if (!raw?.id || raw.name === undefined || raw.isDefault === undefined) {
+  if (!raw?.id || raw.name === undefined || raw.isAssignable === undefined) {
     return null
   }
-  return { id: raw.id, name: raw.name, isDefault: raw.isDefault }
+  return { id: raw.id, name: raw.name, isAssignable: raw.isAssignable }
 }
 
 /**
@@ -76,7 +76,8 @@ const dedupeById = <T extends { id: string }>(items: T[]): T[] => {
  * - 點 trigger 開啟 popover，內含搜尋輸入與可滾動清單
  * - 搜尋輸入 debounce 300ms 後寫入 queryKey 重抓
  * - 清單底端的 sentinel 進入視窗時自動 fetchNextPage（由 useInfiniteScrollSentinel 收斂）
- * - isDefault === true 的選項顯示但 disabled，標示「（預設）」（與角色列表 badge 一致）
+ * - isAssignable === false 的選項顯示但 disabled，標示「（預設）」（與角色列表 badge 一致）
+ *   後端 isAssignable=false 推導規則：目前 roleCode === 'SUPERADMIN' 才 disabled
  * - 編輯模式若 value 不在第一頁，並列 fetch fallback option，合併進清單頂端
  */
 export const RoleCombobox = ({
@@ -155,9 +156,9 @@ export const RoleCombobox = ({
                   <CommandItem
                     key={opt.id}
                     value={opt.id}
-                    disabled={opt.isDefault}
+                    disabled={!opt.isAssignable}
                     onSelect={() => {
-                      if (opt.isDefault) return
+                      if (!opt.isAssignable) return
                       onChange(opt.id)
                       setOpen(false)
                     }}
@@ -169,7 +170,7 @@ export const RoleCombobox = ({
                       )}
                     />
                     <span>{opt.name}</span>
-                    {opt.isDefault ? (
+                    {!opt.isAssignable ? (
                       <span className="text-muted-foreground ml-2 text-xs">
                         （預設）
                       </span>

@@ -22,7 +22,7 @@ describe('GetRoleOptionService', () => {
     mockLoadRole.findActiveRoleOption.mockResolvedValue({
       id: ROLE_ID,
       name: '一般使用者',
-      isDefault: false,
+      isAssignable: true,
     });
 
     const result = await makeService().execute(ROLE_ID);
@@ -30,7 +30,7 @@ describe('GetRoleOptionService', () => {
     expect(result).toEqual({
       id: ROLE_ID,
       name: '一般使用者',
-      isDefault: false,
+      isAssignable: true,
     });
   });
 

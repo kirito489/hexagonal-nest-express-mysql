@@ -36,8 +36,10 @@ URL state 同步）、新增 / 編輯共用 Dialog、權限分組多選（含「
 - 「使用人數」欄 MUST 顯示 `memberCount` 數字。
 - 「建立時間」欄 MUST 顯示相對時間（如「3 分鐘前」），hover 顯示絕對 ISO 字串；重用既有 `format-relative-time` helper。
 - 「狀態」欄 MUST 使用 shadcn `Switch`，點擊即時切換並觸發 PATCH `/api/roles/:id`。
-- 「操作」欄 MUST 使用 shadcn `DropdownMenu`，內含「編輯」與「刪除」兩個動作。
-- 使用者沒有 `BACKEND:ROLE:EDIT` 權限時 MUST 隱藏 Switch 與 DropdownMenu。
+- 「操作」欄 MUST 使用 shadcn `DropdownMenu`：
+  - 至少含「檢視」項（使用者能進到此頁就一定具備 VIEW 權限）。
+  - 若使用者具備 `BACKEND:ROLE:EDIT`，再追加「編輯」「刪除」兩項。
+- 「狀態」Switch 在使用者沒有 `BACKEND:ROLE:EDIT` 權限時 MUST disabled 並 tooltip 顯示「無編輯權限」。
 
 #### Scenario: 渲染列表
 
@@ -53,7 +55,7 @@ URL state 同步）、新增 / 編輯共用 Dialog、權限分組多選（含「
 
 列表頁的分頁與搜尋條件 SHALL 同步到 URL query string，重新整理與分享連結保留狀態。
 
-- 支援的 query 參數：`page`（預設 1）、`limit`（預設後端 `DEFAULT_PAGE_LIMIT`）、`name`、`edit`（編輯中 role 的 uuid）。
+- 支援的 query 參數：`page`（預設 1）、`limit`（預設後端 `DEFAULT_PAGE_LIMIT`）、`name`、`edit`（編輯中 role 的 uuid）、`view`（檢視中 role 的 uuid，與 edit 互斥）。
 - 搜尋輸入 MUST debounce 300ms 後寫入 URL 並觸發新請求（重用既有 `useDebouncedValue` hook）。
 - 翻頁按鈕 MUST 改寫 URL `page` 參數而非僅改 component state。
 - URL 直接輸入或瀏覽器上一頁 MUST 觸發對應的 list query 與 dialog 開關。
@@ -68,9 +70,9 @@ URL state 同步）、新增 / 編輯共用 Dialog、權限分組多選（含「
 - **WHEN** 使用者複製 `/roles?page=2&limit=20&name=admin` 給同事
 - **THEN** 同事開啟連結時看到第 2 頁、每頁 20 筆、含 `admin` 的結果
 
-### Requirement: 新增與編輯共用 Dialog
+### Requirement: 新增、編輯、檢視共用 Dialog
 
-新增與編輯 SHALL 走同一個 shadcn `Dialog`，由 mode（`create` / `edit`）切換按鈕文字與初值。
+新增、編輯與檢視 SHALL 走同一個 shadcn `Dialog`，由 mode（`create` / `edit` / `view`）切換按鈕文字、初值與互動行為。`view` 模式所有欄位 MUST disabled、submit 按鈕 MUST 隱藏，取消按鈕文字改為「關閉」；URL 以 `?view=<uuid>` 控制，與 `?edit=<uuid>` 互斥。
 
 - Dialog 表單欄位：名稱 / 權限多選 / 狀態。
 - **新增模式**：名稱必填（1-100 字元），提交後 `POST /api/roles`，成功 toast「角色已新增」+ invalidate `['GET', '/roles']` + 關閉 dialog。

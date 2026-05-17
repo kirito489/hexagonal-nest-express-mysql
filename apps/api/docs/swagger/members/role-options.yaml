@@ -64,10 +64,10 @@ responses:
                         type: string
                         description: 角色名稱（顯示用）
                         example: 一般使用者
-                      isDefault:
+                      isAssignable:
                         type: boolean
-                        description: 系統角色旗標；前端顯示但 disabled，不可由一般帳號指派
-                        example: false
+                        description: 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（如 roleCode='SUPERADMIN' 的系統管理者角色）
+                        example: true
                 meta:
                   type: object
                   properties:

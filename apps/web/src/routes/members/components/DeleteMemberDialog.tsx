@@ -34,7 +34,7 @@ export const DeleteMemberDialog = ({
               {' '}
               {member?.member ?? '—'}{' '}
             </span>
-            ({member?.email ?? '—'})。後端為軟刪除，可由管理員恢復；確認繼續嗎？
+            ({member?.email ?? '—'})。確認繼續嗎？
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

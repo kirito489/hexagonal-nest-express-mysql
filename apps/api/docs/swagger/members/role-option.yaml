@@ -38,9 +38,10 @@ responses:
                 name:
                   type: string
                   example: 一般使用者
-                isDefault:
+                isAssignable:
                   type: boolean
-                  example: false
+                  description: 是否可被一般帳號指派；roleCode='SUPERADMIN' 為 false
+                  example: true
             timestamp:
               type: string
               format: date-time

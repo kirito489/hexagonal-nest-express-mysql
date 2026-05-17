@@ -1,8 +1,11 @@
 export interface RoleOptionItem {
   id: string;
   name: string;
-  /** true 表示系統角色（如管理者），前端 select 顯示但 disabled */
-  isDefault: boolean;
+  /**
+   * 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled。
+   * 規則由後端推導（roleCode === 'SUPERADMIN' → isAssignable=false）
+   */
+  isAssignable: boolean;
 }
 
 export interface ListRoleOptionsQuery {

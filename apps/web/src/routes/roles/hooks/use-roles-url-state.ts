@@ -10,6 +10,8 @@ export type RolesUrlState = {
   name: string
   /** 編輯中 role 的 uuid；undefined 表示 dialog 關閉 */
   edit: string | undefined
+  /** 檢視中 role 的 uuid（唯讀 dialog）；與 edit 互斥 */
+  view: string | undefined
 }
 
 const parseInt = (v: string | null, fallback: number): number => {
@@ -28,6 +30,8 @@ export const useRolesUrlState = (): RolesUrlState & {
   setSearch: (name: string) => void
   openEdit: (id: string) => void
   closeEdit: () => void
+  openView: (id: string) => void
+  closeView: () => void
 } => {
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -36,6 +40,7 @@ export const useRolesUrlState = (): RolesUrlState & {
     limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
     name: searchParams.get('name') ?? '',
     edit: searchParams.get('edit') ?? undefined,
+    view: searchParams.get('view') ?? undefined,
   }
 
   const update = useCallback(
@@ -60,6 +65,7 @@ export const useRolesUrlState = (): RolesUrlState & {
             apply('limit', mut.limit, (v) => v === DEFAULT_LIMIT)
           if ('name' in mut) apply('name', mut.name, () => false)
           if ('edit' in mut) apply('edit', mut.edit, () => false)
+          if ('view' in mut) apply('view', mut.view, () => false)
           return next
         },
         { replace: true },
@@ -77,14 +83,26 @@ export const useRolesUrlState = (): RolesUrlState & {
     (name: string) => update({ name, page: DEFAULT_PAGE }),
     [update],
   )
+  // edit / view 互斥
   const openEdit = useCallback(
-    (id: string) => update({ edit: id }),
+    (id: string) => update({ edit: id, view: undefined }),
     [update],
   )
-  const closeEdit = useCallback(
-    () => update({ edit: undefined }),
+  const closeEdit = useCallback(() => update({ edit: undefined }), [update])
+  const openView = useCallback(
+    (id: string) => update({ view: id, edit: undefined }),
     [update],
   )
+  const closeView = useCallback(() => update({ view: undefined }), [update])
 
-  return { ...state, setPage, setLimit, setSearch, openEdit, closeEdit }
+  return {
+    ...state,
+    setPage,
+    setLimit,
+    setSearch,
+    openEdit,
+    closeEdit,
+    openView,
+    closeView,
+  }
 }

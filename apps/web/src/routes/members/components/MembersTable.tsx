@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ type MembersTableProps = {
   currentSub: string | undefined
   /** 是否有 BACKEND:ACCOUNT:EDIT 權限 */
   canEdit: boolean
+  onView: (member: MemberRow) => void
   onEdit: (member: MemberRow) => void
   onDelete: (member: MemberRow) => void
   onToggleStatus: (member: MemberRow, nextStatus: boolean) => void
@@ -49,6 +50,7 @@ export const MembersTable = ({
   isLoading,
   currentSub,
   canEdit,
+  onView,
   onEdit,
   onDelete,
   onToggleStatus,
@@ -136,7 +138,8 @@ export const MembersTable = ({
         id: 'actions',
         header: () => <div className="text-right">操作</div>,
         cell: ({ row }) => {
-          if (!canEdit) return null
+          // VIEW 權限既然能到頁面就一定能看 → 至少顯示「檢視」
+          // EDIT 權限再加「編輯」「刪除」
           const isSelf = row.original.id === currentSub
           const isDefault = row.original.isDefault === true
           const editReason = isDefault ? '預設帳號不可編輯' : ''
@@ -147,26 +150,6 @@ export const MembersTable = ({
               : ''
           const deleteDisabled = isDefault || isSelf
 
-          const editItem = (
-            <DropdownMenuItem
-              disabled={isDefault}
-              onSelect={() => onEdit(row.original)}
-            >
-              <Pencil />
-              編輯
-            </DropdownMenuItem>
-          )
-          const deleteItem = (
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={deleteDisabled}
-              onSelect={() => onDelete(row.original)}
-            >
-              <Trash2 />
-              刪除
-            </DropdownMenuItem>
-          )
-
           return (
             <div className="text-right">
               <DropdownMenu>
@@ -176,8 +159,33 @@ export const MembersTable = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DisabledHint reason={editReason}>{editItem}</DisabledHint>
-                  <DisabledHint reason={deleteReason}>{deleteItem}</DisabledHint>
+                  <DropdownMenuItem onSelect={() => onView(row.original)}>
+                    <Eye />
+                    檢視
+                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DisabledHint reason={editReason}>
+                        <DropdownMenuItem
+                          disabled={isDefault}
+                          onSelect={() => onEdit(row.original)}
+                        >
+                          <Pencil />
+                          編輯
+                        </DropdownMenuItem>
+                      </DisabledHint>
+                      <DisabledHint reason={deleteReason}>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={deleteDisabled}
+                          onSelect={() => onDelete(row.original)}
+                        >
+                          <Trash2 />
+                          刪除
+                        </DropdownMenuItem>
+                      </DisabledHint>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -185,7 +193,7 @@ export const MembersTable = ({
         },
       },
     ],
-    [currentSub, canEdit, onEdit, onDelete, onToggleStatus],
+    [currentSub, canEdit, onView, onEdit, onDelete, onToggleStatus],
   )
 
   return (

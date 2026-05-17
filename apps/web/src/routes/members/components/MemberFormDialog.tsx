@@ -30,13 +30,15 @@ import { RoleCombobox } from './RoleCombobox'
 
 type MemberFormDialogProps = {
   open: boolean
-  mode: 'create' | 'edit'
-  /** edit 模式時帶入欄位預設值 */
+  /** view = 唯讀檢視（所有欄位 disabled、隱藏 submit）；edit / create = 可編輯 */
+  mode: 'create' | 'edit' | 'view'
+  /** edit / view 模式時帶入欄位預設值 */
   initialValues?: Partial<CreateMemberForm>
   isSubmitting: boolean
   onClose: () => void
   /**
-   * 提交時的回呼。edit 模式下若 password 為空字串會被剝掉，由父層決定是否帶到 PATCH body
+   * 提交時的回呼。edit 模式下若 password 為空字串會被剝掉，由父層決定是否帶到 PATCH body。
+   * view 模式不會呼叫此 callback（沒有 submit 按鈕）
    */
   onSubmit: (values: CreateMemberForm) => Promise<void> | void
 }
@@ -57,13 +59,13 @@ export const MemberFormDialog = ({
   onClose,
   onSubmit,
 }: MemberFormDialogProps) => {
-  // 編輯模式允許密碼留空（schema 用 union(literal '' or 8-30) 表達），
-  // 兩個 schema 的 password 都是 string 型別，form value 統一走 CreateMemberForm
+  const isView = mode === 'view'
+  // view 模式 form 不會 submit，resolver 取哪個都行，沿用 update schema 較寬鬆
   const form = useForm<CreateMemberForm>({
     resolver:
-      mode === 'edit'
-        ? standardSchemaResolver(updateMemberFormSchema)
-        : standardSchemaResolver(createMemberFormSchema),
+      mode === 'create'
+        ? standardSchemaResolver(createMemberFormSchema)
+        : standardSchemaResolver(updateMemberFormSchema),
     defaultValues: { ...DEFAULT_VALUES, ...initialValues },
   })
 
@@ -84,12 +86,14 @@ export const MemberFormDialog = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? '新增會員' : '編輯會員'}
+            {mode === 'create' ? '新增會員' : mode === 'edit' ? '編輯會員' : '檢視會員'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
               ? '建立一個新會員帳號'
-              : '更新會員資料；密碼欄留空則不更動'}
+              : mode === 'edit'
+                ? '更新會員資料；密碼欄留空則不更動'
+                : '檢視會員資料（唯讀）'}
           </DialogDescription>
         </DialogHeader>
 
@@ -106,6 +110,7 @@ export const MemberFormDialog = ({
                       type="email"
                       autoComplete="email"
                       placeholder="name@example.com"
+                      disabled={isView}
                       {...field}
                     />
                   </FormControl>
@@ -120,39 +125,43 @@ export const MemberFormDialog = ({
                 <FormItem>
                   <FormLabel>名稱</FormLabel>
                   <FormControl>
-                    <Input placeholder="顯示名稱" {...field} />
+                    <Input placeholder="顯示名稱" disabled={isView} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    密碼{' '}
-                    {mode === 'edit' && (
-                      <span className="text-muted-foreground text-xs font-normal">
-                        （留空則不更動）
-                      </span>
-                    )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      autoComplete={
-                        mode === 'create' ? 'new-password' : 'off'
-                      }
-                      placeholder={mode === 'create' ? '8-30 字元' : '••••••••'}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isView && (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      密碼{' '}
+                      {mode === 'edit' && (
+                        <span className="text-muted-foreground text-xs font-normal">
+                          （留空則不更動）
+                        </span>
+                      )}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete={
+                          mode === 'create' ? 'new-password' : 'off'
+                        }
+                        placeholder={
+                          mode === 'create' ? '8-30 字元' : '••••••••'
+                        }
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="roleId"
@@ -164,8 +173,9 @@ export const MemberFormDialog = ({
                       value={field.value || ''}
                       onChange={field.onChange}
                       editingRoleId={
-                        mode === 'edit' ? initialValues?.roleId : undefined
+                        mode !== 'create' ? initialValues?.roleId : undefined
                       }
+                      disabled={isView}
                     />
                   </FormControl>
                   <FormMessage />
@@ -187,6 +197,7 @@ export const MemberFormDialog = ({
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      disabled={isView}
                     />
                   </FormControl>
                 </FormItem>
@@ -195,15 +206,17 @@ export const MemberFormDialog = ({
 
             <DialogFooter className="mt-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                取消
+                {isView ? '關閉' : '取消'}
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? '儲存中…'
-                  : mode === 'create'
-                    ? '新增'
-                    : '儲存'}
-              </Button>
+              {!isView && (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? '儲存中…'
+                    : mode === 'create'
+                      ? '新增'
+                      : '儲存'}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>

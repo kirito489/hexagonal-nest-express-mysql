@@ -54,8 +54,8 @@ describe('ListRoleOptionsService', () => {
   it('組裝 meta：totalPages = ceil(total / limit)', async () => {
     mockLoadRole.listActiveRoles.mockResolvedValue({
       list: [
-        { id: 'r1', name: '一般使用者', isDefault: false },
-        { id: 'r2', name: '審核者', isDefault: false },
+        { id: 'r1', name: '一般使用者', isAssignable: true },
+        { id: 'r2', name: '審核者', isAssignable: true },
       ],
       total: 35,
     });
