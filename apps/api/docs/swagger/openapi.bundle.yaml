@@ -1321,13 +1321,38 @@ paths:
     get:
       tags:
         - Members
-      summary: 角色下拉選項
+      summary: 角色下拉選項（分頁）
       description: |
-        帳號建立/編輯 Modal 的「角色」下拉用，只回傳啟用中的角色（status=true）。
+        帳號建立/編輯 Modal 的「角色」Combobox 用，分頁回傳啟用中的角色（status=true 且未軟刪除）。
+        支援名稱模糊搜尋；每筆含 isDefault 旗標（前端顯示但 disabled，不可由一般帳號指派）。
         需要 `BACKEND:ACCOUNT:VIEW` 權限。
         需要 JWT Bearer Token 認證。
       security:
         - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 頁碼，預設 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: 每頁筆數，預設 20、上限 100
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: 名稱模糊搜尋；trim 後為空字串視為未提供
       responses:
         '200':
           description: 查詢成功
@@ -1344,23 +1369,44 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    type: array
-                    description: 啟用中的角色清單
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                          description: 角色 ID
-                        name:
-                          type: string
-                          description: 角色名稱（顯示用）
-                          example: 管理者
-                        isDefault:
-                          type: boolean
-                          description: 系統角色旗標；前端 select 仍顯示但 disabled，不可由一般帳號指派
-                          example: false
+                    type: object
+                    required:
+                      - list
+                      - meta
+                    properties:
+                      list:
+                        type: array
+                        description: 啟用中的角色清單
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              description: 角色 ID
+                            name:
+                              type: string
+                              description: 角色名稱（顯示用）
+                              example: 一般使用者
+                            isDefault:
+                              type: boolean
+                              description: 系統角色旗標；前端顯示但 disabled，不可由一般帳號指派
+                              example: false
+                      meta:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                            example: 1
+                          limit:
+                            type: integer
+                            example: 20
+                          total:
+                            type: integer
+                            example: 35
+                          totalPages:
+                            type: integer
+                            example: 2
                   timestamp:
                     type: string
                     format: date-time
@@ -1368,6 +1414,72 @@ paths:
           $ref: '#/components/responses/NoToken'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  '/members/role/options/{id}':
+    get:
+      tags:
+        - Members
+      summary: 單筆角色選項（fallback）
+      description: |
+        帳號編輯 Modal 的「角色」Combobox 在「現有 roleId 不在分頁第一頁」時 fallback 取用。
+        與 `GET /api/roles/:id` 區隔：本 endpoint 給「會員」場景，只回 `{ id, name, isDefault }`，
+        且只需要 `BACKEND:ACCOUNT:VIEW` 權限，方便沒有 `BACKEND:ROLE:VIEW` 的會員管理者使用。
+        軟刪除或 status=false 的角色一律回 404。
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 查詢成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        example: 一般使用者
+                      isDefault:
+                        type: boolean
+                        example: false
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/NoToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 找不到角色或角色已停用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 角色不存在
+                code: ROLE_NOT_FOUND
+                timestamp: '2024-01-01T00:00:00.000Z'
         '500':
           $ref: '#/components/responses/InternalServerError'
   '/members/{id}':

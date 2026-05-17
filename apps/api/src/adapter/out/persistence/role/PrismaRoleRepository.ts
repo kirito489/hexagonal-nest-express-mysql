@@ -4,6 +4,8 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
 import {
   LoadRolePort,
+  ListActiveRolesParams,
+  ListActiveRolesResult,
   RoleOptionItem,
 } from '../../../../application/port/out/role/LoadRolePort';
 import {
@@ -37,15 +39,35 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
     return role ?? null;
   }
 
-  async listActiveRoles(): Promise<RoleOptionItem[]> {
-    // 仍回傳 isDefault=true 的系統角色，但帶 isDefault 旗標讓前端 disabled 顯示：
-    // 這樣「編輯自己（isDefault admin）」時 select 能對得上既有角色，僅無法改成別的
-    const roles = await this.prisma.role.findMany({
-      where: { status: true, deletedAt: null },
+  async listActiveRoles(
+    params: ListActiveRolesParams,
+  ): Promise<ListActiveRolesResult> {
+    // 仍回傳 isDefault=true 的系統角色（前端 disabled 顯示）；分頁 + 名稱模糊搜尋
+    const where = {
+      status: true,
+      deletedAt: null,
+      ...(params.search ? { name: { contains: params.search } } : {}),
+    };
+    const [list, total] = await this.prisma.$transaction([
+      this.prisma.role.findMany({
+        where,
+        select: { id: true, name: true, isDefault: true },
+        orderBy: { createdAt: 'asc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.role.count({ where }),
+    ]);
+    return { list, total };
+  }
+
+  async findActiveRoleOption(id: string): Promise<RoleOptionItem | null> {
+    // 編輯帶入 fallback：軟刪除或停用都回 null（前端顯示「（已停用 / 不可用）」）
+    const role = await this.prisma.role.findFirst({
+      where: { id, status: true, deletedAt: null },
       select: { id: true, name: true, isDefault: true },
-      orderBy: { createdAt: 'asc' },
     });
-    return roles;
+    return role ?? null;
   }
 
   // ── RoleRepositoryPort ────────────────────────

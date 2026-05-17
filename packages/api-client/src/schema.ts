@@ -1261,14 +1261,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 角色下拉選項
-         * @description 帳號建立/編輯 Modal 的「角色」下拉用，只回傳啟用中的角色（status=true）。
+         * 角色下拉選項（分頁）
+         * @description 帳號建立/編輯 Modal 的「角色」Combobox 用，分頁回傳啟用中的角色（status=true 且未軟刪除）。
+         *     支援名稱模糊搜尋；每筆含 isDefault 旗標（前端顯示但 disabled，不可由一般帳號指派）。
          *     需要 `BACKEND:ACCOUNT:VIEW` 權限。
          *     需要 JWT Bearer Token 認證。
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description 頁碼，預設 1 */
+                    page?: number;
+                    /** @description 每頁筆數，預設 20、上限 100 */
+                    limit?: number;
+                    /** @description 名稱模糊搜尋；trim 後為空字串視為未提供 */
+                    search?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1284,24 +1292,36 @@ export interface paths {
                         "application/json": {
                             /** @example true */
                             success: boolean;
-                            /** @description 啟用中的角色清單 */
                             data: {
-                                /**
-                                 * Format: uuid
-                                 * @description 角色 ID
-                                 */
-                                id?: string;
-                                /**
-                                 * @description 角色名稱（顯示用）
-                                 * @example 管理者
-                                 */
-                                name?: string;
-                                /**
-                                 * @description 系統角色旗標；前端 select 仍顯示但 disabled，不可由一般帳號指派
-                                 * @example false
-                                 */
-                                isDefault?: boolean;
-                            }[];
+                                /** @description 啟用中的角色清單 */
+                                list: {
+                                    /**
+                                     * Format: uuid
+                                     * @description 角色 ID
+                                     */
+                                    id?: string;
+                                    /**
+                                     * @description 角色名稱（顯示用）
+                                     * @example 一般使用者
+                                     */
+                                    name?: string;
+                                    /**
+                                     * @description 系統角色旗標；前端顯示但 disabled，不可由一般帳號指派
+                                     * @example false
+                                     */
+                                    isDefault?: boolean;
+                                }[];
+                                meta: {
+                                    /** @example 1 */
+                                    page?: number;
+                                    /** @example 20 */
+                                    limit?: number;
+                                    /** @example 35 */
+                                    total?: number;
+                                    /** @example 2 */
+                                    totalPages?: number;
+                                };
+                            };
                             /** Format: date-time */
                             timestamp: string;
                         };
@@ -1309,6 +1329,83 @@ export interface paths {
                 };
                 401: components["responses"]["NoToken"];
                 403: components["responses"]["Forbidden"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/members/role/options/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 單筆角色選項（fallback）
+         * @description 帳號編輯 Modal 的「角色」Combobox 在「現有 roleId 不在分頁第一頁」時 fallback 取用。
+         *     與 `GET /api/roles/:id` 區隔：本 endpoint 給「會員」場景，只回 `{ id, name, isDefault }`，
+         *     且只需要 `BACKEND:ACCOUNT:VIEW` 權限，方便沒有 `BACKEND:ROLE:VIEW` 的會員管理者使用。
+         *     軟刪除或 status=false 的角色一律回 404。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 查詢成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /** Format: uuid */
+                                id?: string;
+                                /** @example 一般使用者 */
+                                name?: string;
+                                /** @example false */
+                                isDefault?: boolean;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到角色或角色已停用 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "角色不存在",
+                         *       "code": "ROLE_NOT_FOUND",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 500: components["responses"]["InternalServerError"];
             };
         };

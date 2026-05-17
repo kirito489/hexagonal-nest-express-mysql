@@ -62,6 +62,7 @@ const mockLoadRole = {
   findRoleById: jest.fn(),
   findDefaultRoleId: jest.fn(),
   listActiveRoles: jest.fn(),
+  findActiveRoleOption: jest.fn(),
 } as jest.Mocked<LoadRolePort>;
 
 const mockClearMemberContext = {

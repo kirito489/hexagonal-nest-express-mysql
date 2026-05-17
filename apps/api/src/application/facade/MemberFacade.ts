@@ -28,9 +28,15 @@ import {
 } from '../port/in/member/DeleteMemberUseCase';
 import {
   LIST_ROLE_OPTIONS_USE_CASE,
+  ListRoleOptionsQuery,
+  ListRoleOptionsResult,
   ListRoleOptionsUseCase,
   RoleOptionItem,
 } from '../port/in/member/ListRoleOptionsUseCase';
+import {
+  GET_ROLE_OPTION_USE_CASE,
+  GetRoleOptionUseCase,
+} from '../port/in/member/GetRoleOptionUseCase';
 import {
   LOAD_MEMBER_CONTEXT_PORT,
   LoadMemberContextPort,
@@ -55,6 +61,8 @@ export class MemberFacade {
     private readonly deleteMemberUseCase: DeleteMemberUseCase,
     @Inject(LIST_ROLE_OPTIONS_USE_CASE)
     private readonly listRoleOptionsUseCase: ListRoleOptionsUseCase,
+    @Inject(GET_ROLE_OPTION_USE_CASE)
+    private readonly getRoleOptionUseCase: GetRoleOptionUseCase,
     @Inject(LOAD_MEMBER_CONTEXT_PORT)
     private readonly loadMemberContextPort: LoadMemberContextPort,
   ) {}
@@ -79,8 +87,12 @@ export class MemberFacade {
     return this.deleteMemberUseCase.execute(command);
   }
 
-  listRoleOptions(): Promise<RoleOptionItem[]> {
-    return this.listRoleOptionsUseCase.execute();
+  listRoleOptions(query: ListRoleOptionsQuery): Promise<ListRoleOptionsResult> {
+    return this.listRoleOptionsUseCase.execute(query);
+  }
+
+  getRoleOption(id: string): Promise<RoleOptionItem> {
+    return this.getRoleOptionUseCase.execute(id);
   }
 
   async getMyProfile(id: string): Promise<ProfileDetail> {

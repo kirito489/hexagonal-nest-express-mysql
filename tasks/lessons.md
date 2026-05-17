@@ -68,6 +68,14 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **Docker MySQL 容器剛啟動的前幾秒，Prisma adapter 連線池會 pool timeout**：`docker compose up -d` / `docker start my-mysql` 立刻打 API 會看到 `DriverAdapterError: pool timeout: failed to retrieve a connection from pool after 10000ms (pool connections: active=0 idle=0 limit=10)`，但同時 mysql2 直連、`docker exec mysql ...` 都正常。容器要 5–30 秒完整 ready，Prisma 7 mariadb adapter 在這段過渡期建不起連線。**Why:** 2026-05-17 早上 `pnpm dev` 後立刻試登入打到此狀況，幾秒後 retry 又好了。**How to apply:** 看到 pool timeout 先等 10 秒重試。要徹底解可在 `apps/api/src/main.ts` 加 `wait-on tcp:3306` 或 retry，但 dev 體驗影響不大不值得。
 
+## 前端 / TanStack Query infinite
+
+- **`useInfiniteQuery` 不會走 `useApiQuery` 的 envelope unwrap，要手動呼叫 `unwrapEnvelope`**：`useApiQuery` / `useApiMutation` 內部會把後端 `{ success, data, timestamp }` 外殼剝開，呼叫端 `.data` 直接拿到內層內容。但 `useInfiniteQuery` 用 `apiClient.GET(...)` 自寫 `queryFn` 時不會經過 hooks 內的 unwrap，呼叫端 `lastPage.list` 永遠是 undefined（因為實際長相是 `{ success, data: { list, meta } }`）。**Why:** 2026-05-18 paginate-member-role-options change Phase 9 完工後手動驗證 Combobox 顯示「找不到角色」即踩到此問題。**How to apply:** 在 `@app/api-client` 內把 `unwrapEnvelope` export 出來；自寫 `useInfiniteQuery` / `useQuery` 的 `queryFn` 都在 return 前呼叫一次，與 `useApiQuery` 行為一致。
+
+## API endpoint 設計
+
+- **分頁列表 + 「按 id 取單筆」是同一個 capability 的兩個 endpoint，不要借用其他模組同樣資料的 endpoint**：本專案 Combobox 編輯時要顯示「不在第一頁的角色」名稱，看起來 `GET /api/roles/:id` 就夠用，但那個 endpoint 需要 `BACKEND:ROLE:VIEW` 權限；只有 `BACKEND:ACCOUNT:VIEW` 的會員管理者打不到，UX 會破。**Why:** 2026-05-18 paginate-member-role-options change 設計階段曾考慮借用 `/api/roles/:id`，後拍板開窄化 endpoint `GET /api/members/role/options/:id`，回應只含 `{ id, name, isDefault }` 並沿用會員管理權限。**How to apply:** 同樣資料但「呼叫情境不同 = 權限模型不同」時，寧可開薄薄的窄化 endpoint，也不要借用別的模組。維護成本看起來增加，但避免「打得到 list 卻打不到單筆」的權限詭異感。
+
 ## OpenSpec workflow
 
 - **propose 階段要先核對 API contract，不要假設「list 有的欄位 update 也支援」**：role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 update DTO 與 service 卻沒處理 `status`。提案寫成「純前端 change」，動工後才發現要連動改後端 + Swagger + api-client + unit spec + e2e。**Why:** 2026-05-18 add-role-management-page Phase 2 開動前才發現必須擴後端，artifacts 整份重改範圍。**How to apply:** 寫 proposal / design 前，先讀 `apps/api/src/adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端要做的互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充行為要在 proposal 的 Capabilities 列為 Modified / ADDED，並在 tasks.md 放在「前端開動前」的 phase。

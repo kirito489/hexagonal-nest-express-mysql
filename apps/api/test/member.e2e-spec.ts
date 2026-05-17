@@ -95,7 +95,10 @@ const mockPrisma = {
       status: true,
     }),
     findFirst: jest.fn().mockResolvedValue({ id: ROLE_UUID, name: 'admin' }),
-    findMany: jest.fn().mockResolvedValue([{ id: ROLE_UUID, name: 'admin' }]),
+    findMany: jest
+      .fn()
+      .mockResolvedValue([{ id: ROLE_UUID, name: 'admin', isDefault: false }]),
+    count: jest.fn().mockResolvedValue(1),
   },
 };
 
@@ -149,8 +152,9 @@ describe('Member E2E', () => {
       name: 'admin',
     });
     mockPrisma.role.findMany.mockResolvedValue([
-      { id: ROLE_UUID, name: 'admin' },
+      { id: ROLE_UUID, name: 'admin', isDefault: false },
     ]);
+    mockPrisma.role.count.mockResolvedValue(1);
     mockPrisma.$transaction.mockImplementation((arg: unknown) => {
       if (typeof arg === 'function')
         return (arg as (tx: unknown) => unknown)(mockPrisma);
@@ -202,7 +206,7 @@ describe('Member E2E', () => {
       expect(res.status).toBe(401);
     });
 
-    it('有 JWT + EDIT 權限 → 200 + 角色清單', async () => {
+    it('預設分頁 → 200 + { list, meta }', async () => {
       const token = await loginAndGetToken(app);
 
       const res = await request(app.getHttpServer())
@@ -210,16 +214,120 @@ describe('Member E2E', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      const body = res.body as { data: unknown[] };
-      expect(Array.isArray(body.data)).toBe(true);
+      const body = res.body as {
+        data: {
+          list: Array<{ id: string; name: string; isDefault: boolean }>;
+          meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
+        };
+      };
+      expect(Array.isArray(body.data.list)).toBe(true);
+      expect(body.data.meta.page).toBe(1);
+      expect(body.data.meta.limit).toBe(20);
+      expect(body.data.meta.total).toBe(1);
+      expect(body.data.meta.totalPages).toBe(1);
+      expect(body.data.list[0]).toEqual(
+        expect.objectContaining({ isDefault: false }),
+      );
     });
 
-    it('無 EDIT 權限 → 403', async () => {
+    it('指定 page / limit → 200 且 prisma.findMany 收到對應 skip/take', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members/role/options?page=2&limit=10')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 }),
+      );
+    });
+
+    it('search 命中 → 200 且 where.name.contains 被帶上', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members/role/options?search=admin')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            name: { contains: 'admin' },
+          }),
+        }),
+      );
+    });
+
+    it('無 VIEW 權限 → 403', async () => {
       const token = await loginAsNoPerm(app);
       mockPrisma.memberRecord.findFirst.mockResolvedValue(NO_PERM_MEMBER_DB);
 
       const res = await request(app.getHttpServer())
         .get('/api/members/role/options')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ── GET /api/members/role/options/:id ──────────
+
+  describe('GET /api/members/role/options/:id', () => {
+    it('無 JWT → 401', async () => {
+      const res = await request(app.getHttpServer()).get(
+        `/api/members/role/options/${ROLE_UUID}`,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('找到啟用角色 → 200 + { id, name, isDefault }', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.role.findFirst.mockResolvedValueOnce({
+        id: ROLE_UUID,
+        name: 'admin',
+        isDefault: false,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/members/role/options/${ROLE_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        data: { id: string; name: string; isDefault: boolean };
+      };
+      expect(body.data).toEqual({
+        id: ROLE_UUID,
+        name: 'admin',
+        isDefault: false,
+      });
+    });
+
+    it('角色不存在 / 停用 → 404 ROLE_NOT_FOUND', async () => {
+      const token = await loginAndGetToken(app);
+      mockPrisma.role.findFirst.mockResolvedValueOnce(null);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/members/role/options/${ROLE_UUID}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+    });
+
+    it('無 VIEW 權限 → 403', async () => {
+      const token = await loginAsNoPerm(app);
+      mockPrisma.memberRecord.findFirst.mockResolvedValue(NO_PERM_MEMBER_DB);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/members/role/options/${ROLE_UUID}`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(403);

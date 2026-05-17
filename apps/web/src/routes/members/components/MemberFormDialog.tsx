@@ -22,20 +22,11 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   createMemberFormSchema,
   updateMemberFormSchema,
   type CreateMemberForm,
 } from '../lib/member-form-schema'
-import { useRoleOptionsQuery } from '../hooks/use-role-options-query'
-
-type RoleOption = { id?: string; name?: string; isDefault?: boolean }
+import { RoleCombobox } from './RoleCombobox'
 
 type MemberFormDialogProps = {
   open: boolean
@@ -66,9 +57,6 @@ export const MemberFormDialog = ({
   onClose,
   onSubmit,
 }: MemberFormDialogProps) => {
-  const roleOptions = useRoleOptionsQuery()
-  const roles: RoleOption[] = roleOptions.data ?? []
-
   // 編輯模式允許密碼留空（schema 用 union(literal '' or 8-30) 表達），
   // 兩個 schema 的 password 都是 string 型別，form value 統一走 CreateMemberForm
   const form = useForm<CreateMemberForm>({
@@ -171,39 +159,15 @@ export const MemberFormDialog = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>角色</FormLabel>
-                  <Select
-                    value={field.value || undefined}
-                    onValueChange={field.onChange}
-                    disabled={roleOptions.isLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            roleOptions.isLoading ? '載入中…' : '請選擇角色'
-                          }
-                        />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {roles.map((role) =>
-                        role.id ? (
-                          <SelectItem
-                            key={role.id}
-                            value={role.id}
-                            disabled={role.isDefault === true}
-                          >
-                            {role.name ?? '(未命名)'}
-                            {role.isDefault ? (
-                              <span className="text-muted-foreground ml-2 text-xs">
-                                （系統角色）
-                              </span>
-                            ) : null}
-                          </SelectItem>
-                        ) : null,
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <RoleCombobox
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      editingRoleId={
+                        mode === 'edit' ? initialValues?.roleId : undefined
+                      }
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

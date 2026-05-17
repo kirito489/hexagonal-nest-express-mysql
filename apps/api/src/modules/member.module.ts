@@ -11,6 +11,7 @@ import {
 import { UpdateMemberService } from '../application/service/member/UpdateMemberService';
 import { DeleteMemberService } from '../application/service/member/DeleteMemberService';
 import { ListRoleOptionsService } from '../application/service/member/ListRoleOptionsService';
+import { GetRoleOptionService } from '../application/service/member/GetRoleOptionService';
 import { PasswordPolicyService } from '../application/service/PasswordPolicyService';
 import { PrismaMemberRepository } from '../adapter/out/persistence/member/PrismaMemberRepository';
 import { LIST_MEMBERS_USE_CASE } from '../application/port/in/member/ListMembersUseCase';
@@ -19,6 +20,7 @@ import { CREATE_MEMBER_USE_CASE } from '../application/port/in/member/CreateMemb
 import { UPDATE_MEMBER_USE_CASE } from '../application/port/in/member/UpdateMemberUseCase';
 import { DELETE_MEMBER_USE_CASE } from '../application/port/in/member/DeleteMemberUseCase';
 import { LIST_ROLE_OPTIONS_USE_CASE } from '../application/port/in/member/ListRoleOptionsUseCase';
+import { GET_ROLE_OPTION_USE_CASE } from '../application/port/in/member/GetRoleOptionUseCase';
 import { LOAD_MEMBER_PORT } from '../application/port/out/member/LoadMemberPort';
 import { SAVE_MEMBER_PORT } from '../application/port/out/member/SaveMemberPort';
 import { LOAD_MEMBER_CONTEXT_PORT } from '../application/port/out/member/LoadMemberContextPort';
@@ -50,6 +52,7 @@ import { getEnv } from '../infrastructure/validate-env';
     { provide: UPDATE_MEMBER_USE_CASE, useClass: UpdateMemberService },
     { provide: DELETE_MEMBER_USE_CASE, useClass: DeleteMemberService },
     { provide: LIST_ROLE_OPTIONS_USE_CASE, useClass: ListRoleOptionsService },
+    { provide: GET_ROLE_OPTION_USE_CASE, useClass: GetRoleOptionService },
     MemberFacade,
   ],
   exports: [

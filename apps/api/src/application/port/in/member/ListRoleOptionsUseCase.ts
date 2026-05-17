@@ -5,8 +5,26 @@ export interface RoleOptionItem {
   isDefault: boolean;
 }
 
+export interface ListRoleOptionsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface ListRoleOptionsMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ListRoleOptionsResult {
+  list: RoleOptionItem[];
+  meta: ListRoleOptionsMeta;
+}
+
 export const LIST_ROLE_OPTIONS_USE_CASE = 'LIST_ROLE_OPTIONS_USE_CASE';
 
 export interface ListRoleOptionsUseCase {
-  execute(): Promise<RoleOptionItem[]>;
+  execute(query: ListRoleOptionsQuery): Promise<ListRoleOptionsResult>;
 }

@@ -240,6 +240,10 @@ paths:
     get:
       $ref: './members/role-options.yaml'
 
+  /members/role/options/{id}:
+    get:
+      $ref: './members/role-option.yaml'
+
   /members/{id}:
     get:
       $ref: './members/get.yaml'

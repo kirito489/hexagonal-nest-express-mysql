@@ -110,8 +110,11 @@ export const createApiQueryHooks = (client: ApiClient) => {
   return { useApiQuery, useApiMutation }
 }
 
-// 後端統一回應 { success, data, timestamp }；剝開外殼回傳 data，沒有 data 欄位則回傳原值
-const unwrapEnvelope = (body: unknown): unknown => {
+/**
+ * 後端統一回應 `{ success, data, timestamp }`；剝開外殼回傳 data，沒有 data 欄位則回傳原值。
+ * Export 讓 `useInfiniteQuery` 等不走 `useApiQuery` 的呼叫端能複用同一段 unwrap 邏輯
+ */
+export const unwrapEnvelope = (body: unknown): unknown => {
   if (
     typeof body === 'object' &&
     body !== null &&

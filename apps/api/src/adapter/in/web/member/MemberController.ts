@@ -23,6 +23,10 @@ import {
 import { PermissionCode } from '../../../../domain/value-object/Role';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
 import { listMembersQuerySchema, ListMembersQuery } from './ListMembersQuery';
+import {
+  listRoleOptionsQuerySchema,
+  ListRoleOptionsQueryDto,
+} from './ListRoleOptionsQuery';
 import { createMemberSchema, CreateMemberRequest } from './CreateMemberRequest';
 import { updateMemberSchema, UpdateMemberRequest } from './UpdateMemberRequest';
 
@@ -42,8 +46,18 @@ export class MemberController {
 
   @Get('role/options')
   @Permissions(PermissionCode.BACKEND_ACCOUNT_VIEW)
-  listRoleOptions() {
-    return this.memberFacade.listRoleOptions();
+  listRoleOptions(
+    @Query(new ZodValidationPipe(listRoleOptionsQuerySchema))
+    query: ListRoleOptionsQueryDto,
+  ) {
+    return this.memberFacade.listRoleOptions(query);
+  }
+
+  // 注意：literal path 必須宣告在 `:id` 之前才不會被吃掉（Express 5 路由匹配順序）
+  @Get('role/options/:id')
+  @Permissions(PermissionCode.BACKEND_ACCOUNT_VIEW)
+  getRoleOption(@Param('id', ParseUUIDPipe) id: string) {
+    return this.memberFacade.getRoleOption(id);
   }
 
   @Get(':id')
