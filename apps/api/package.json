@@ -28,7 +28,7 @@
     "db:drop": "ts-node scripts/drop-database.ts",
     "db:migrate": "ts-node scripts/prisma-env.ts prisma migrate dev",
     "db:migrate:deploy": "ts-node scripts/prisma-env.ts prisma migrate deploy",
-    "db:generate": "ts-node scripts/prisma-env.ts prisma generate",
+    "db:generate": "ts-node scripts/prisma-env.ts prisma generate --no-hints",
     "db:studio": "ts-node scripts/prisma-env.ts prisma studio",
     "postinstall": "cd node_modules/@prisma/client && ln -sf ../../.prisma .prisma"
   },

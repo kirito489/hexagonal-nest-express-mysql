@@ -2,7 +2,7 @@ import * as mysql from 'mysql2/promise';
 import * as dotenv from 'dotenv';
 import pino from 'pino';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const log = pino({
   name: 'create-database',

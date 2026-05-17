@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pino from 'pino';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // production 擋關：避免誤把測試資料 upsert 到生產庫
 if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_PROD_SEED) {

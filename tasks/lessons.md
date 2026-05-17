@@ -46,11 +46,9 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 ## NestJS build
 
+- **tsconfig 要設 `preserveWatchOutput: true`，否則 `tsc --watch` 會吃掉終端 scrollback**：tsc 預設使用 alternate screen buffer（同 `vim` / `less` 那種），watch 模式每次重建會把畫面整個替換，先前的輸出（如 `[web]` 的 Vite ready URL）會消失且無法往上 scroll 找回。`apps/api/tsconfig.json` 設 `"preserveWatchOutput": true` 就會把每次編譯結果 append 進主畫面，不切換 alt screen。**Why:** 2026-05-17 確認 customLogger 修好 Vite 訊息後，使用者跑 `pnpm dev` 還是看不到 `[web]`，因為 `nest start --watch` 內的 tsc 把畫面切到 alt screen 把它擋掉了。**How to apply:** monorepo 內任何用 `tsc --watch` 的 workspace（包括 NestJS 的 nest start --watch）都加這條。
+
 - **`tsBuildInfoFile` 必須放在 dist 內**：`apps/api/nest-cli.json` 設 `deleteOutDir: true`，每次 `nest build` / `nest start --watch` 會把 dist 整個刪掉；但 TS `incremental: true` 的 `.tsbuildinfo` 預設在 tsconfig 旁邊（root），刪 dist 不會清掉它，導致 TS 以為「沒變動 = 不用 emit」，build 完 dist 是空的，nest 啟動 dist/main 失敗。**Why:** 2026-05-16 setup-monorepo-frontend 階段 10 後第一次 `pnpm dev`，前端 Vite 起來但 `[api]` 報 `Cannot find module '.../dist/main'`，明明 `tsc` 印 `Found 0 errors`。**How to apply:** `apps/api/tsconfig.json` 設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`，cache 與 build 產物同生共死。如果遇到「明明改過 code 卻沒重編」，先刪 `.tsbuildinfo` 重跑即可。
-
-## Vite / Concurrently
-
-- **Vite 8 在 stdout 為 pipe（concurrently / CI）時會抑制 ready banner**：直接在 terminal 跑 `vite` 會印 `VITE vX.X.X ready in XXX ms / ➜ Local: http://localhost:5173/`，但被 `concurrently` 包起來後 stdout 是 pipe，Vite 偵測到非 TTY 就完全靜音。dev server 實際**有跑**（curl 該 port 拿得到 HTML），只是 log 看不到。連寫個小 plugin 用 `console.log` 或 `process.stderr.write` 也無效（Vite 內部對 stream 做了處理）。**Why:** 2026-05-16 setup-monorepo-frontend phase 10 後手動測 `pnpm dev` 時 `[web]` 沒任何輸出，誤以為 Vite 沒起來；用 `ps` / `lsof -ti:5173` / `curl` 才確認其實是好的。**How to apply:** 別期待在 `pnpm dev` 看到 Vite ready 訊息；直接開瀏覽器 `http://localhost:5173/` 即可。要解決得換 PTY 支援的 runner（如 `npm-run-all2 --pty`），但成本不划算。
 
 ## Docker / 本機服務
 

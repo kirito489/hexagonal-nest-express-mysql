@@ -56,7 +56,14 @@ import { getEnv } from './infrastructure/validate-env';
                   ? [
                       {
                         target: 'pino-pretty',
-                        options: { colorize: true, translateTime: 'HH:MM:ss' },
+                        options: {
+                          colorize: true,
+                          translateTime: 'HH:MM:ss',
+                          // 把 context 移到訊息前綴，並隱藏 pid / hostname 與第二行的 context
+                          messageFormat: '[{context}] {msg}',
+                          ignore: 'pid,hostname,context',
+                          singleLine: true,
+                        },
                         level: env.LOG_LEVEL,
                       },
                     ]

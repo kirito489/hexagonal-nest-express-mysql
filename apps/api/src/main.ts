@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ quiet: true });
 
 import { LoggerService } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
