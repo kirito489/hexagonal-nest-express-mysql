@@ -68,6 +68,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **Docker MySQL 容器剛啟動的前幾秒，Prisma adapter 連線池會 pool timeout**：`docker compose up -d` / `docker start my-mysql` 立刻打 API 會看到 `DriverAdapterError: pool timeout: failed to retrieve a connection from pool after 10000ms (pool connections: active=0 idle=0 limit=10)`，但同時 mysql2 直連、`docker exec mysql ...` 都正常。容器要 5–30 秒完整 ready，Prisma 7 mariadb adapter 在這段過渡期建不起連線。**Why:** 2026-05-17 早上 `pnpm dev` 後立刻試登入打到此狀況，幾秒後 retry 又好了。**How to apply:** 看到 pool timeout 先等 10 秒重試。要徹底解可在 `apps/api/src/main.ts` 加 `wait-on tcp:3306` 或 retry，但 dev 體驗影響不大不值得。
 
+## OpenSpec workflow
+
+- **propose 階段要先核對 API contract，不要假設「list 有的欄位 update 也支援」**：role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 update DTO 與 service 卻沒處理 `status`。提案寫成「純前端 change」，動工後才發現要連動改後端 + Swagger + api-client + unit spec + e2e。**Why:** 2026-05-18 add-role-management-page Phase 2 開動前才發現必須擴後端，artifacts 整份重改範圍。**How to apply:** 寫 proposal / design 前，先讀 `apps/api/src/adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端要做的互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充行為要在 proposal 的 Capabilities 列為 Modified / ADDED，並在 tasks.md 放在「前端開動前」的 phase。
+
 ## Swagger
 
 - **採分檔 + `$ref` 結構**：`openapi.yaml` 只放 components / servers / info 與 paths 索引；每個 endpoint 一個獨立 yaml。不要 inline 寫整包 spec。
@@ -83,6 +87,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 ## 前端 / React + zod + react-hook-form
 
 - **zod v4.1+ 不要用 `zodResolver`，改用 `standardSchemaResolver`**：`@hookform/resolvers/zod` 的 v4 overload 是針對 zod 4.0 編譯的（內部檢查 `_zod.version.minor === 0`），任何 zod 4.1+ 都會型別錯誤 `Type '4' is not assignable to type '0'`。解法：`import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'`，zod v4 原生實作 Standard Schema spec，型別簽章不依賴 zod 內部版本欄位。**Why:** 2026-05-16 setup-monorepo-frontend 階段二踩到，先用 `as never` 繞過被否決，找出真正乾淨解。**How to apply:** 新表單一律用 `standardSchemaResolver(schema)`，不要用 `zodResolver`；好處是未來換 valibot/arktype 也是同一個 resolver。
+
+- **react-hook-form 表單 schema 不要用 zod `.transform()`**：`standardSchemaResolver(schemaWithTransform)` 會讓 input/output 型別分歧（input 是 raw、output 是 transform 後），但 `useForm<T>` 同時把 T 套在 defaultValues、field control、handleSubmit values 三邊，型別會 narrow 不下來而報 `Type 'FieldValues' is missing the following properties...`。**Why:** 2026-05-18 add-role-management-page 把 EDIT→VIEW normalize 寫在 `roleFormSchema.permissionCodes.transform(...)` 內，typecheck 立即炸。**How to apply:** 表單 schema 只做 validate，**normalize 放 submit handler**（在 `mutateAsync({ body: ... })` 組 body 那一步呼叫 helper）；helper export 出來給其他呼叫端共用，達成 defense in depth 但不打亂表單型別。若一定要在 schema 做轉換，要拆 `z.input<T>` / `z.output<T>` 並用 `useForm<TInput, TContext, TOutput>` 三個泛型，成本不划算。
+
+- **PermissionsField 等「分組多選 checkbox」用垂直 stack，不要把 module 名與 checkboxes 擺同一行**：module label + 兩個含 i18n 文字的 checkbox + 全選 button 想擺同 row，項目寬度一變動就會醜（換行錯位 / 全選被推到下面）。**Why:** 2026-05-18 add-role-management-page 第一版用 `grid-cols-[1fr_auto] flex-wrap` 把所有東西塞同列，遇到「後台-角色與權限管理-檢視 / 編輯」這種長字串就 wrap 跨兩行很難看。**How to apply:** 每個 module 一個 card，內部分兩層：(1) header row（module 名 + 全選 button，`flex justify-between`），(2) checkbox 區（垂直 `flex flex-col gap-2`，每個 checkbox 獨佔一行）。文字長度不再影響排版。
 
 - **shadcn nova preset 的 registry 沒有 `form`**：`pnpm dlx shadcn@latest add form` 會 silent fail（只印 "Checking registry"），其他元件如 input/label/card/sidebar 都正常。解法：自寫 `src/components/ui/form.tsx`，內容是標準 shadcn form pattern（Controller + Slot + FormItemContext + useFormField），需注意 radix-ui 是 mega-package，import 寫 `import { Slot } from 'radix-ui'`。
 

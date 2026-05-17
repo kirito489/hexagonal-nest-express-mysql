@@ -1,4 +1,4 @@
-import { Home, Users } from 'lucide-react'
+import { Home, Shield, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
@@ -20,5 +20,11 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/members',
     icon: Users,
     requiredPermission: 'BACKEND:ACCOUNT:VIEW',
+  },
+  {
+    label: '角色管理',
+    path: '/roles',
+    icon: Shield,
+    requiredPermission: 'BACKEND:ROLE:VIEW',
   },
 ]

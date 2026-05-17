@@ -10,6 +10,7 @@ import { Layout } from '@/routes/_layout'
 import { LoginPage } from '@/routes/login/page'
 import { HomePage } from '@/routes/home/page'
 import { MembersPage } from '@/routes/members/page'
+import { RolesPage } from '@/routes/roles/page'
 import { queryClient } from '@/api/query-client'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -32,6 +33,7 @@ export const App = () => {
               >
                 <Route path="/" element={<HomePage />} />
                 <Route path="/members" element={<MembersPage />} />
+                <Route path="/roles" element={<RolesPage />} />
               </Route>
             </Routes>
           </BrowserRouter>
