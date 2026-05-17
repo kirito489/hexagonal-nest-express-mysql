@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { RotateCcw } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  StatusFilterSelect,
-  type StatusFilterValue,
-} from '@/components/StatusFilterSelect'
+import { StatusFilterSelect } from '@/components/StatusFilterSelect'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
-
-type StatusFilter = 'true' | 'false' | undefined
+import { useIsFirstRun } from '@/lib/use-is-first-run'
+import type { StatusFilter } from '@/lib/status-filter'
 
 type MembersSearchBarProps = {
   initialName: string
@@ -34,19 +33,22 @@ export const MembersSearchBar = ({
   const debouncedName = useDebouncedValue(nameInput, 300)
   const debouncedEmail = useDebouncedValue(emailInput, 300)
 
-  // mount 首次的 debounced 值等於 initialName/Email（即 URL 現況），不需要再 push 一次
-  const isFirstRun = useRef(true)
+  // mount 首次的 debounced 值等於 initialName/Email（即 URL 現況），跳過避免多走 setSearchParams
+  const consumeFirstRun = useIsFirstRun()
   useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false
-      return
-    }
+    if (consumeFirstRun()) return
     onSearch(debouncedName, debouncedEmail)
-  }, [debouncedName, debouncedEmail, onSearch])
+  }, [debouncedName, debouncedEmail, onSearch, consumeFirstRun])
 
-  const statusValue: StatusFilterValue = initialStatus ?? 'all'
-  const handleStatusChange = (v: StatusFilterValue) => {
-    onStatusChange(v === 'all' ? undefined : v)
+  const hasFilter =
+    nameInput !== '' || emailInput !== '' || initialStatus !== undefined
+
+  const handleReset = () => {
+    setNameInput('')
+    setEmailInput('')
+    // 立即寫 URL，不等 debounce；之後 useEffect 因 debounced 變空再 fire 一次無害
+    onSearch('', '')
+    onStatusChange(undefined)
   }
 
   return (
@@ -75,7 +77,20 @@ export const MembersSearchBar = ({
           className="w-56"
         />
       </div>
-      <StatusFilterSelect value={statusValue} onChange={handleStatusChange} />
+      <StatusFilterSelect
+        value={initialStatus}
+        onChange={onStatusChange}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleReset}
+        disabled={!hasFilter}
+        title="重置搜尋條件"
+      >
+        <RotateCcw />
+        重置
+      </Button>
     </div>
   )
 }

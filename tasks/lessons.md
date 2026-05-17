@@ -84,6 +84,19 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **propose 階段要先核對 API contract，不要假設「list 有的欄位 update 也支援」**：role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 update DTO 與 service 卻沒處理 `status`。提案寫成「純前端 change」，動工後才發現要連動改後端 + Swagger + api-client + unit spec + e2e。**Why:** 2026-05-18 add-role-management-page Phase 2 開動前才發現必須擴後端，artifacts 整份重改範圍。**How to apply:** 寫 proposal / design 前，先讀 `apps/api/src/adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端要做的互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充行為要在 proposal 的 Capabilities 列為 Modified / ADDED，並在 tasks.md 放在「前端開動前」的 phase。
 
+- **archive commit 不要只有標題，body 必須列出新建 / 修改的 master spec**：`openspec-archive-change` 跑完只把 change 資料夾搬走、合併 spec，git diff 看得到但 commit message 看不到。連續 3 次 archive commit body 空白被 review 點到（`ef167399` / `fa3708a` / `64f80f3`），未來 `git log` 找「某 capability 何時定義 / reqs 變動」會卡住。**Why:** 2026-05-18 add-status-filter-to-list-pages archive 後 review 第三次點此問題，決定樣板化。**How to apply:** archive commit 一律用以下樣板（短橫線縮排）：
+
+  ```
+  chore: 封存 <change-name>
+
+    - 移到 openspec/changes/archive/<YYYY-MM-DD>-*/
+    - master specs：
+      <spec-A> 新建（N reqs：簡述涵蓋範圍）
+      <spec-B> 修（簡述變動）
+  ```
+
+  Reqs 數量可從 `grep -c "^### Requirement:" openspec/specs/<spec>/spec.md` 取得。
+
 ## Swagger
 
 - **採分檔 + `$ref` 結構**：`openapi.yaml` 只放 components / servers / info 與 paths 索引；每個 endpoint 一個獨立 yaml。不要 inline 寫整包 spec。
@@ -95,6 +108,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 ## Seeds / Scripts
 
 - **`seed-runner.ts` 必須擋 production**：`if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_PROD_SEED) process.exit(1)`，避免誤把測試資料 upsert 到生產庫。
+
+## 前端 / React hooks
+
+- **自訂 hook 回傳的函式若會進到呼叫端 useEffect deps，必須 `useCallback` 包起來，否則陷無限迴圈**：每次 render 都建新 function instance → 進 deps 後 effect 每 render 都跑 → effect 內若呼叫會改父 state / URL 的 setter（如 `setSearchParams`）就觸發父層 re-render → 新 function instance → 又跑 → Chrome 直接擋 `Throttling navigation to prevent the browser from hanging`。`useRef` 持有的狀態用 `useCallback([], )` 包是安全的（mount 時建一次，閉包讀 `ref.current` 永遠是最新值）。**Why:** 2026-05-18 add-status-filter-to-list-pages review 全修把 SearchBar 的 `isFirstRun` ref 抽成 `useIsFirstRun` helper，回傳 `() => { ... }` 沒用 `useCallback`；SearchBar 把 `consumeFirstRun` 放進 deps 後 `/members` / `/roles` 一進場就被 throttling，URL 連改數十次。**How to apply:** 任何 `useXxx()` 回傳函式都檢查「呼叫端是否會放進 deps」；只要可能就一律 `useCallback`，jsdoc 寫明「必須 useCallback，否則無限迴圈」當路標。對 lint：react-compiler 不會幫你抓這條，要靠紀律 + e2e 進場時實際開頁面看 console 有無 throttling 警告。
 
 ## 前端 / React + zod + react-hook-form
 

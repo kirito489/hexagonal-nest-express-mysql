@@ -1,11 +1,10 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { parseStatusParam, type StatusFilter } from '@/lib/status-filter'
+
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 10
-
-/** 'true' / 'false' / undefined（undefined 表示「全部」，URL 不寫該參數） */
-export type StatusFilter = 'true' | 'false' | undefined
 
 export type MembersUrlState = {
   page: number
@@ -17,11 +16,6 @@ export type MembersUrlState = {
   edit: string | undefined
   /** 檢視中 member 的 uuid（唯讀 dialog）；與 edit 互斥 */
   view: string | undefined
-}
-
-const parseStatus = (v: string | null): StatusFilter => {
-  if (v === 'true' || v === 'false') return v
-  return undefined
 }
 
 const parseInt = (v: string | null, fallback: number): number => {
@@ -53,7 +47,7 @@ export const useMembersUrlState = (): MembersUrlState & {
     limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
     name: searchParams.get('name') ?? '',
     email: searchParams.get('email') ?? '',
-    status: parseStatus(searchParams.get('status')),
+    status: parseStatusParam(searchParams.get('status')),
     edit: editParam,
     view: editParam ? undefined : (searchParams.get('view') ?? undefined),
   }

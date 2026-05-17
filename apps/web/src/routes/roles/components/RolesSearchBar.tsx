@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { RotateCcw } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  StatusFilterSelect,
-  type StatusFilterValue,
-} from '@/components/StatusFilterSelect'
+import { StatusFilterSelect } from '@/components/StatusFilterSelect'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
-
-type StatusFilter = 'true' | 'false' | undefined
+import { useIsFirstRun } from '@/lib/use-is-first-run'
+import type { StatusFilter } from '@/lib/status-filter'
 
 type RolesSearchBarProps = {
   initialName: string
@@ -29,18 +28,19 @@ export const RolesSearchBar = ({
   const [nameInput, setNameInput] = useState(initialName)
   const debouncedName = useDebouncedValue(nameInput, 300)
 
-  const isFirstRun = useRef(true)
+  // mount 首次的 debounced 值等於 initialName（即 URL 現況），跳過
+  const consumeFirstRun = useIsFirstRun()
   useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false
-      return
-    }
+    if (consumeFirstRun()) return
     onSearch(debouncedName)
-  }, [debouncedName, onSearch])
+  }, [debouncedName, onSearch, consumeFirstRun])
 
-  const statusValue: StatusFilterValue = initialStatus ?? 'all'
-  const handleStatusChange = (v: StatusFilterValue) => {
-    onStatusChange(v === 'all' ? undefined : v)
+  const hasFilter = nameInput !== '' || initialStatus !== undefined
+
+  const handleReset = () => {
+    setNameInput('')
+    onSearch('')
+    onStatusChange(undefined)
   }
 
   return (
@@ -57,7 +57,20 @@ export const RolesSearchBar = ({
           className="w-56"
         />
       </div>
-      <StatusFilterSelect value={statusValue} onChange={handleStatusChange} />
+      <StatusFilterSelect
+        value={initialStatus}
+        onChange={onStatusChange}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleReset}
+        disabled={!hasFilter}
+        title="重置搜尋條件"
+      >
+        <RotateCcw />
+        重置
+      </Button>
     </div>
   )
 }

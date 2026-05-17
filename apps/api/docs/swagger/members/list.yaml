@@ -41,7 +41,6 @@ parameters:
     required: false
     schema:
       type: boolean
-      enum: [true, false]
     description: 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用）
 
 responses:

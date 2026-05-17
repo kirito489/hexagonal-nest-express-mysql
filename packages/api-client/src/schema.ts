@@ -458,7 +458,7 @@ export interface paths {
                     /** @description 以名稱模糊搜尋 */
                     name?: string;
                     /** @description 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用） */
-                    status?: true | false;
+                    status?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -1037,7 +1037,7 @@ export interface paths {
                     /** @description 以 Email 模糊搜尋 */
                     email?: string;
                     /** @description 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用） */
-                    status?: true | false;
+                    status?: boolean;
                 };
                 header?: never;
                 path?: never;
