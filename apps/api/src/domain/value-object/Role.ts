@@ -1,14 +1,12 @@
-/** 角色名稱常數（對應 roles 表的 name 欄位） */
-export const RoleName = {
-  USER: 'USER',
-  ADMIN: 'ADMIN',
+/**
+ * 角色代碼（對應 roles 表的 role_code 欄位），用於 Guard / 權限判斷
+ * 顯示用的角色名稱（role.name，如「管理者」）放 DB，由 controller 直接讀，不再用 enum
+ */
+export const RoleCode = {
+  SUPERADMIN: 'SUPERADMIN',
 } as const;
 
-export type RoleName = (typeof RoleName)[keyof typeof RoleName];
-
-/** @deprecated 使用 RoleName */
-export const RoleCode = RoleName;
-export type RoleCode = RoleName;
+export type RoleCode = (typeof RoleCode)[keyof typeof RoleCode];
 
 /** Permission code 常數（對應 permissions 表的 permission_code 欄位）
  *  格式：{PLATFORM}:{MODULE}[:{SUB_MODULE}]:{ACTION}

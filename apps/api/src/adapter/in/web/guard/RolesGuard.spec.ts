@@ -1,11 +1,11 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './RolesGuard';
-import { RoleName } from '../../../../domain/value-object/Role';
+import { RoleCode } from '../../../../domain/value-object/Role';
 import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
 
-const makeContext = (roleName: string): ExecutionContext => {
-  const request = { member: { roleName } };
+const makeContext = (roleCode: string): ExecutionContext => {
+  const request = { member: { roleCode } };
   return {
     switchToHttp: () => ({ getRequest: () => request }),
     getHandler: jest.fn(),
@@ -35,28 +35,28 @@ describe('RolesGuard', () => {
 
   it('無 @Roles 裝飾（undefined）→ 放行', () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
-    expect(guard.canActivate(makeContext('member'))).toBe(true);
+    expect(guard.canActivate(makeContext('USER'))).toBe(true);
   });
 
   it('空 roles 陣列 → 放行', () => {
     reflector.getAllAndOverride.mockReturnValue([]);
-    expect(guard.canActivate(makeContext('member'))).toBe(true);
+    expect(guard.canActivate(makeContext('USER'))).toBe(true);
   });
 
-  it('使用者角色符合要求 → 放行', () => {
-    reflector.getAllAndOverride.mockReturnValue([RoleName.ADMIN]);
-    expect(guard.canActivate(makeContext(RoleName.ADMIN))).toBe(true);
+  it('使用者 roleCode 符合要求 → 放行', () => {
+    reflector.getAllAndOverride.mockReturnValue([RoleCode.SUPERADMIN]);
+    expect(guard.canActivate(makeContext(RoleCode.SUPERADMIN))).toBe(true);
   });
 
-  it('使用者角色不符合要求 → ForbiddenException', () => {
-    reflector.getAllAndOverride.mockReturnValue([RoleName.ADMIN]);
-    expect(() => guard.canActivate(makeContext('member'))).toThrow(
+  it('使用者 roleCode 不符合要求 → ForbiddenException', () => {
+    reflector.getAllAndOverride.mockReturnValue([RoleCode.SUPERADMIN]);
+    expect(() => guard.canActivate(makeContext('USER'))).toThrow(
       ForbiddenException,
     );
   });
 
   it('member 為 undefined → ForbiddenException', () => {
-    reflector.getAllAndOverride.mockReturnValue([RoleName.ADMIN]);
+    reflector.getAllAndOverride.mockReturnValue([RoleCode.SUPERADMIN]);
     const ctx = {
       switchToHttp: () => ({ getRequest: () => ({ member: undefined }) }),
       getHandler: jest.fn(),

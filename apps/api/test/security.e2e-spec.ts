@@ -26,7 +26,8 @@ const ADMIN_RECORD = {
   updatedAt: new Date('2024-01-01T00:00:00.000Z'),
   lastLoginAt: null,
   role: {
-    name: 'ADMIN',
+    name: '管理者',
+    roleCode: 'SUPERADMIN',
     permissions: [
       {
         permission: {
@@ -287,7 +288,11 @@ describe('Security E2E', () => {
 
   describe('POST /api/auth/reset-password', () => {
     it('無效 token → 400', async () => {
-      mockPrisma.passwordResetTokenRecord.findUnique.mockResolvedValue(null);
+      // 新的 atomic claim：找不到符合條件的 token 時 Prisma 丟 P2025
+      const p2025 = Object.assign(new Error('Record not found'), {
+        code: 'P2025',
+      });
+      mockPrisma.passwordResetTokenRecord.update.mockRejectedValueOnce(p2025);
 
       const res = await request(app.getHttpServer())
         .post('/api/auth/reset-password')

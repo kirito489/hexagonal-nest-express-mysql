@@ -115,6 +115,7 @@ describe('JwtAuthGuard', () => {
       sub: TEST_UUID,
       email: 'u@e.com',
       roleName: 'admin',
+      roleCode: 'SUPERADMIN',
       permissions: ['member.view'],
       status: true,
     });
@@ -138,6 +139,7 @@ describe('JwtAuthGuard', () => {
       id: TEST_UUID,
       email: 'u@e.com',
       roleName: 'admin',
+      roleCode: 'SUPERADMIN',
       permissions: ['member.view'],
       status: true,
     });

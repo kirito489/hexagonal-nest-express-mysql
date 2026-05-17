@@ -248,6 +248,7 @@ export class PrismaMemberRepository
       id: member.id,
       email: member.email,
       roleName: member.role.name,
+      roleCode: member.role.roleCode ?? '',
       permissions: member.role.permissions.map(
         (rp) => rp.permission.permissionCode,
       ),

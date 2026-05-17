@@ -6,7 +6,10 @@ import { Request } from 'express';
 export interface MemberContext {
   sub: string;
   email: string;
+  /** 角色顯示名（給 UI 用，如「管理者」） */
   roleName: string;
+  /** 角色代碼（給 Guard / 權限判斷用，如 SUPERADMIN） */
+  roleCode: string;
   permissions: string[];
   /** 帳號啟用狀態（false 時 Guard 會拒絕請求） */
   status: boolean;
@@ -18,6 +21,7 @@ export const MemberContextSchema = z.object({
   sub: z.string(),
   email: z.string(),
   roleName: z.string(),
+  roleCode: z.string(),
   permissions: z.array(z.string()),
   status: z.boolean(),
   lastPasswordChange: z.string().nullable().optional(),

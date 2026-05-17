@@ -1,7 +1,10 @@
 export interface MemberContextData {
   id: string;
   email: string;
+  /** 角色顯示名（role.name，如「管理者」），給 UI 展示用 */
   roleName: string;
+  /** 角色代碼（role.role_code，如 SUPERADMIN），給 Guard / 權限判斷用 */
+  roleCode: string;
   permissions: string[];
   /** 帳號啟用狀態（false = 停用，Guard 拒絕請求） */
   status: boolean;

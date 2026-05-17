@@ -1,12 +1,20 @@
+// 鍵名比對使用 lowercase，所以列舉時也用全小寫
+// 包含 camelCase 去底線後的小寫形式（accessToken → accesstoken）與 snake_case 兩種寫法
 const SENSITIVE_KEYS = new Set([
   'password',
   'passwordhash', // 防止 Member entity 的 bcrypt hash 進入 log
   'token',
+  'accesstoken',
+  'refreshtoken',
   'access_token',
+  'refresh_token',
   'authorization',
+  'cookie',
+  'set-cookie',
   'secret',
   'private_key',
   'api_key',
+  'apikey',
   'bearer',
 ]);
 

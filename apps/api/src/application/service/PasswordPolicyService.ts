@@ -7,7 +7,7 @@ import { getEnv } from '../../infrastructure/validate-env';
 import { RoleCode } from '../../domain/value-object/Role';
 
 // 高複雜度密碼策略適用的 roleCode 清單
-const HIGH_COMPLEXITY_ROLE_CODES = new Set<RoleCode>([RoleCode.ADMIN]);
+const HIGH_COMPLEXITY_ROLE_CODES = new Set<RoleCode>([RoleCode.SUPERADMIN]);
 
 /**
  * 密碼策略服務：依 roleCode 套用對應複雜度

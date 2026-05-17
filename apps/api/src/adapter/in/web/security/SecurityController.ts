@@ -43,7 +43,7 @@ import {
  */
 @Controller('security')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleCode.ADMIN)
+@Roles(RoleCode.SUPERADMIN)
 export class SecurityController {
   constructor(private readonly securityFacade: SecurityFacade) {}
 

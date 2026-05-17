@@ -39,7 +39,8 @@ export class RolesGuard implements CanActivate {
       .switchToHttp()
       .getRequest<Request & { member: MemberContext }>();
 
-    if (!requiredRoles.includes(request.member?.roleName as RoleCode)) {
+    // 用 roleCode（如 SUPERADMIN）比對，不要用 roleName（顯示名「管理者」）
+    if (!requiredRoles.includes(request.member?.roleCode as RoleCode)) {
       throw new ForbiddenException('權限不足');
     }
 

@@ -51,14 +51,14 @@ export class ResetPasswordService implements ResetPasswordUseCase {
   ) {}
 
   async execute(command: ResetPasswordCommand): Promise<void> {
-    // 驗證 token
-    const result = await this.resetToken.validateToken(command.token);
+    // 先驗證密碼策略，避免 claim 成功但密碼不合格時無法再次重試
+    this.passwordPolicy.validateOrThrow(command.newPassword);
+
+    // 原子 claim：同步檢查 + 標記已使用，防止同 token 併發重複觸發
+    const result = await this.resetToken.claim(command.token);
     if (!result) {
       throw new BadRequestException('重設密碼連結無效或已過期');
     }
-
-    // 驗證新密碼是否符合策略
-    this.passwordPolicy.validateOrThrow(command.newPassword);
 
     // 雜湊新密碼
     const env = getEnv();
@@ -69,9 +69,6 @@ export class ResetPasswordService implements ResetPasswordUseCase {
 
     // 更新密碼
     await this.updatePassword.updatePassword(result.memberId, passwordHash);
-
-    // 標記 token 已使用
-    await this.resetToken.markUsed(command.token);
 
     // 強制登出（清除 MemberContext 快取）
     if (env.APPLICATION_IS_LOGOUT_AFTER_PASSWORD_RESET) {

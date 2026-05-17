@@ -25,23 +25,32 @@ export class PrismaPasswordResetTokenRepository implements PasswordResetTokenPor
     return token;
   }
 
-  async validateToken(token: string): Promise<{ memberId: string } | null> {
-    const record = await this.prisma.passwordResetTokenRecord.findUnique({
-      where: { token },
-      select: { memberId: true, expiresAt: true, usedAt: true },
-    });
-
-    if (!record) return null;
-    if (record.usedAt) return null; // 已使用
-    if (record.expiresAt < new Date()) return null; // 已過期
-
-    return { memberId: record.memberId };
+  async claim(token: string): Promise<{ memberId: string } | null> {
+    try {
+      // 用 extended where 一次 UPDATE 同時檢查 token + 未使用 + 未過期：
+      // 任一條件不滿足 → Prisma 丟 P2025（記錄找不到）→ 視為 claim 失敗
+      const result = await this.prisma.passwordResetTokenRecord.update({
+        where: {
+          token,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+        select: { memberId: true },
+      });
+      return { memberId: result.memberId };
+    } catch (err) {
+      if (this.isRecordNotFound(err)) return null;
+      throw err;
+    }
   }
 
-  async markUsed(token: string): Promise<void> {
-    await this.prisma.passwordResetTokenRecord.update({
-      where: { token },
-      data: { usedAt: new Date() },
-    });
+  private isRecordNotFound(err: unknown): boolean {
+    return (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code: string }).code === 'P2025'
+    );
   }
 }

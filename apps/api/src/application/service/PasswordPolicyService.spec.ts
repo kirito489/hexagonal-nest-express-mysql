@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PasswordPolicyService } from './PasswordPolicyService';
+import { RoleCode } from '../../domain/value-object/Role';
 
 jest.mock('../../infrastructure/validate-env', () => ({
   getEnv: () => ({
@@ -18,25 +19,27 @@ describe('PasswordPolicyService', () => {
     service.onModuleInit();
   });
 
-  describe('ADMIN 角色（複雜度 4）', () => {
+  describe('SUPERADMIN 角色（複雜度 4）', () => {
     it('強密碼通過', () => {
-      expect(() => service.validateOrThrow('Xy!9zKm#', 'ADMIN')).not.toThrow();
+      expect(() =>
+        service.validateOrThrow('Xy!9zKm#', RoleCode.SUPERADMIN),
+      ).not.toThrow();
     });
 
     it('包含常見字串 → BadRequestException', () => {
-      expect(() => service.validateOrThrow('Password1!', 'ADMIN')).toThrow(
-        BadRequestException,
-      );
+      expect(() =>
+        service.validateOrThrow('Password1!', RoleCode.SUPERADMIN),
+      ).toThrow(BadRequestException);
     });
 
     it('缺少特殊符號 → BadRequestException', () => {
-      expect(() => service.validateOrThrow('Abcdefg1', 'ADMIN')).toThrow(
-        BadRequestException,
-      );
+      expect(() =>
+        service.validateOrThrow('Abcdefg1', RoleCode.SUPERADMIN),
+      ).toThrow(BadRequestException);
     });
   });
 
-  describe('非 ADMIN 角色（複雜度 1）', () => {
+  describe('非 SUPERADMIN 角色（複雜度 1）', () => {
     it('包含字母與數字通過', () => {
       expect(() => service.validateOrThrow('abcdefg1')).not.toThrow();
     });
@@ -45,6 +48,10 @@ describe('PasswordPolicyService', () => {
       expect(() => service.validateOrThrow('12345678')).toThrow(
         BadRequestException,
       );
+    });
+
+    it('一般 role code（如 USER）走低複雜度', () => {
+      expect(() => service.validateOrThrow('abcdefg1', 'USER')).not.toThrow();
     });
   });
 

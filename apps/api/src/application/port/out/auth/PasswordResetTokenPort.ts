@@ -10,15 +10,10 @@ export interface PasswordResetTokenPort {
   createToken(memberId: string, expiresInMinutes: number): Promise<string>;
 
   /**
-   * 驗證 token 是否有效（未過期、未使用）
+   * 原子地驗證並標記 token 已使用：一次 UPDATE 同時檢查未過期、未使用，
+   * 避免「驗證 → 重設 → 標記」三步之間的併發 race（同 token 重複使用）
    * @param token - token 字串
-   * @returns memberId 若有效，null 若無效
+   * @returns memberId 若 claim 成功；null 表示 token 不存在 / 已用 / 已過期
    */
-  validateToken(token: string): Promise<{ memberId: string } | null>;
-
-  /**
-   * 標記 token 已使用
-   * @param token - token 字串
-   */
-  markUsed(token: string): Promise<void>;
+  claim(token: string): Promise<{ memberId: string } | null>;
 }
