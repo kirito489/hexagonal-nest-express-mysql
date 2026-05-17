@@ -39,6 +39,7 @@ export interface RoleRepositoryPort {
     id: string,
     name: string | undefined,
     permissionCodes: string[] | undefined,
+    status?: boolean,
   ): Promise<void>;
   softDelete(id: string): Promise<void>;
   countMembers(id: string): Promise<number>;

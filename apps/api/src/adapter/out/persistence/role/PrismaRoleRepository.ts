@@ -139,12 +139,22 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
     id: string,
     name: string | undefined,
     permissionCodes: string[] | undefined,
+    status?: boolean,
   ): Promise<void> {
-    if (name === undefined && permissionCodes === undefined) return;
+    if (
+      name === undefined &&
+      permissionCodes === undefined &&
+      status === undefined
+    )
+      return;
     try {
       await this.prisma.$transaction(async (tx) => {
-        if (name !== undefined) {
-          await tx.role.update({ where: { id }, data: { name } });
+        // name 或 status 任一變更皆需要一次 role.update
+        if (name !== undefined || status !== undefined) {
+          const data: { name?: string; status?: boolean } = {};
+          if (name !== undefined) data.name = name;
+          if (status !== undefined) data.status = status;
+          await tx.role.update({ where: { id }, data });
         }
         if (permissionCodes !== undefined) {
           const permissions = await tx.permission.findMany({

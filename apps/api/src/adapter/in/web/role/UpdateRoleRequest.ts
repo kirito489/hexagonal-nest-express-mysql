@@ -12,6 +12,7 @@ export const updateRoleSchema = z.object({
   permissionCodes: z
     .array(z.string().regex(permissionCodeRegex, 'permissionCode 格式不合法'))
     .optional(),
+  status: z.boolean().optional(),
 });
 
 export type UpdateRoleRequest = z.infer<typeof updateRoleSchema>;

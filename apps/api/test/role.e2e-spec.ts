@@ -323,6 +323,76 @@ describe('PATCH /api/roles/:id', () => {
     expect(res.status).toBe(404);
     expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
   });
+
+  it('僅送 status → 204 且 role.update 收到 { status }', async () => {
+    const token = await getToken();
+    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: false });
+
+    expect(res.status).toBe(204);
+    expect(mockPrisma.role.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: TARGET_ROLE_UUID },
+        data: { status: false },
+      }),
+    );
+    // 沒送 permissionCodes 時不應動到 rolePermission
+    expect(mockPrisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('name + status 同送 → 204 且 role.update data 同時含 name 與 status', async () => {
+    const token = await getToken();
+    mockPrisma.role.findFirst
+      .mockResolvedValueOnce(TARGET_ROLE) // findById
+      .mockResolvedValueOnce(null); // findByName（無衝突）
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: '審核人員', status: false });
+
+    expect(res.status).toBe(204);
+    expect(mockPrisma.role.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: TARGET_ROLE_UUID },
+        data: { name: '審核人員', status: false },
+      }),
+    );
+  });
+
+  it('status 型別錯誤（非 boolean）→ 400', async () => {
+    const token = await getToken();
+    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'off' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('預設角色僅切 status → 400 DEFAULT_ROLE_NOT_EDITABLE', async () => {
+    const token = await getToken();
+    mockPrisma.role.findFirst.mockResolvedValue({
+      ...TARGET_ROLE,
+      isDefault: true,
+    });
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: false });
+
+    expect(res.status).toBe(400);
+    expect((res.body as { code: string }).code).toBe(
+      'DEFAULT_ROLE_NOT_EDITABLE',
+    );
+  });
 });
 
 // ──────────────────────────────────────────────

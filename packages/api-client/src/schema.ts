@@ -811,7 +811,7 @@ export interface paths {
         head?: never;
         /**
          * 更新角色
-         * @description 更新角色名稱或 permissions。name/permissionCodes 均為選填（省略表示不變更）。
+         * @description 更新角色名稱、permissions 或啟用狀態。三者均為選填（省略表示不變更）。
          *     permissionCodes 傳空陣列 `[]` 表示清空所有權限。預設角色不可編輯。
          *     需要 `BACKEND:ROLE:EDIT` 權限。
          */
@@ -830,6 +830,8 @@ export interface paths {
                         name?: string;
                         /** @description 省略表示不變更；傳空陣列表示清空所有權限 */
                         permissionCodes?: string[];
+                        /** @description 省略表示不變更；傳 true/false 切換角色啟用狀態 */
+                        status?: boolean;
                     };
                 };
             };

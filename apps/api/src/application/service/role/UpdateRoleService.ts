@@ -46,6 +46,7 @@ export class UpdateRoleService implements UpdateRoleUseCase {
       command.id,
       command.name,
       command.permissionCodes,
+      command.status,
     );
   }
 }
