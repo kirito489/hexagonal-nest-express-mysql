@@ -2,19 +2,77 @@ import { createApiClient, createApiQueryHooks } from '@app/api-client'
 
 import { tokenStorage } from '@/lib/storage'
 
-// 全 app 共用一個 API client：baseUrl 走 Vite proxy 的 /api，每次請求即時讀 token
-export const apiClient = createApiClient('/api', () => tokenStorage.get())
+const API_BASE = '/api'
+const REFRESH_PATH = '/auth/refresh'
 
-// 401 全域處理：清掉 token 並導向登入頁（避免從 /login 自己跳到 /login 形成迴圈）
+// 全 app 共用一個 API client：baseUrl 走 Vite proxy 的 /api，每次請求即時讀 token
+export const apiClient = createApiClient(API_BASE, () => tokenStorage.get())
+
+// 共享 refresh promise：多個並發 401 只觸發一次 refresh
+let refreshPromise: Promise<boolean> | null = null
+
+const refreshAccessToken = async (): Promise<boolean> => {
+  const refresh = tokenStorage.getRefresh()
+  if (!refresh) return false
+
+  try {
+    const res = await fetch(`${API_BASE}${REFRESH_PATH}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refresh }),
+    })
+    if (!res.ok) return false
+    const body = (await res.json()) as { data?: { accessToken?: string } }
+    const newToken = body.data?.accessToken
+    if (!newToken) return false
+    tokenStorage.set(newToken)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const redirectToLogin = (): void => {
+  tokenStorage.clear()
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login')
+  }
+}
+
 apiClient.use({
-  onResponse({ response }) {
-    if (response.status === 401) {
-      tokenStorage.clear()
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login')
-      }
+  async onResponse({ request, response }) {
+    if (response.status !== 401) return response
+
+    // refresh endpoint 自己 401 表示 refresh token 也失效，直接登出
+    if (new URL(request.url).pathname.endsWith(REFRESH_PATH)) {
+      redirectToLogin()
+      return response
     }
-    return response
+
+    refreshPromise ??= refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
+    const ok = await refreshPromise
+
+    if (!ok) {
+      redirectToLogin()
+      return response
+    }
+
+    // refresh 成功 → 用新 token 重發原請求
+    const retried = await fetch(request.url, {
+      method: request.method,
+      headers: {
+        ...Object.fromEntries(request.headers),
+        Authorization: `Bearer ${tokenStorage.get()}`,
+      },
+      body:
+        request.method !== 'GET' && request.method !== 'HEAD'
+          ? await request.clone().text()
+          : undefined,
+      credentials: request.credentials,
+    })
+    return retried
   },
 })
 

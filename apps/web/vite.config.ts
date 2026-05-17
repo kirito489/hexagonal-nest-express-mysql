@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -20,5 +21,11 @@ export default defineConfig({
         // 後端在 main.ts 設了 setGlobalPrefix('api')，故不需 rewrite
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
   },
 })

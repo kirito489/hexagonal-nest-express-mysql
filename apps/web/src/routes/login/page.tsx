@@ -58,6 +58,9 @@ export const LoginPage = () => {
       const res = await loginMutation.mutateAsync({ body: values })
       if (res?.accessToken) {
         tokenStorage.set(res.accessToken)
+        if (res.refreshToken) {
+          tokenStorage.setRefresh(res.refreshToken)
+        }
         const from = (location.state as LocationState | null)?.from?.pathname ?? '/'
         navigate(from, { replace: true })
       }
