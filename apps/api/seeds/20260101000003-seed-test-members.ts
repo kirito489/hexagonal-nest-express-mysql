@@ -19,7 +19,7 @@ const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin1234!';
 const TEST_MEMBERS = [
   {
     email: adminEmail,
-    member: '測試管理員',
+    member: '超級管理者',
     password: adminPassword,
     roleCode: 'SUPERADMIN',
     isDefault: true,

@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { DataTable } from '@/components/data-table/DataTable'
+import { DisabledHint } from '@/components/DisabledHint'
 import { formatRelativeTime } from '@/lib/format-relative-time'
 
 export type MemberRow = {
@@ -175,30 +176,8 @@ export const MembersTable = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {editReason ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="block">{editItem}</span>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">
-                        {editReason}
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    editItem
-                  )}
-                  {deleteReason ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="block">{deleteItem}</span>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">
-                        {deleteReason}
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    deleteItem
-                  )}
+                  <DisabledHint reason={editReason}>{editItem}</DisabledHint>
+                  <DisabledHint reason={deleteReason}>{deleteItem}</DisabledHint>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

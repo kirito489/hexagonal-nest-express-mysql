@@ -35,17 +35,17 @@ const PERMISSIONS: PermissionSeed[] = [
     action: 'EDIT',
   },
 
-  // 後台 - 角色與權限管理
+  // 後台 - 角色管理
   {
     permissionCode: 'BACKEND:ROLE:VIEW',
-    name: '後台-角色與權限管理-檢視',
+    name: '後台-角色管理-檢視',
     platform: 'BACKEND',
     module: 'ROLE',
     action: 'VIEW',
   },
   {
     permissionCode: 'BACKEND:ROLE:EDIT',
-    name: '後台-角色與權限管理-編輯',
+    name: '後台-角色管理-編輯',
     platform: 'BACKEND',
     module: 'ROLE',
     action: 'EDIT',

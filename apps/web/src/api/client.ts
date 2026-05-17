@@ -82,4 +82,5 @@ apiClient.use({
   },
 })
 
-export const { useApiQuery, useApiMutation } = createApiQueryHooks(apiClient)
+export const { useApiQuery, useApiMutation, useApiInfiniteQuery } =
+  createApiQueryHooks(apiClient)

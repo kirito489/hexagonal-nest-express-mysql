@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
+import type { paths } from '@app/api-client'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -16,9 +17,16 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
+import { useInfiniteScrollSentinel } from '@/lib/use-infinite-scroll-sentinel'
 import { useRoleOptionsInfiniteQuery } from '../hooks/use-role-options-infinite-query'
 import { useRoleOptionFallbackQuery } from '../hooks/use-role-option-fallback-query'
 
+// 從 generated schema 推導；raw 三欄都是 optional（後端 contract）
+type RoleOptionRaw = NonNullable<
+  paths['/members/role/options/{id}']['get']['responses'][200]['content']['application/json']['data']
+>
+
+// Combobox 渲染需要的 narrowed 形狀
 type RoleOption = {
   id: string
   name: string
@@ -36,12 +44,38 @@ type RoleComboboxProps = {
 }
 
 /**
+ * 把 generated schema 的 optional 欄位 narrow 成 Combobox 需要的 non-null 形狀；
+ * 任一必要欄位缺失就回 null，呼叫端用 filter 排除
+ */
+const toRoleOption = (raw: RoleOptionRaw | undefined): RoleOption | null => {
+  if (!raw?.id || raw.name === undefined || raw.isDefault === undefined) {
+    return null
+  }
+  return { id: raw.id, name: raw.name, isDefault: raw.isDefault }
+}
+
+/**
+ * 依 id 去重，保留陣列中第一次出現的順序（fallback 在前、分頁資料在後）
+ */
+const dedupeById = <T extends { id: string }>(items: T[]): T[] => {
+  const seen = new Set<string>()
+  const result: T[] = []
+  for (const item of items) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id)
+      result.push(item)
+    }
+  }
+  return result
+}
+
+/**
  * 會員 dialog 的角色選擇 Combobox：cmdk + popover + useInfiniteQuery + IntersectionObserver
  *
  * 互動規格：
  * - 點 trigger 開啟 popover，內含搜尋輸入與可滾動清單
  * - 搜尋輸入 debounce 300ms 後寫入 queryKey 重抓
- * - 清單底端的 sentinel 進入視窗時自動 fetchNextPage
+ * - 清單底端的 sentinel 進入視窗時自動 fetchNextPage（由 useInfiniteScrollSentinel 收斂）
  * - isDefault === true 的選項顯示但 disabled，標示「（預設）」（與角色列表 badge 一致）
  * - 編輯模式若 value 不在第一頁，並列 fetch fallback option，合併進清單頂端
  */
@@ -58,64 +92,30 @@ export const RoleCombobox = ({
   const listQuery = useRoleOptionsInfiniteQuery(debouncedSearch)
   const fallbackQuery = useRoleOptionFallbackQuery(editingRoleId)
 
-  // 合併分頁回的 list 與 fallback option（fallback 放頂端、依 id 去重）
+  // 合併分頁與 fallback：fallback 放頂端、依 id 去重、過濾欄位缺失的 row
   const options: RoleOption[] = useMemo(() => {
-    const merged: RoleOption[] = []
-    const seen = new Set<string>()
-    const fb = fallbackQuery.data
-    if (fb?.id && fb.name !== undefined && fb.isDefault !== undefined) {
-      merged.push({ id: fb.id, name: fb.name, isDefault: fb.isDefault })
-      seen.add(fb.id)
-    }
+    const fallback = toRoleOption(fallbackQuery.data)
     const pages = listQuery.data?.pages ?? []
-    for (const page of pages) {
-      for (const item of page?.list ?? []) {
-        if (
-          item.id &&
-          !seen.has(item.id) &&
-          item.name !== undefined &&
-          item.isDefault !== undefined
-        ) {
-          merged.push({
-            id: item.id,
-            name: item.name,
-            isDefault: item.isDefault,
-          })
-          seen.add(item.id)
-        }
-      }
-    }
-    return merged
+    const fromPages = pages
+      .flatMap((page) => page?.list ?? [])
+      .map(toRoleOption)
+    return dedupeById(
+      [fallback, ...fromPages].filter((opt): opt is RoleOption => opt !== null),
+    )
   }, [listQuery.data, fallbackQuery.data])
 
   // 顯示「目前選中角色」名稱：先用 options 內找，找不到看 fallback 失敗 → 顯示 placeholder
   const selectedLabel = useMemo(() => {
     if (!value) return ''
-    const found = options.find((o) => o.id === value)
+    const found = options.find((opt) => opt.id === value)
     if (found) return found.name
     // value 存在但找不到對應角色（fallback 404 / 角色已停用）
     if (fallbackQuery.isError) return '（已停用 / 不可用）'
     return ''
   }, [value, options, fallbackQuery.isError])
 
-  // sentinel + IntersectionObserver：在清單底端觸發 fetchNextPage
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
-  const hasNextPage = listQuery.hasNextPage
-  const isFetchingNextPage = listQuery.isFetchingNextPage
-  const fetchNextPage = listQuery.fetchNextPage
-  useEffect(() => {
-    if (!open) return
-    const target = sentinelRef.current
-    if (!target) return
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0]
-      if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        void fetchNextPage()
-      }
-    })
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [open, hasNextPage, isFetchingNextPage, fetchNextPage])
+  // sentinel + IntersectionObserver：在清單底端觸發 fetchNextPage；popover 關閉時 disable
+  const sentinelRef = useInfiniteScrollSentinel(listQuery, open)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

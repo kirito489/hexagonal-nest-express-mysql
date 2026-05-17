@@ -11,7 +11,7 @@ const log = pino({
 
 const ROLES = [
   {
-    name: '管理者',
+    name: '超級管理者',
     roleCode: 'SUPERADMIN',
     isDefault: true,
     // null = 全部權限

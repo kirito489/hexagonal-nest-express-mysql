@@ -1,4 +1,5 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   type UseMutationOptions,
@@ -107,7 +108,69 @@ export const createApiQueryHooks = (client: ApiClient) => {
     })
   }
 
-  return { useApiQuery, useApiMutation }
+  /**
+   * 對稱 useApiQuery 的 infinite 版本：把 GET + 401 攔截 + unwrapEnvelope + queryKey 收斂
+   * 在這層，呼叫端只需提供 `getInit(pageParam)` 與 `getNextPageParam` 兩段邏輯
+   *
+   * @param method 固定 'GET'（顯式寫出維持與 useApiQuery 同形）
+   * @param path  openapi path（會進 queryKey 第二格）
+   * @param getInit 由 pageParam 組出該頁的 init（params.query 等）
+   * @param getNextPageParam 由上一頁 data 推導下一頁的 pageParam；undefined 表示已到底
+   * @param options.initialPageParam 起始 pageParam（多半是 1）
+   * @param options.queryKeyExtra 額外進 queryKey 的鍵（如 search 字串），key 變化時自動 reset
+   * @param options.staleTime / enabled  TanStack `useInfiniteQuery` 常用選項
+   *
+   * 為了讓 select/throwOnError 等大量泛型不打架，這裡只白名單列出常用選項；
+   * 需要更多選項時直接擴 useApiInfiniteQueryOptions 介面
+   */
+  const useApiInfiniteQuery = <P extends GetPath, TPage = GetResponse<P>>(
+    method: 'GET',
+    path: P,
+    getInit: (pageParam: number) => GetInit<P>,
+    getNextPageParam: (
+      lastPage: TPage,
+      allPages: TPage[],
+      lastPageParam: number,
+    ) => number | undefined,
+    options: {
+      initialPageParam: number
+      queryKeyExtra?: ReadonlyArray<unknown>
+      staleTime?: number
+      enabled?: boolean
+      gcTime?: number
+      retry?: boolean | number
+    },
+  ) => {
+    void method
+    const {
+      initialPageParam,
+      queryKeyExtra,
+      staleTime,
+      enabled,
+      gcTime,
+      retry,
+    } = options
+    return useInfiniteQuery<TPage, Error>({
+      queryKey: ['GET', path, ...(queryKeyExtra ?? [])] as const,
+      initialPageParam,
+      queryFn: async ({ pageParam }) => {
+        const fn = client.GET as unknown as LooseFn
+        const result = await fn(path, getInit(pageParam as number))
+        if (result.error) {
+          throw new Error(formatError(result.error, result.response))
+        }
+        return unwrapEnvelope(result.data) as TPage
+      },
+      getNextPageParam: (lastPage, allPages, lastPageParam) =>
+        getNextPageParam(lastPage, allPages, lastPageParam as number),
+      staleTime,
+      enabled,
+      gcTime,
+      retry,
+    })
+  }
+
+  return { useApiQuery, useApiMutation, useApiInfiniteQuery }
 }
 
 /**
