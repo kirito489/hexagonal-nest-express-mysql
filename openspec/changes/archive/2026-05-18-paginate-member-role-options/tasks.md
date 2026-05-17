@@ -74,5 +74,5 @@
 ## 11. 收尾
 
 - [x] 11.1 `tasks/lessons.md` 補：(1) `useInfiniteQuery` 要手動 `unwrapEnvelope`、(2) 窄化 endpoint 不要借用其他模組同樣資料的 endpoint
-- [ ] 11.2 commit（使用者執行）
-- [ ] 11.3 邀請 `openspec-archive-change` 走完整封存流程
+- [x] 11.2 commit（使用者執行）— 856515a
+- [x] 11.3 邀請 `openspec-archive-change` 走完整封存流程
