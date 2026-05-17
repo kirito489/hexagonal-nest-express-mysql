@@ -253,7 +253,7 @@ describe('Member E2E', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(mockPrisma.memberRecord.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.memberRecord.create).toHaveBeenCalledTimes(1);
     });
 
     it('email 已存在 → 409', async () => {

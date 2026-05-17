@@ -126,11 +126,10 @@ export class PrismaMemberRepository
     return count > 0;
   }
 
-  async saveMember(member: Member): Promise<void> {
+  async createMember(member: Member): Promise<void> {
     try {
-      await this.prisma.memberRecord.upsert({
-        where: { id: member.id.toString() },
-        create: {
+      await this.prisma.memberRecord.create({
+        data: {
           id: member.id.toString(),
           email: member.email.toString(),
           member: member.member,
@@ -139,7 +138,23 @@ export class PrismaMemberRepository
           status: member.status,
           isDefault: member.isDefault,
         },
-        update: {
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new EmailAlreadyExistsException();
+      }
+      throw err;
+    }
+  }
+
+  async updateMember(member: Member): Promise<void> {
+    try {
+      await this.prisma.memberRecord.update({
+        where: { id: member.id.toString() },
+        data: {
           email: member.email.toString(),
           member: member.member,
           password: member.password,

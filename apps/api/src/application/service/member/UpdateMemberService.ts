@@ -79,7 +79,7 @@ export class UpdateMemberService implements UpdateMemberUseCase {
     if (passwordHash !== undefined) {
       await this.saveMember.saveMemberWithPassword(member, passwordHash);
     } else {
-      await this.saveMember.saveMember(member);
+      await this.saveMember.updateMember(member);
     }
 
     await this.clearMemberContext.clearMemberContext(command.id);

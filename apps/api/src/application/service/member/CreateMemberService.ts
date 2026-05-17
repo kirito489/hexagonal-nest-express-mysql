@@ -55,7 +55,7 @@ export class CreateMemberService implements CreateMemberUseCase {
       command.roleId,
       command.status ?? true,
     );
-    await this.saveMember.saveMember(member);
+    await this.saveMember.createMember(member);
     return { id: member.id.toString() };
   }
 }

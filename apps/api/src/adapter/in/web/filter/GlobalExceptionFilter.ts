@@ -13,6 +13,7 @@ import {
   SaveSystemLogPort,
 } from '../../../../application/port/out/shared/SaveSystemLogPort';
 import { buildSystemLogData } from '../helper/system-log-helper';
+import { getRequestStartTime } from '../helper/request-start-time';
 import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
 import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
 import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
@@ -128,8 +129,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const { status, message, code } = this.resolveError(exception);
 
     const now = new Date();
-    const startTime =
-      (request as Request & { _startTime?: Date })._startTime ?? now;
+    const startTime = getRequestStartTime(request) ?? now;
 
     this.logger.error(
       message,

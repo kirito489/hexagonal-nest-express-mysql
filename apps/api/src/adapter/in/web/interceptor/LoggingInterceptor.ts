@@ -14,6 +14,7 @@ import {
 } from '../../../../application/port/out/shared/SaveSystemLogPort';
 import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
 import { buildSystemLogData } from '../helper/system-log-helper';
+import { setRequestStartTime } from '../helper/request-start-time';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -29,8 +30,8 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const startTime = new Date();
 
-    // 掛上 startTime，讓 GlobalExceptionFilter 可以計算實際 execTime
-    (request as Request & { _startTime?: Date })._startTime = startTime;
+    // 記錄起始時間，讓 GlobalExceptionFilter 在錯誤路徑也能計算 execTime
+    setRequestStartTime(request, startTime);
 
     return next.handle().pipe(
       tap((responseData) => {

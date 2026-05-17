@@ -30,7 +30,8 @@ const mockLoadMember = {
 } as unknown as jest.Mocked<LoadMemberPort>;
 
 const mockSaveMember = {
-  saveMember: jest.fn(),
+  createMember: jest.fn(),
+  updateMember: jest.fn(),
   saveMemberWithPassword: jest.fn(),
   deleteMember: jest.fn(),
   updateLastLoginAt: jest.fn(),
@@ -67,7 +68,7 @@ describe('CreateMemberService', () => {
       roleCode: null,
     });
     (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$10$hashed');
-    (mockSaveMember.saveMember as jest.Mock).mockResolvedValue(undefined);
+    (mockSaveMember.createMember as jest.Mock).mockResolvedValue(undefined);
   });
 
   it('有效指令 → 建立 member 並回傳 UUID', async () => {
@@ -81,7 +82,7 @@ describe('CreateMemberService', () => {
     expect(result.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
-    expect(mockSaveMember.saveMember).toHaveBeenCalledTimes(1);
+    expect(mockSaveMember.createMember).toHaveBeenCalledTimes(1);
   });
 
   it('Email 已存在 → 拋出 EmailAlreadyExistsException', async () => {
@@ -96,7 +97,7 @@ describe('CreateMemberService', () => {
       }),
     ).rejects.toThrow(EmailAlreadyExistsException);
 
-    expect(mockSaveMember.saveMember).not.toHaveBeenCalled();
+    expect(mockSaveMember.createMember).not.toHaveBeenCalled();
   });
 
   it('Role 不存在 → 拋出 RoleNotFoundException', async () => {
@@ -111,7 +112,7 @@ describe('CreateMemberService', () => {
       }),
     ).rejects.toThrow(RoleNotFoundException);
 
-    expect(mockSaveMember.saveMember).not.toHaveBeenCalled();
+    expect(mockSaveMember.createMember).not.toHaveBeenCalled();
   });
 
   it('密碼過短（不足 8 字元）→ 驗證失敗，不執行 DB 寫入', async () => {
@@ -124,6 +125,6 @@ describe('CreateMemberService', () => {
       }),
     ).rejects.toThrow();
 
-    expect(mockSaveMember.saveMember).not.toHaveBeenCalled();
+    expect(mockSaveMember.createMember).not.toHaveBeenCalled();
   });
 });
