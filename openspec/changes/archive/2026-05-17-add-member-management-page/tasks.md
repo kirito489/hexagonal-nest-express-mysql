@@ -81,5 +81,5 @@
     依 mode 切換 resolver；`updateMemberFormSchema.password` 改為
     `z.union([z.literal(''), z.string().min(8).max(30)])` 與 create 對齊型別
 - [x] 9.2 `pnpm-lock.yaml` 含 sonner / next-themes / shadcn 新增依賴，會進 commit
-- [ ] 9.3 階段尾：commit（使用者執行）
-- [ ] 9.4 邀請 `openspec-archive-change` 走完整封存流程（commit 後執行）
+- [x] 9.3 階段尾：commit（使用者執行）
+- [x] 9.4 邀請 `openspec-archive-change` 走完整封存流程（commit 後執行）
