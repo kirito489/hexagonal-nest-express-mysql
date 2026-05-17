@@ -38,9 +38,11 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   }
 
   async listActiveRoles(): Promise<RoleOptionItem[]> {
+    // 仍回傳 isDefault=true 的系統角色，但帶 isDefault 旗標讓前端 disabled 顯示：
+    // 這樣「編輯自己（isDefault admin）」時 select 能對得上既有角色，僅無法改成別的
     const roles = await this.prisma.role.findMany({
       where: { status: true, deletedAt: null },
-      select: { id: true, name: true },
+      select: { id: true, name: true, isDefault: true },
       orderBy: { createdAt: 'asc' },
     });
     return roles;
@@ -56,7 +58,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.role.findMany({
         where,
-        include: { _count: { select: { members: true } } },
+        // memberCount 要排除軟刪除的 member（與 DeleteRoleService 的 countMembers 對齊）
+        include: {
+          _count: { select: { members: { where: { deletedAt: null } } } },
+        },
         orderBy: { createdAt: 'desc' },
         skip: (params.page - 1) * params.limit,
         take: params.limit,
@@ -69,7 +74,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   async findById(id: string): Promise<RoleRecord | null> {
     const role = await this.prisma.role.findFirst({
       where: { id, deletedAt: null },
-      include: { _count: { select: { members: true } } },
+      // memberCount 要排除軟刪除的 member（與 DeleteRoleService 的 countMembers 對齊）
+      include: {
+        _count: { select: { members: { where: { deletedAt: null } } } },
+      },
     });
     return role ? this.toRecord(role) : null;
   }
@@ -77,7 +85,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   async findByName(name: string): Promise<RoleRecord | null> {
     const role = await this.prisma.role.findFirst({
       where: { name, deletedAt: null },
-      include: { _count: { select: { members: true } } },
+      // memberCount 要排除軟刪除的 member（與 DeleteRoleService 的 countMembers 對齊）
+      include: {
+        _count: { select: { members: { where: { deletedAt: null } } } },
+      },
     });
     return role ? this.toRecord(role) : null;
   }
@@ -86,7 +97,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
     try {
       const role = await this.prisma.role.create({
         data: { name: data.name },
-        include: { _count: { select: { members: true } } },
+        // memberCount 要排除軟刪除的 member（與 DeleteRoleService 的 countMembers 對齊）
+        include: {
+          _count: { select: { members: { where: { deletedAt: null } } } },
+        },
       });
       return this.toRecord(role);
     } catch (err) {
@@ -108,7 +122,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
       return await this.prisma.$transaction(async (tx) => {
         const role = await tx.role.create({
           data: { name },
-          include: { _count: { select: { members: true } } },
+          // memberCount 要排除軟刪除的 member（與 DeleteRoleService 的 countMembers 對齊）
+          include: {
+            _count: { select: { members: { where: { deletedAt: null } } } },
+          },
         });
         if (permissionCodes.length > 0) {
           const permissions = await tx.permission.findMany({

@@ -1357,6 +1357,10 @@ paths:
                           type: string
                           description: 角色名稱（顯示用）
                           example: 管理者
+                        isDefault:
+                          type: boolean
+                          description: 系統角色旗標；前端 select 仍顯示但 disabled，不可由一般帳號指派
+                          example: false
                   timestamp:
                     type: string
                     format: date-time

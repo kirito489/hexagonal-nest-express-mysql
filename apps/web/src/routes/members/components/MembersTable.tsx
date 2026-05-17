@@ -11,8 +11,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import {
-  Tooltip as TooltipPrimitive,
-} from 'radix-ui'
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { DataTable } from '@/components/data-table/DataTable'
 import { formatRelativeTime } from '@/lib/format-relative-time'
 
@@ -41,10 +43,6 @@ type MembersTableProps = {
   onToggleStatus: (member: MemberRow, nextStatus: boolean) => void
 }
 
-const Tooltip = TooltipPrimitive.Root
-const TooltipTrigger = TooltipPrimitive.Trigger
-const TooltipContent = TooltipPrimitive.Content
-
 export const MembersTable = ({
   data,
   isLoading,
@@ -61,7 +59,14 @@ export const MembersTable = ({
         accessorKey: 'member',
         header: '名稱',
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.member ?? '—'}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{row.original.member ?? '—'}</span>
+            {row.original.isDefault ? (
+              <span className="bg-muted text-muted-foreground inline-flex h-5 items-center rounded-full px-2 text-xs">
+                預設
+              </span>
+            ) : null}
+          </div>
         ),
       },
       {
@@ -83,12 +88,16 @@ export const MembersTable = ({
         header: '狀態',
         cell: ({ row }) => {
           const isSelf = row.original.id === currentSub
-          const disabled = !canEdit || isSelf
+          const isDefault = row.original.isDefault === true
+          const disabled = !canEdit || isSelf || isDefault
+          // 優先序：權限 > 預設帳號 > 自己（更具體先講）
           const reason = !canEdit
             ? '無編輯權限'
-            : isSelf
-              ? '不能停用自己的帳號'
-              : ''
+            : isDefault
+              ? '預設帳號不可變更狀態'
+              : isSelf
+                ? '不能停用自己的帳號'
+                : ''
           const switchNode = (
             <Switch
               checked={row.original.status ?? false}
@@ -104,12 +113,7 @@ export const MembersTable = ({
               <TooltipTrigger asChild>
                 <span className="inline-block">{switchNode}</span>
               </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                className="bg-foreground text-background rounded-md px-2 py-1 text-xs"
-              >
-                {reason}
-              </TooltipContent>
+              <TooltipContent>{reason}</TooltipContent>
             </Tooltip>
           )
         },
@@ -132,6 +136,36 @@ export const MembersTable = ({
         header: () => <div className="text-right">操作</div>,
         cell: ({ row }) => {
           if (!canEdit) return null
+          const isSelf = row.original.id === currentSub
+          const isDefault = row.original.isDefault === true
+          const editReason = isDefault ? '預設帳號不可編輯' : ''
+          const deleteReason = isDefault
+            ? '預設帳號不可刪除'
+            : isSelf
+              ? '不能刪除自己的帳號'
+              : ''
+          const deleteDisabled = isDefault || isSelf
+
+          const editItem = (
+            <DropdownMenuItem
+              disabled={isDefault}
+              onSelect={() => onEdit(row.original)}
+            >
+              <Pencil />
+              編輯
+            </DropdownMenuItem>
+          )
+          const deleteItem = (
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={deleteDisabled}
+              onSelect={() => onDelete(row.original)}
+            >
+              <Trash2 />
+              刪除
+            </DropdownMenuItem>
+          )
+
           return (
             <div className="text-right">
               <DropdownMenu>
@@ -141,18 +175,30 @@ export const MembersTable = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => onEdit(row.original)}>
-                    <Pencil />
-                    編輯
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    disabled={row.original.isDefault}
-                    onSelect={() => onDelete(row.original)}
-                  >
-                    <Trash2 />
-                    刪除
-                  </DropdownMenuItem>
+                  {editReason ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block">{editItem}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        {editReason}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    editItem
+                  )}
+                  {deleteReason ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block">{deleteItem}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        {deleteReason}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    deleteItem
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

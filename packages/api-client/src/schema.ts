@@ -1296,6 +1296,11 @@ export interface paths {
                                  * @example 管理者
                                  */
                                 name?: string;
+                                /**
+                                 * @description 系統角色旗標；前端 select 仍顯示但 disabled，不可由一般帳號指派
+                                 * @example false
+                                 */
+                                isDefault?: boolean;
                             }[];
                             /** Format: date-time */
                             timestamp: string;

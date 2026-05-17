@@ -35,7 +35,7 @@ import {
 } from '../lib/member-form-schema'
 import { useRoleOptionsQuery } from '../hooks/use-role-options-query'
 
-type RoleOption = { id?: string; name?: string }
+type RoleOption = { id?: string; name?: string; isDefault?: boolean }
 
 type MemberFormDialogProps = {
   open: boolean
@@ -188,8 +188,17 @@ export const MemberFormDialog = ({
                     <SelectContent>
                       {roles.map((role) =>
                         role.id ? (
-                          <SelectItem key={role.id} value={role.id}>
+                          <SelectItem
+                            key={role.id}
+                            value={role.id}
+                            disabled={role.isDefault === true}
+                          >
                             {role.name ?? '(未命名)'}
+                            {role.isDefault ? (
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                （系統角色）
+                              </span>
+                            ) : null}
                           </SelectItem>
                         ) : null,
                       )}

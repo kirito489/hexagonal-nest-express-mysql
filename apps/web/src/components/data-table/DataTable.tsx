@@ -31,6 +31,9 @@ export const DataTable = <TData,>({
   isLoading,
   emptyMessage = '尚無資料',
 }: DataTableProps<TData>) => {
+  // TanStack Table 的 useReactTable 回傳 function，React Compiler memo 規則不適用；
+  // 既有元件已自行控制 re-render，此處 opt-out 警告
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,
