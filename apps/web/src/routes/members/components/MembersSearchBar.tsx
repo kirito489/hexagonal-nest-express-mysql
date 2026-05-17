@@ -2,21 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  StatusFilterSelect,
+  type StatusFilterValue,
+} from '@/components/StatusFilterSelect'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
+
+type StatusFilter = 'true' | 'false' | undefined
 
 type MembersSearchBarProps = {
   initialName: string
   initialEmail: string
+  initialStatus: StatusFilter
   onSearch: (name: string, email: string) => void
+  onStatusChange: (status: StatusFilter) => void
 }
 
 /**
- * name + email 兩個搜尋輸入，debounce 300ms 後通知父層寫入 URL state
+ * name + email debounce 300ms + 狀態下拉（即時觸發）
  */
 export const MembersSearchBar = ({
   initialName,
   initialEmail,
+  initialStatus,
   onSearch,
+  onStatusChange,
 }: MembersSearchBarProps) => {
   const [nameInput, setNameInput] = useState(initialName)
   const [emailInput, setEmailInput] = useState(initialEmail)
@@ -25,7 +35,6 @@ export const MembersSearchBar = ({
   const debouncedEmail = useDebouncedValue(emailInput, 300)
 
   // mount 首次的 debounced 值等於 initialName/Email（即 URL 現況），不需要再 push 一次
-  // 否則會多走 setSearchParams replace + 連帶 url 上不需要的回呼
   const isFirstRun = useRef(true)
   useEffect(() => {
     if (isFirstRun.current) {
@@ -34,6 +43,11 @@ export const MembersSearchBar = ({
     }
     onSearch(debouncedName, debouncedEmail)
   }, [debouncedName, debouncedEmail, onSearch])
+
+  const statusValue: StatusFilterValue = initialStatus ?? 'all'
+  const handleStatusChange = (v: StatusFilterValue) => {
+    onStatusChange(v === 'all' ? undefined : v)
+  }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -61,6 +75,7 @@ export const MembersSearchBar = ({
           className="w-56"
         />
       </div>
+      <StatusFilterSelect value={statusValue} onChange={handleStatusChange} />
     </div>
   )
 }

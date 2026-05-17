@@ -158,6 +158,59 @@ describe('GET /api/roles', () => {
     const res = await request(app.getHttpServer()).get('/api/roles');
     expect(res.status).toBe(401);
   });
+
+  it('status=true → 200 且 prisma.findMany where 含 status: true', async () => {
+    const token = await getToken();
+
+    const res = await request(app.getHttpServer())
+      .get('/api/roles?status=true')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: true }),
+      }),
+    );
+  });
+
+  it('status=false → 200 且 prisma.findMany where 含 status: false', async () => {
+    const token = await getToken();
+
+    const res = await request(app.getHttpServer())
+      .get('/api/roles?status=false')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: false }),
+      }),
+    );
+  });
+
+  it('未帶 status → where 不含 status key', async () => {
+    const token = await getToken();
+
+    await request(app.getHttpServer())
+      .get('/api/roles')
+      .set('Authorization', `Bearer ${token}`);
+
+    const call = mockPrisma.role.findMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>;
+    };
+    expect('status' in call.where).toBe(false);
+  });
+
+  it('status=foo (非合法 enum) → 400', async () => {
+    const token = await getToken();
+
+    const res = await request(app.getHttpServer())
+      .get('/api/roles?status=foo')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // ──────────────────────────────────────────────

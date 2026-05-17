@@ -20,6 +20,8 @@ export interface ListMembersParams {
   limit: number;
   name?: string;
   email?: string;
+  /** 啟用狀態過濾；undefined 表示不過濾 */
+  status?: boolean;
 }
 
 export interface ListMembersPage {

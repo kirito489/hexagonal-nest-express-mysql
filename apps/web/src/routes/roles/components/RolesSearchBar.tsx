@@ -2,24 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  StatusFilterSelect,
+  type StatusFilterValue,
+} from '@/components/StatusFilterSelect'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
+
+type StatusFilter = 'true' | 'false' | undefined
 
 type RolesSearchBarProps = {
   initialName: string
+  initialStatus: StatusFilter
   onSearch: (name: string) => void
+  onStatusChange: (status: StatusFilter) => void
 }
 
 /**
- * 角色搜尋輸入：只有 name 一欄，debounce 300ms 後通知父層寫入 URL state
+ * 角色搜尋：name debounce 300ms + 狀態下拉（即時觸發）
  */
 export const RolesSearchBar = ({
   initialName,
+  initialStatus,
   onSearch,
+  onStatusChange,
 }: RolesSearchBarProps) => {
   const [nameInput, setNameInput] = useState(initialName)
   const debouncedName = useDebouncedValue(nameInput, 300)
 
-  // mount 首次值等於 initialName（URL 現況），不需要再 push 一次
   const isFirstRun = useRef(true)
   useEffect(() => {
     if (isFirstRun.current) {
@@ -28,6 +37,11 @@ export const RolesSearchBar = ({
     }
     onSearch(debouncedName)
   }, [debouncedName, onSearch])
+
+  const statusValue: StatusFilterValue = initialStatus ?? 'all'
+  const handleStatusChange = (v: StatusFilterValue) => {
+    onStatusChange(v === 'all' ? undefined : v)
+  }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -43,6 +57,7 @@ export const RolesSearchBar = ({
           className="w-56"
         />
       </div>
+      <StatusFilterSelect value={statusValue} onChange={handleStatusChange} />
     </div>
   )
 }

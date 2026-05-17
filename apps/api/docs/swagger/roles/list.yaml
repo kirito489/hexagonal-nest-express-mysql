@@ -1,8 +1,8 @@
 tags: [Roles]
 summary: 角色列表
 description: |
-  分頁取得角色列表，支援名稱模糊搜尋。需要 `BACKEND:ROLE:VIEW` 權限。
-  需要 JWT Bearer Token 認證。
+  分頁取得角色列表，支援名稱模糊搜尋與 status 啟用狀態過濾。
+  需要 `BACKEND:ROLE:VIEW` 權限。需要 JWT Bearer Token 認證。
 
 security:
   - bearerAuth: []
@@ -28,6 +28,13 @@ parameters:
     schema:
       type: string
     description: 以名稱模糊搜尋
+  - in: query
+    name: status
+    required: false
+    schema:
+      type: boolean
+      enum: [true, false]
+    description: 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用）
 
 responses:
   '200':

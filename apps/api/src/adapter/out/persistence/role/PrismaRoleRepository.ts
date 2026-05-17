@@ -96,6 +96,7 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
     const where = {
       deletedAt: null,
       ...(params.name ? { name: { contains: params.name } } : {}),
+      ...(params.status !== undefined ? { status: params.status } : {}),
     };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.role.findMany({

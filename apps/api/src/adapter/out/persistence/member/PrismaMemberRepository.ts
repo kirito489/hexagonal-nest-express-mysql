@@ -88,6 +88,7 @@ export class PrismaMemberRepository
     const where: Prisma.MemberRecordWhereInput = { deletedAt: null };
     if (params.name) where.member = { contains: params.name };
     if (params.email) where.email = { contains: params.email };
+    if (params.status !== undefined) where.status = params.status;
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.memberRecord.findMany({

@@ -5,6 +5,8 @@ export interface ListMembersQuery {
   limit?: number;
   name?: string;
   email?: string;
+  /** 啟用狀態過濾；undefined 表示不過濾（兩者皆回） */
+  status?: boolean;
 }
 
 export interface MemberListItem {

@@ -55,6 +55,7 @@ export const RolesPage = () => {
     page: url.page,
     limit: url.limit,
     name: url.name,
+    status: url.status,
   })
   const mutations = useRoleMutations()
 
@@ -183,7 +184,12 @@ export const RolesPage = () => {
         </Button>
       </header>
 
-      <RolesSearchBar initialName={url.name} onSearch={url.setSearch} />
+      <RolesSearchBar
+        initialName={url.name}
+        initialStatus={url.status}
+        onSearch={url.setSearch}
+        onStatusChange={url.setStatus}
+      />
 
       <RolesTable
         data={list}

@@ -76,6 +76,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **分頁列表 + 「按 id 取單筆」是同一個 capability 的兩個 endpoint，不要借用其他模組同樣資料的 endpoint**：本專案 Combobox 編輯時要顯示「不在第一頁的角色」名稱，看起來 `GET /api/roles/:id` 就夠用，但那個 endpoint 需要 `BACKEND:ROLE:VIEW` 權限；只有 `BACKEND:ACCOUNT:VIEW` 的會員管理者打不到，UX 會破。**Why:** 2026-05-18 paginate-member-role-options change 設計階段曾考慮借用 `/api/roles/:id`，後拍板開窄化 endpoint `GET /api/members/role/options/:id`，回應只含 `{ id, name, isDefault }` 並沿用會員管理權限。**How to apply:** 同樣資料但「呼叫情境不同 = 權限模型不同」時，寧可開薄薄的窄化 endpoint，也不要借用別的模組。維護成本看起來增加，但避免「打得到 list 卻打不到單筆」的權限詭異感。
 
+## Zod / 後端 validation
+
+- **`z.coerce.boolean()` 對字串 `'false'` 會 coerce 成 `true`，list query 不要用**：zod 的 coerce 底層走 JS `Boolean()`，凡是非空字串都是 truthy，所以 `?status=false` 進來會被 schema 變成 `true`，跟使用者意圖相反。**Why:** 2026-05-18 add-status-filter-to-list-pages change 動工前發現此風險，提前避開。**How to apply:** query 接 boolean filter 一律用 `z.enum(['true', 'false']).optional().transform((v) => v === undefined ? undefined : v === 'true')`，並在 Swagger 將 `type: boolean` 配 `enum: [true, false]` 限制；client 也只送這兩個合法值。陷阱避得早一點，未來 e2e 才不會踩。
+
 ## OpenSpec workflow
 
 - **propose 階段要先核對 API contract，不要假設「list 有的欄位 update 也支援」**：role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 update DTO 與 service 卻沒處理 `status`。提案寫成「純前端 change」，動工後才發現要連動改後端 + Swagger + api-client + unit spec + e2e。**Why:** 2026-05-18 add-role-management-page Phase 2 開動前才發現必須擴後端，artifacts 整份重改範圍。**How to apply:** 寫 proposal / design 前，先讀 `apps/api/src/adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端要做的互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充行為要在 proposal 的 Capabilities 列為 Modified / ADDED，並在 tasks.md 放在「前端開動前」的 phase。

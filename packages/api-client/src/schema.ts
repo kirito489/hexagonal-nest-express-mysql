@@ -447,8 +447,8 @@ export interface paths {
         };
         /**
          * 角色列表
-         * @description 分頁取得角色列表，支援名稱模糊搜尋。需要 `BACKEND:ROLE:VIEW` 權限。
-         *     需要 JWT Bearer Token 認證。
+         * @description 分頁取得角色列表，支援名稱模糊搜尋與 status 啟用狀態過濾。
+         *     需要 `BACKEND:ROLE:VIEW` 權限。需要 JWT Bearer Token 認證。
          */
         get: {
             parameters: {
@@ -457,6 +457,8 @@ export interface paths {
                     limit?: number;
                     /** @description 以名稱模糊搜尋 */
                     name?: string;
+                    /** @description 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用） */
+                    status?: true | false;
                 };
                 header?: never;
                 path?: never;
@@ -1020,8 +1022,8 @@ export interface paths {
         };
         /**
          * 帳號列表
-         * @description 分頁取得帳號列表，支援 name / email 模糊搜尋。需要 `BACKEND:ACCOUNT:VIEW` 權限。
-         *     需要 JWT Bearer Token 認證。
+         * @description 分頁取得帳號列表，支援 name / email 模糊搜尋與 status 啟用狀態過濾。
+         *     需要 `BACKEND:ACCOUNT:VIEW` 權限。需要 JWT Bearer Token 認證。
          */
         get: {
             parameters: {
@@ -1034,6 +1036,8 @@ export interface paths {
                     name?: string;
                     /** @description 以 Email 模糊搜尋 */
                     email?: string;
+                    /** @description 啟用狀態過濾；省略則不過濾（同時回啟用 + 停用） */
+                    status?: true | false;
                 };
                 header?: never;
                 path?: never;
@@ -1306,7 +1310,7 @@ export interface paths {
                                      */
                                     name?: string;
                                     /**
-                                     * @description 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（如 roleCode='SUPERADMIN' 的系統管理者角色）
+                                     * @description 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（由後端依角色屬性判斷）
                                      * @example true
                                      */
                                     isAssignable?: boolean;
@@ -1380,7 +1384,7 @@ export interface paths {
                                 /** @example 一般使用者 */
                                 name?: string;
                                 /**
-                                 * @description 是否可被一般帳號指派；roleCode='SUPERADMIN' 為 false
+                                 * @description 是否可被一般帳號指派；false 時前端 select 仍顯示但 disabled（由後端依角色屬性判斷）
                                  * @example true
                                  */
                                 isAssignable?: boolean;

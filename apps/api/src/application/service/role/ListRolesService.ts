@@ -32,6 +32,7 @@ export class ListRolesService implements ListRolesUseCase {
       page,
       limit,
       name: query.name,
+      status: query.status,
     });
     return {
       list: data.map((r) => ({

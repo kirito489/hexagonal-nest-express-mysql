@@ -6,6 +6,8 @@ export interface ListRolesQuery {
   page?: number;
   limit?: number;
   name?: string;
+  /** 啟用狀態過濾；undefined 表示不過濾 */
+  status?: boolean;
 }
 
 export interface RoleListItem {

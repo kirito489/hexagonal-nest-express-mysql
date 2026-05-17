@@ -194,6 +194,59 @@ describe('Member E2E', () => {
 
       expect(res.status).toBe(403);
     });
+
+    it('status=true → 200 且 prisma.findMany where 含 status: true', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members?status=true')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.memberRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: true }),
+        }),
+      );
+    });
+
+    it('status=false → 200 且 prisma.findMany where 含 status: false', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members?status=false')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.memberRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: false }),
+        }),
+      );
+    });
+
+    it('未帶 status → where 不含 status key', async () => {
+      const token = await loginAndGetToken(app);
+
+      await request(app.getHttpServer())
+        .get('/api/members')
+        .set('Authorization', `Bearer ${token}`);
+
+      const call = mockPrisma.memberRecord.findMany.mock.calls[0]?.[0] as {
+        where: Record<string, unknown>;
+      };
+      expect('status' in call.where).toBe(false);
+    });
+
+    it('status=foo (非合法 enum) → 400', async () => {
+      const token = await loginAndGetToken(app);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/members?status=foo')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+    });
   });
 
   // ── GET /api/members/role/options ──────────

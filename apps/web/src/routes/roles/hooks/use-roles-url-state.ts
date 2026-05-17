@@ -4,14 +4,23 @@ import { useSearchParams } from 'react-router-dom'
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 10
 
+/** 'true' / 'false' / undefined（undefined 表示「全部」，URL 不寫該參數） */
+export type StatusFilter = 'true' | 'false' | undefined
+
 export type RolesUrlState = {
   page: number
   limit: number
   name: string
+  status: StatusFilter
   /** 編輯中 role 的 uuid；undefined 表示 dialog 關閉 */
   edit: string | undefined
   /** 檢視中 role 的 uuid（唯讀 dialog）；與 edit 互斥 */
   view: string | undefined
+}
+
+const parseStatus = (v: string | null): StatusFilter => {
+  if (v === 'true' || v === 'false') return v
+  return undefined
 }
 
 const parseInt = (v: string | null, fallback: number): number => {
@@ -28,6 +37,7 @@ export const useRolesUrlState = (): RolesUrlState & {
   setPage: (page: number) => void
   setLimit: (limit: number) => void
   setSearch: (name: string) => void
+  setStatus: (status: StatusFilter) => void
   openEdit: (id: string) => void
   closeEdit: () => void
   openView: (id: string) => void
@@ -42,6 +52,7 @@ export const useRolesUrlState = (): RolesUrlState & {
     page: parseInt(searchParams.get('page'), DEFAULT_PAGE),
     limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
     name: searchParams.get('name') ?? '',
+    status: parseStatus(searchParams.get('status')),
     edit: editParam,
     view: editParam ? undefined : (searchParams.get('view') ?? undefined),
   }
@@ -67,6 +78,7 @@ export const useRolesUrlState = (): RolesUrlState & {
           if ('limit' in mut)
             apply('limit', mut.limit, (v) => v === DEFAULT_LIMIT)
           if ('name' in mut) apply('name', mut.name, () => false)
+          if ('status' in mut) apply('status', mut.status, () => false)
           if ('edit' in mut) apply('edit', mut.edit, () => false)
           if ('view' in mut) apply('view', mut.view, () => false)
           return next
@@ -86,6 +98,10 @@ export const useRolesUrlState = (): RolesUrlState & {
     (name: string) => update({ name, page: DEFAULT_PAGE }),
     [update],
   )
+  const setStatus = useCallback(
+    (status: StatusFilter) => update({ status, page: DEFAULT_PAGE }),
+    [update],
+  )
   // edit / view 互斥
   const openEdit = useCallback(
     (id: string) => update({ edit: id, view: undefined }),
@@ -103,6 +119,7 @@ export const useRolesUrlState = (): RolesUrlState & {
     setPage,
     setLimit,
     setSearch,
+    setStatus,
     openEdit,
     closeEdit,
     openView,

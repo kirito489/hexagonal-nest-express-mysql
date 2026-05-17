@@ -56,6 +56,7 @@ export const MembersPage = () => {
     limit: url.limit,
     name: url.name,
     email: url.email,
+    status: url.status,
   })
   const mutations = useMemberMutations()
 
@@ -183,7 +184,9 @@ export const MembersPage = () => {
       <MembersSearchBar
         initialName={url.name}
         initialEmail={url.email}
+        initialStatus={url.status}
         onSearch={url.setSearch}
+        onStatusChange={url.setStatus}
       />
 
       <MembersTable

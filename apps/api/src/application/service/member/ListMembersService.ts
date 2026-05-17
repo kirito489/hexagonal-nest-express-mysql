@@ -30,6 +30,7 @@ export class ListMembersService implements ListMembersUseCase {
       limit,
       name: query.name,
       email: query.email,
+      status: query.status,
     });
     return {
       list: data.map((r) => ({
