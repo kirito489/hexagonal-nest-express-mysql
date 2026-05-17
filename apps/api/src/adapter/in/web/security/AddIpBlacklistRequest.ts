@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { ipSchema } from './ip-schema';
 
 export const addIpBlacklistSchema = z.object({
-  ip: z.string().min(1, 'IP 不可為空'),
+  ip: ipSchema,
   reason: z.string().optional(),
 });
 

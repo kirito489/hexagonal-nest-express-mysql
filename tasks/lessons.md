@@ -22,6 +22,8 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **`REFRESH_SECRET` 必填且與 `ACCESS_SECRET` 不同**：optional 化會 fallback 到 JwtModule default secret（= ACCESS_SECRET），導致雙 secret 失去意義（access 洩漏 = refresh 也洩漏）。validate-env 一律 `z.string().min(32)` required，不要 optional。
 
+- **`/auth/forgot-password` 的時間差列舉是接受的風險**：email 不存在立刻 return（~10ms），email 存在要寫 DB + 寄 SMTP（~100ms-1s）；攻擊者用回應時間能列舉註冊 email。本專案決定**不修**——admin 工具威脅模型下 attacker 已經要會 fuzz email；要消除得引入 queue（寫 + 寄都 fire-and-forget）或加固定 delay（醜），代價不划算。緩解靠 rate limit（全域 ThrottlerGuard 已涵蓋）。未來真有需求才改 queue 方案。
+
 - **refresh_token 放 localStorage 必搭配 rotation**：access_token 放 localStorage 可接受，但 refresh_token 一起放等於 XSS 一次拿到長效憑證。本專案 `/auth/refresh` 採 **rotation**：每次 refresh 同時發新 access + 新 refresh，舊 refresh 立刻 `tokenBlacklist.addToBlacklist`。攻擊者偷到 refresh 但晚於使用者下次 refresh → 舊 token 已黑名單 → 401。使用者也要更新 storage（前端 `apiClient` 的 `refreshAccessToken` 中處理）。未來強化路線：加 refresh token family / reuse detection（需新增 DB 表），或改 httpOnly cookie + CSRF token（需後端 cookie 處理 + 前端不再碰 refresh）。
 
 - **JwtAuthGuard 快取命中與 DB 查詢兩條路徑都要檢查 `member.status`**：停用帳號的舊 JWT 在自然過期前仍可通，兩條路徑都要 `if (!data.status) throw new AccountDisabledException()`。

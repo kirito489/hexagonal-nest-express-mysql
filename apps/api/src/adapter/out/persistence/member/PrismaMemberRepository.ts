@@ -163,27 +163,27 @@ export class PrismaMemberRepository
     passwordHash: string,
   ): Promise<void> {
     try {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.memberRecord.upsert({
-          where: { id: member.id.toString() },
-          create: {
-            id: member.id.toString(),
-            email: member.email.toString(),
-            member: member.member,
-            password: passwordHash,
-            roleId: member.roleId,
-            status: member.status,
-            isDefault: member.isDefault,
-          },
-          update: {
-            email: member.email.toString(),
-            member: member.member,
-            password: passwordHash,
-            roleId: member.roleId,
-            status: member.status,
-            lastPasswordChange: new Date(),
-          },
-        });
+      // upsert 本身就是單一 SQL（INSERT ... ON DUPLICATE KEY UPDATE），
+      // 不需要 $transaction 包；多此一舉的 begin/commit 反而增加 latency
+      await this.prisma.memberRecord.upsert({
+        where: { id: member.id.toString() },
+        create: {
+          id: member.id.toString(),
+          email: member.email.toString(),
+          member: member.member,
+          password: passwordHash,
+          roleId: member.roleId,
+          status: member.status,
+          isDefault: member.isDefault,
+        },
+        update: {
+          email: member.email.toString(),
+          member: member.member,
+          password: passwordHash,
+          roleId: member.roleId,
+          status: member.status,
+          lastPasswordChange: new Date(),
+        },
       });
     } catch (err) {
       if (

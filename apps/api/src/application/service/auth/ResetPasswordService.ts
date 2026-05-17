@@ -14,6 +14,10 @@ import {
   PasswordResetTokenPort,
 } from '../../port/out/auth/PasswordResetTokenPort';
 import {
+  LOAD_MEMBER_PORT,
+  LoadMemberPort,
+} from '../../port/out/member/LoadMemberPort';
+import {
   UPDATE_MEMBER_PASSWORD_PORT,
   UpdateMemberPasswordPort,
 } from '../../port/out/member/UpdateMemberPasswordPort';
@@ -40,6 +44,8 @@ export class ResetPasswordService implements ResetPasswordUseCase {
   constructor(
     @Inject(PASSWORD_RESET_TOKEN_PORT)
     private readonly resetToken: PasswordResetTokenPort,
+    @Inject(LOAD_MEMBER_PORT)
+    private readonly loadMember: LoadMemberPort,
     @Inject(UPDATE_MEMBER_PASSWORD_PORT)
     private readonly updatePassword: UpdateMemberPasswordPort,
     @Inject(CLEAR_MEMBER_CONTEXT_PORT)
@@ -75,12 +81,13 @@ export class ResetPasswordService implements ResetPasswordUseCase {
       await this.clearMemberContext.clearMemberContext(result.memberId);
     }
 
-    // 記錄日誌
+    // 記錄日誌：audit 表的核心價值是「事件當下的快照」，email 不該事後 join，故在此補查
     if (this.featureFlags.isEnabled('authLogEnabled')) {
       try {
+        const member = await this.loadMember.loadMemberById(result.memberId);
         await this.saveAuthLog.saveAuthLog({
           memberId: result.memberId,
-          email: '',
+          email: member?.email ?? '',
           action: 'PASSWORD_RESET',
           detail: '密碼已重設',
         });

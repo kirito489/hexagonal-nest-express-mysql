@@ -23,6 +23,7 @@ import {
   MemberContext,
 } from '../decorator/current-member.decorator';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
+import { ipSchema } from './ip-schema';
 import {
   AddIpWhitelistRequest,
   addIpWhitelistSchema,
@@ -71,7 +72,9 @@ export class SecurityController {
 
   @Delete('ip-whitelist/:ip')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeFromWhitelist(@Param('ip') ip: string): Promise<void> {
+  async removeFromWhitelist(
+    @Param('ip', new ZodValidationPipe(ipSchema)) ip: string,
+  ): Promise<void> {
     await this.securityFacade.removeFromWhitelist(ip);
   }
 
@@ -95,7 +98,9 @@ export class SecurityController {
 
   @Delete('ip-blacklist/:ip')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeFromBlacklist(@Param('ip') ip: string): Promise<void> {
+  async removeFromBlacklist(
+    @Param('ip', new ZodValidationPipe(ipSchema)) ip: string,
+  ): Promise<void> {
     await this.securityFacade.removeFromBlacklist(ip);
   }
 
