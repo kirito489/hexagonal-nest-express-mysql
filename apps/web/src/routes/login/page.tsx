@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
 import { z } from 'zod'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,7 @@ type LocationState = {
 export const LoginPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const loginMutation = useApiMutation('POST', '/auth/login')
@@ -61,6 +63,9 @@ export const LoginPage = () => {
         if (res.refreshToken) {
           tokenStorage.setRefresh(res.refreshToken)
         }
+        // 換帳號要清掉前一個使用者的 query cache（/me、permissions、list 等），
+        // 否則直到 staleTime 過期才會重抓，使用者會看到前一個身分的資料
+        queryClient.clear()
         const from = (location.state as LocationState | null)?.from?.pathname ?? '/'
         navigate(from, { replace: true })
       }

@@ -1,4 +1,5 @@
 import { useNavigate, NavLink, Outlet } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { LogOut } from 'lucide-react'
 
 import {
@@ -23,6 +24,7 @@ import { NAV_ITEMS } from './_nav-items'
 // 後台共用 layout：左側 Sidebar、右側 main，登入後所有頁面共用
 export const Layout = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { permissions } = useCurrentMember()
 
   const visibleNavItems = NAV_ITEMS.filter(
@@ -32,6 +34,8 @@ export const Layout = () => {
 
   const handleLogout = () => {
     tokenStorage.clear()
+    // 清前一個使用者的 query cache，避免下一個使用者登入前的短暫 race 看到舊資料
+    queryClient.clear()
     navigate('/login', { replace: true })
   }
 
