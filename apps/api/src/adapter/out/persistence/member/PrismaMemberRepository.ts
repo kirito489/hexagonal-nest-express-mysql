@@ -47,8 +47,9 @@ export class PrismaMemberRepository
   }
 
   async loadMemberById(id: string): Promise<MemberRecordDto | null> {
+    // extended where：findUnique 用 id 為主索引同時過濾軟刪
     const r = await this.prisma.memberRecord.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: { role: { select: { id: true, name: true } } },
     });
     if (!r) return null;
@@ -67,7 +68,9 @@ export class PrismaMemberRepository
   }
 
   async loadMemberDomainById(id: string): Promise<Member | null> {
-    const r = await this.prisma.memberRecord.findUnique({ where: { id } });
+    const r = await this.prisma.memberRecord.findUnique({
+      where: { id, deletedAt: null },
+    });
     if (!r) return null;
     return Member.reconstitute(
       r.id,

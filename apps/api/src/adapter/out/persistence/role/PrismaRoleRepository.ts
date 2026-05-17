@@ -185,7 +185,10 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   }
 
   async countMembers(id: string): Promise<number> {
-    return this.prisma.memberRecord.count({ where: { roleId: id } });
+    // 排除軟刪會員：DeleteRoleService 用此判斷「角色是否仍有成員」
+    return this.prisma.memberRecord.count({
+      where: { roleId: id, deletedAt: null },
+    });
   }
 
   // ── Private helpers ───────────────────────────

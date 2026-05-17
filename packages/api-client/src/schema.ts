@@ -190,8 +190,8 @@ export interface paths {
         put?: never;
         /**
          * 更新 Access Token
-         * @description 使用 Refresh Token 取得新的 Access Token。
-         *     Refresh Token 採絕對效期，不旋轉。
+         * @description 使用 Refresh Token 取得新的 Access Token 與新的 Refresh Token（rotation）。
+         *     舊 Refresh Token 會立即加入黑名單；如果同一個舊 Refresh Token 再次被用 → 401。
          */
         post: {
             parameters: {
@@ -223,7 +223,9 @@ export interface paths {
                          *       "success": true,
                          *       "data": {
                          *         "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                         *         "accessTokenExpiresIn": 900
+                         *         "accessTokenExpiresIn": 7200,
+                         *         "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                         *         "refreshTokenExpiresIn": 604800
                          *       },
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
@@ -231,12 +233,16 @@ export interface paths {
                         "application/json": {
                             /** @example true */
                             success: boolean;
-                            /** @description 更新後的 Access Token */
+                            /** @description 更新後的 token 雙包 */
                             data: {
                                 /** @description 新的 Access Token */
                                 accessToken: string;
                                 /** @description Access Token 絕對有效期（秒） */
                                 accessTokenExpiresIn: number;
+                                /** @description 新的 Refresh Token（舊 token 已加入黑名單） */
+                                refreshToken: string;
+                                /** @description Refresh Token 絕對有效期（秒） */
+                                refreshTokenExpiresIn: number;
                             };
                             /** Format: date-time */
                             timestamp: string;

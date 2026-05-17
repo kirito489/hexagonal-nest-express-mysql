@@ -22,10 +22,16 @@ const refreshAccessToken = async (): Promise<boolean> => {
       body: JSON.stringify({ refreshToken: refresh }),
     })
     if (!res.ok) return false
-    const body = (await res.json()) as { data?: { accessToken?: string } }
+    const body = (await res.json()) as {
+      data?: { accessToken?: string; refreshToken?: string }
+    }
     const newToken = body.data?.accessToken
     if (!newToken) return false
     tokenStorage.set(newToken)
+    // Rotation：後端會回新的 refresh token，舊的已經進黑名單
+    if (body.data?.refreshToken) {
+      tokenStorage.setRefresh(body.data.refreshToken)
+    }
     return true
   } catch {
     return false

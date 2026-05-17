@@ -21,12 +21,7 @@ const envSchema = z.object({
   ACCESS_SECRET: z.string().min(32),
   //預設 2 小時
   ACCESS_TOKEN_EXPIRES_IN: z.coerce.number().default(7200),
-  REFRESH_SECRET: z
-    .string()
-    .min(32)
-    .or(z.literal(''))
-    .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+  REFRESH_SECRET: z.string().min(32),
   //預設 7 天
   REFRESH_TOKEN_EXPIRES_IN: z.coerce.number().default(604800),
   SESSION_SECRET: z
@@ -260,6 +255,11 @@ export const getEnv = (): Env => {
     }
     if (!process.env.APP_TIMEZONE || process.env.APP_TIMEZONE.trim() === '') {
       productionErrors.push('APP_TIMEZONE: 生產環境必填（例：Asia/Tokyo）');
+    }
+    if (!_env.APPLICATION_ADMIN_ROLE_ENABLED) {
+      productionErrors.push(
+        'APPLICATION_ADMIN_ROLE_ENABLED: 生產環境必須開啟，否則 RolesGuard 失效（@Roles 裝飾無作用）',
+      );
     }
     if (productionErrors.length > 0) {
       productionErrors.forEach((msg) => log.error(msg));
