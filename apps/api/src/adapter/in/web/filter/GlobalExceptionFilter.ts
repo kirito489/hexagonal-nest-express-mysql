@@ -37,6 +37,80 @@ export interface ApiErrorResponse {
   timestamp: string;
 }
 
+// Domain exception → { HTTP status, error code } 映射表
+// 新增 domain exception 時只需在此加一筆，不用再追長串 if/else if
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DomainExceptionCtor = new (...args: any[]) => Error;
+
+const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
+  readonly [DomainExceptionCtor, { status: HttpStatus; code: string }]
+> = [
+  [
+    MemberNotFoundException,
+    { status: HttpStatus.NOT_FOUND, code: 'MEMBER_NOT_FOUND' },
+  ],
+  [
+    EmailAlreadyExistsException,
+    { status: HttpStatus.CONFLICT, code: 'EMAIL_ALREADY_EXISTS' },
+  ],
+  [
+    AccountDisabledException,
+    { status: HttpStatus.FORBIDDEN, code: 'ACCOUNT_DISABLED' },
+  ],
+  [
+    PasswordChangeRequiredException,
+    { status: HttpStatus.FORBIDDEN, code: 'PASSWORD_CHANGE_REQUIRED' },
+  ],
+  [
+    InvalidRefreshTokenException,
+    { status: HttpStatus.UNAUTHORIZED, code: 'INVALID_REFRESH_TOKEN' },
+  ],
+  [
+    RoleNotFoundException,
+    { status: HttpStatus.NOT_FOUND, code: 'ROLE_NOT_FOUND' },
+  ],
+  [
+    CannotDeleteSelfException,
+    { status: HttpStatus.CONFLICT, code: 'CANNOT_DELETE_SELF' },
+  ],
+  [
+    DefaultMemberNotDeletableException,
+    { status: HttpStatus.CONFLICT, code: 'DEFAULT_MEMBER_NOT_DELETABLE' },
+  ],
+  [
+    DefaultMemberNotEditableException,
+    { status: HttpStatus.CONFLICT, code: 'DEFAULT_MEMBER_NOT_EDITABLE' },
+  ],
+  [
+    CannotDisableSelfException,
+    { status: HttpStatus.CONFLICT, code: 'CANNOT_DISABLE_SELF' },
+  ],
+  [
+    DuplicateRoleNameException,
+    { status: HttpStatus.CONFLICT, code: 'DUPLICATE_ROLE_NAME' },
+  ],
+  [
+    DefaultRoleNotDeletableException,
+    { status: HttpStatus.BAD_REQUEST, code: 'DEFAULT_ROLE_NOT_DELETABLE' },
+  ],
+  [
+    DefaultRoleNotEditableException,
+    { status: HttpStatus.BAD_REQUEST, code: 'DEFAULT_ROLE_NOT_EDITABLE' },
+  ],
+  [
+    RoleHasMembersException,
+    { status: HttpStatus.CONFLICT, code: 'ROLE_HAS_MEMBERS' },
+  ],
+  [
+    InvalidPermissionCodeException,
+    { status: HttpStatus.BAD_REQUEST, code: 'INVALID_PERMISSION_CODE' },
+  ],
+  [
+    InvalidPermissionCombinationException,
+    { status: HttpStatus.BAD_REQUEST, code: 'INVALID_PERMISSION_COMBINATION' },
+  ],
+];
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -51,87 +125,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    let status: number;
-    let message: string;
-    let code: string;
-
-    if (exception instanceof MemberNotFoundException) {
-      status = HttpStatus.NOT_FOUND;
-      message = exception.message;
-      code = 'MEMBER_NOT_FOUND';
-    } else if (exception instanceof EmailAlreadyExistsException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'EMAIL_ALREADY_EXISTS';
-    } else if (exception instanceof AccountDisabledException) {
-      status = HttpStatus.FORBIDDEN;
-      message = exception.message;
-      code = 'ACCOUNT_DISABLED';
-    } else if (exception instanceof PasswordChangeRequiredException) {
-      status = HttpStatus.FORBIDDEN;
-      message = exception.message;
-      code = 'PASSWORD_CHANGE_REQUIRED';
-    } else if (exception instanceof InvalidRefreshTokenException) {
-      status = HttpStatus.UNAUTHORIZED;
-      message = exception.message;
-      code = 'INVALID_REFRESH_TOKEN';
-    } else if (exception instanceof RoleNotFoundException) {
-      status = HttpStatus.NOT_FOUND;
-      message = exception.message;
-      code = 'ROLE_NOT_FOUND';
-    } else if (exception instanceof CannotDeleteSelfException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'CANNOT_DELETE_SELF';
-    } else if (exception instanceof DefaultMemberNotDeletableException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'DEFAULT_MEMBER_NOT_DELETABLE';
-    } else if (exception instanceof DefaultMemberNotEditableException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'DEFAULT_MEMBER_NOT_EDITABLE';
-    } else if (exception instanceof CannotDisableSelfException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'CANNOT_DISABLE_SELF';
-    } else if (exception instanceof DuplicateRoleNameException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'DUPLICATE_ROLE_NAME';
-    } else if (exception instanceof DefaultRoleNotDeletableException) {
-      status = HttpStatus.BAD_REQUEST;
-      message = exception.message;
-      code = 'DEFAULT_ROLE_NOT_DELETABLE';
-    } else if (exception instanceof DefaultRoleNotEditableException) {
-      status = HttpStatus.BAD_REQUEST;
-      message = exception.message;
-      code = 'DEFAULT_ROLE_NOT_EDITABLE';
-    } else if (exception instanceof RoleHasMembersException) {
-      status = HttpStatus.CONFLICT;
-      message = exception.message;
-      code = 'ROLE_HAS_MEMBERS';
-    } else if (exception instanceof InvalidPermissionCodeException) {
-      status = HttpStatus.BAD_REQUEST;
-      message = exception.message;
-      code = 'INVALID_PERMISSION_CODE';
-    } else if (exception instanceof InvalidPermissionCombinationException) {
-      status = HttpStatus.BAD_REQUEST;
-      message = exception.message;
-      code = 'INVALID_PERMISSION_COMBINATION';
-    } else if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      message = exception.message;
-      code = exception.constructor.name
-        .replace('Exception', '')
-        .replace(/([A-Z])/g, '_$1')
-        .replace(/^_/, '')
-        .toUpperCase();
-    } else {
-      status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Internal server error';
-      code = 'INTERNAL_SERVER_ERROR';
-    }
+    const { status, message, code } = this.resolveError(exception);
 
     const now = new Date();
     const startTime =
@@ -168,5 +162,44 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     response.status(status).json(body);
+  }
+
+  private resolveError(exception: unknown): {
+    status: number;
+    message: string;
+    code: string;
+  } {
+    // 1. domain exception：查表
+    if (exception instanceof Error) {
+      for (const [Ctor, meta] of DOMAIN_EXCEPTION_MAP) {
+        if (exception instanceof Ctor) {
+          return {
+            status: meta.status,
+            message: exception.message,
+            code: meta.code,
+          };
+        }
+      }
+    }
+
+    // 2. NestJS HttpException：透過 class name 自動轉 SCREAMING_SNAKE_CASE
+    if (exception instanceof HttpException) {
+      return {
+        status: exception.getStatus(),
+        message: exception.message,
+        code: exception.constructor.name
+          .replace('Exception', '')
+          .replace(/([A-Z])/g, '_$1')
+          .replace(/^_/, '')
+          .toUpperCase(),
+      };
+    }
+
+    // 3. 未預期錯誤：500
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
+    };
   }
 }

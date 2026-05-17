@@ -83,19 +83,21 @@ const bootstrap = async (): Promise<void> => {
 
   app.use(cookieParser(env.COOKIE_SECRET));
 
-  // 支援多 origin（以逗號分隔），方便同時放後端、前端 dev、staging 等多個來源
-  const corsOrigins =
-    env.CORS_ORIGIN === '*'
-      ? '*'
-      : env.CORS_ORIGIN.split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
+  // 支援多 origin（以逗號分隔），方便同時放後端、前端 dev、staging 等多個來源。
+  // CORS 規範下 origin=`*` 與 credentials: true 互斥，瀏覽器會拒絕 credentialed
+  // 請求；遇到 `*` 則自動關閉 credentials，避免 silent failure
+  const isWildcard = env.CORS_ORIGIN === '*';
+  const corsOrigins = isWildcard
+    ? '*'
+    : env.CORS_ORIGIN.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
   app.enableCors({
     origin:
       Array.isArray(corsOrigins) && corsOrigins.length === 1
         ? corsOrigins[0]
         : corsOrigins,
-    credentials: true,
+    credentials: !isWildcard,
   });
 
   // API 前綴（Swagger UI 路由不受影響）

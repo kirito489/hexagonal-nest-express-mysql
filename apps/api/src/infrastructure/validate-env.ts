@@ -41,7 +41,11 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   // CORS / Cookie
-  CORS_ORIGIN: z.string().default('*'),
+  // 預設 dev 兩個 origin。**不要設為 `*`**：CORS 規範下 origin=`*` 與 credentials: true
+  // 互斥，瀏覽器會 silent reject credentialed 請求（production 段也擋 `*`）
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:3000,http://localhost:5173'),
   COOKIE_SECRET: z.string().min(32),
 
   // Firebase FCM（選填）
