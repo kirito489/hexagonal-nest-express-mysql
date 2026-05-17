@@ -50,6 +50,18 @@ import { getEnv } from './infrastructure/validate-env';
               ],
               censor: '[REDACTED]',
             },
+            // 預設 serializer 會 dump 整包 req/res（含所有 headers、cookies），dev 看不清楚。
+            // 只保留必要欄位，需要除錯時改 LOG_LEVEL=debug 並還原這段
+            serializers: {
+              req: (req: { id: string; method: string; url: string }) => ({
+                id: req.id,
+                method: req.method,
+                url: req.url,
+              }),
+              res: (res: { statusCode: number }) => ({
+                statusCode: res.statusCode,
+              }),
+            },
             transport: {
               targets: [
                 ...(isDev

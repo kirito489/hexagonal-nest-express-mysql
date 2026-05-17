@@ -50,6 +50,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **`tsBuildInfoFile` 必須放在 dist 內**：`apps/api/nest-cli.json` 設 `deleteOutDir: true`，每次 `nest build` / `nest start --watch` 會把 dist 整個刪掉；但 TS `incremental: true` 的 `.tsbuildinfo` 預設在 tsconfig 旁邊（root），刪 dist 不會清掉它，導致 TS 以為「沒變動 = 不用 emit」，build 完 dist 是空的，nest 啟動 dist/main 失敗。**Why:** 2026-05-16 setup-monorepo-frontend 階段 10 後第一次 `pnpm dev`，前端 Vite 起來但 `[api]` 報 `Cannot find module '.../dist/main'`，明明 `tsc` 印 `Found 0 errors`。**How to apply:** `apps/api/tsconfig.json` 設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`，cache 與 build 產物同生共死。如果遇到「明明改過 code 卻沒重編」，先刪 `.tsbuildinfo` 重跑即可。
 
+## Git hooks / Husky
+
+- **Husky pre-commit 在 nvm 環境下找不到 pnpm，要主動 source `nvm.sh`**：用 nvm 安裝的 node / pnpm 路徑只在 zsh 等互動 shell 載入 nvm 後才會進 PATH；git commit 的子 shell（某些 GUI / oh-my-zsh alias 組合）不會繼承這條，hook 跑 `pnpm lint-staged` 會 `command not found`。**Why:** 2026-05-17 starter pack 補上 husky 後第一次 commit 即踩。**How to apply:** `.husky/pre-commit` 開頭加 `if ! command -v pnpm >/dev/null 2>&1; then [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"; fi`。對非 nvm 用戶（直接安裝 pnpm 或 corepack）這條 if 直接跳過，零成本。
+
 ## Docker / 本機服務
 
 - **Docker MySQL 容器剛啟動的前幾秒，Prisma adapter 連線池會 pool timeout**：`docker compose up -d` / `docker start my-mysql` 立刻打 API 會看到 `DriverAdapterError: pool timeout: failed to retrieve a connection from pool after 10000ms (pool connections: active=0 idle=0 limit=10)`，但同時 mysql2 直連、`docker exec mysql ...` 都正常。容器要 5–30 秒完整 ready，Prisma 7 mariadb adapter 在這段過渡期建不起連線。**Why:** 2026-05-17 早上 `pnpm dev` 後立刻試登入打到此狀況，幾秒後 retry 又好了。**How to apply:** 看到 pool timeout 先等 10 秒重試。要徹底解可在 `apps/api/src/main.ts` 加 `wait-on tcp:3306` 或 retry，但 dev 體驗影響不大不值得。
