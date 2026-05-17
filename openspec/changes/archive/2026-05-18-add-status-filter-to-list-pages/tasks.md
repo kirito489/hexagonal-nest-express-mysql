@@ -64,5 +64,5 @@
 ## 10. 收尾
 
 - [x] 10.1 `tasks/lessons.md` 補：zod `z.coerce.boolean()` 對 'false' 視為 true 的陷阱，list query 用 `z.enum + transform` 嚴格解析
-- [ ] 10.2 commit（使用者執行）
-- [ ] 10.3 邀請 `openspec-archive-change` 走完整封存流程
+- [x] 10.2 commit（使用者執行）— fd3ba86
+- [x] 10.3 邀請 `openspec-archive-change` 走完整封存流程
