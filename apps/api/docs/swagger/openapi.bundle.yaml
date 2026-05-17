@@ -740,7 +740,7 @@ paths:
                           example: 'BACKEND:ACCOUNT:VIEW'
                         name:
                           type: string
-                          example: アカウント閲覧
+                          example: 帳號檢視
                         platform:
                           type: string
                           example: BACKEND

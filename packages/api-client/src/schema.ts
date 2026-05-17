@@ -623,7 +623,7 @@ export interface paths {
                             data: {
                                 /** @example BACKEND:ACCOUNT:VIEW */
                                 permissionCode?: string;
-                                /** @example アカウント閲覧 */
+                                /** @example 帳號檢視 */
                                 name?: string;
                                 /** @example BACKEND */
                                 platform?: string;

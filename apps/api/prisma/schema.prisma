@@ -138,7 +138,7 @@ model PasswordResetTokenRecord {
 
 model AttachmentRecord {
   id           String   @id @default(uuid())
-  /// ファイル名（latin1→UTF-8 デコード済）/ 檔案名稱（存入前須先做 latin1→UTF-8 轉換）
+  /// 檔案名稱（存入前須先做 latin1→UTF-8 轉換）
   fileName     String   @map("file_name") @db.VarChar(255)
   fileUrl      String   @map("file_url") @db.VarChar(500)
   fileType     String   @map("file_type") @db.VarChar(50)

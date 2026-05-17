@@ -106,7 +106,6 @@ export class LoginService implements LoginUseCase {
       throw new UnauthorizedException('帳號或密碼錯誤');
     }
 
-    // status チェック（user enumeration 防止のため bcrypt 後）/
     // status 檢查（放在 bcrypt 後避免 user enumeration）
     if (!member.status) {
       await this.logAuth(

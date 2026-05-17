@@ -18,10 +18,7 @@ import { JwtPayload } from '../../port/jwt-payload';
 import { getEnv } from '../../../infrastructure/validate-env';
 
 /**
- * ログアウト処理 / 登出處理
- *
- * access / refresh 両方を黒リストに投入 / 將 access / refresh 同時加入黑名單，
- * MemberContext キャッシュも削除 / 並清除 MemberContext 快取。
+ * 登出處理：將 access / refresh 同時加入黑名單，並清除 MemberContext 快取
  */
 @Injectable()
 export class LogoutService implements LogoutUseCase {
@@ -41,7 +38,7 @@ export class LogoutService implements LogoutUseCase {
   async execute(command: LogoutCommand): Promise<void> {
     const env = getEnv();
 
-    // Access token を検証＆黒リスト登録 / 驗證並黑名單 access token
+    // 驗證並黑名單 access token
     const accessPayload = this.verifySilently(command.accessToken, {
       secret: env.ACCESS_SECRET,
     });
@@ -55,7 +52,7 @@ export class LogoutService implements LogoutUseCase {
       await this.logAuth(command, accessPayload.sub);
     }
 
-    // Refresh token も提供されていれば同様に / 若 refresh token 一併提供則同樣處理
+    // 若 refresh token 一併提供則同樣處理
     if (command.refreshToken && env.REFRESH_SECRET) {
       const refreshPayload = this.verifySilently(command.refreshToken, {
         secret: env.REFRESH_SECRET,
@@ -69,16 +66,12 @@ export class LogoutService implements LogoutUseCase {
           await this.tokenBlacklist.addToBlacklist(command.refreshToken, ttl);
         }
       } else {
-        this.logger.debug(
-          'Refresh token 検証失敗（スキップ）/ Refresh token 驗證失敗（略過）',
-        );
+        this.logger.debug('Refresh token 驗證失敗（略過）');
       }
     }
   }
 
-  /**
-   * LOGOUT auth log を記録（FeatureFlag 制御）/ 記錄 LOGOUT auth log（FeatureFlag 控制）
-   */
+  /** 記錄 LOGOUT auth log（FeatureFlag 控制） */
   private async logAuth(
     command: LogoutCommand,
     memberId: string,
@@ -93,17 +86,11 @@ export class LogoutService implements LogoutUseCase {
         userAgent: command.userAgent,
       });
     } catch (err) {
-      this.logger.error(
-        'ログアウトログの書き込みに失敗 / 登出日誌寫入失敗',
-        err,
-      );
+      this.logger.error('登出日誌寫入失敗', err);
     }
   }
 
-  /**
-   * JWT 検証失敗時は null を返す（ログアウトは best-effort） /
-   * JWT 驗證失敗回傳 null（登出採 best-effort，不拋例外）
-   */
+  /** JWT 驗證失敗回傳 null（登出採 best-effort，不拋例外） */
   private verifySilently(
     token: string,
     options: { secret: string },
