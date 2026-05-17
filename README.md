@@ -102,6 +102,16 @@ openssl rand -hex 32
 - `ACCESS_SECRET` / `COOKIE_SECRET` 含預設佔位符或長度不足
 - `BCRYPT_ROUNDS < 12`
 
+## 常見啟動問題
+
+| 症狀                                                             | 原因 / 解法                                                                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| typecheck 報「Property X does not exist on PrismaService」一堆   | Prisma client 沒生成。跑 `pnpm --filter @app/api db:generate`（`predev` / `prebuild` 已自動處理） |
+| `pnpm dev` 啟動報 `Cannot find module '.../dist/main'`          | TS incremental cache 跟 nest deleteOutDir 衝突。刪 `apps/api/dist/.tsbuildinfo` 後重跑           |
+| 登入回 `pool timeout: failed to retrieve a connection`           | Docker MySQL 剛啟動還沒完全 ready，等 10 秒重試                                                  |
+| `pnpm dev` 只看到 `[api]`，沒 `[web]` 輸出                       | Vite 8 在 concurrently 下不印 ready banner，但 dev server 仍在 `http://localhost:5173/`，直接開即可 |
+| 後端啟動印 `[FCM] / [S3] 憑證未設定`                             | 未設定的選填功能 debug 訊息，可忽略；正式要用再填 `FCM_*` / `AWS_*` 環境變數                       |
+
 ## 想看更多
 
 | 想知道                          | 看哪裡                                          |

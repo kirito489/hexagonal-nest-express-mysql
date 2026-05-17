@@ -48,6 +48,14 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **`tsBuildInfoFile` 必須放在 dist 內**：`apps/api/nest-cli.json` 設 `deleteOutDir: true`，每次 `nest build` / `nest start --watch` 會把 dist 整個刪掉；但 TS `incremental: true` 的 `.tsbuildinfo` 預設在 tsconfig 旁邊（root），刪 dist 不會清掉它，導致 TS 以為「沒變動 = 不用 emit」，build 完 dist 是空的，nest 啟動 dist/main 失敗。**Why:** 2026-05-16 setup-monorepo-frontend 階段 10 後第一次 `pnpm dev`，前端 Vite 起來但 `[api]` 報 `Cannot find module '.../dist/main'`，明明 `tsc` 印 `Found 0 errors`。**How to apply:** `apps/api/tsconfig.json` 設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`，cache 與 build 產物同生共死。如果遇到「明明改過 code 卻沒重編」，先刪 `.tsbuildinfo` 重跑即可。
 
+## Vite / Concurrently
+
+- **Vite 8 在 stdout 為 pipe（concurrently / CI）時會抑制 ready banner**：直接在 terminal 跑 `vite` 會印 `VITE vX.X.X ready in XXX ms / ➜ Local: http://localhost:5173/`，但被 `concurrently` 包起來後 stdout 是 pipe，Vite 偵測到非 TTY 就完全靜音。dev server 實際**有跑**（curl 該 port 拿得到 HTML），只是 log 看不到。連寫個小 plugin 用 `console.log` 或 `process.stderr.write` 也無效（Vite 內部對 stream 做了處理）。**Why:** 2026-05-16 setup-monorepo-frontend phase 10 後手動測 `pnpm dev` 時 `[web]` 沒任何輸出，誤以為 Vite 沒起來；用 `ps` / `lsof -ti:5173` / `curl` 才確認其實是好的。**How to apply:** 別期待在 `pnpm dev` 看到 Vite ready 訊息；直接開瀏覽器 `http://localhost:5173/` 即可。要解決得換 PTY 支援的 runner（如 `npm-run-all2 --pty`），但成本不划算。
+
+## Docker / 本機服務
+
+- **Docker MySQL 容器剛啟動的前幾秒，Prisma adapter 連線池會 pool timeout**：`docker compose up -d` / `docker start my-mysql` 立刻打 API 會看到 `DriverAdapterError: pool timeout: failed to retrieve a connection from pool after 10000ms (pool connections: active=0 idle=0 limit=10)`，但同時 mysql2 直連、`docker exec mysql ...` 都正常。容器要 5–30 秒完整 ready，Prisma 7 mariadb adapter 在這段過渡期建不起連線。**Why:** 2026-05-17 早上 `pnpm dev` 後立刻試登入打到此狀況，幾秒後 retry 又好了。**How to apply:** 看到 pool timeout 先等 10 秒重試。要徹底解可在 `apps/api/src/main.ts` 加 `wait-on tcp:3306` 或 retry，但 dev 體驗影響不大不值得。
+
 ## Swagger
 
 - **採分檔 + `$ref` 結構**：`openapi.yaml` 只放 components / servers / info 與 paths 索引；每個 endpoint 一個獨立 yaml。不要 inline 寫整包 spec。
