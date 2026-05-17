@@ -18,6 +18,10 @@ import {
   LoadMemberPort,
 } from '../../port/out/member/LoadMemberPort';
 import {
+  SAVE_MEMBER_PORT,
+  SaveMemberPort,
+} from '../../port/out/member/SaveMemberPort';
+import {
   SAVE_AUTH_LOG_PORT,
   SaveAuthLogPort,
 } from '../../port/out/auth/SaveAuthLogPort';
@@ -49,6 +53,8 @@ export class LoginService implements LoginUseCase {
   constructor(
     @Inject(LOAD_MEMBER_PORT)
     private readonly loadMember: LoadMemberPort,
+    @Inject(SAVE_MEMBER_PORT)
+    private readonly saveMember: SaveMemberPort,
     @Inject(SAVE_AUTH_LOG_PORT)
     private readonly saveAuthLog: SaveAuthLogPort,
     @Inject(ACCOUNT_LOCK_PORT)
@@ -147,6 +153,11 @@ export class LoginService implements LoginUseCase {
         env.APPLICATION_SESSION_IDLE_TIMEOUT,
       );
     }
+
+    // 更新 lastLoginAt（fire-and-forget；DB 寫入失敗不影響登入成功流程）
+    this.saveMember.updateLastLoginAt(memberId).catch((err) => {
+      this.logger.warn('updateLastLoginAt 失敗', err);
+    });
 
     // 記錄登入成功日誌
     await this.logAuth(email, memberId, 'LOGIN_SUCCESS', ip, userAgent);

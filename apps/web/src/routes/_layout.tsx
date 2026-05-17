@@ -1,5 +1,5 @@
 import { useNavigate, NavLink, Outlet } from 'react-router-dom'
-import { Home, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 
 import {
   Sidebar,
@@ -17,10 +17,18 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { tokenStorage } from '@/lib/storage'
+import { useCurrentMember } from '@/lib/use-current-member'
+import { NAV_ITEMS } from './_nav-items'
 
 // 後台共用 layout：左側 Sidebar、右側 main，登入後所有頁面共用
 export const Layout = () => {
   const navigate = useNavigate()
+  const { permissions } = useCurrentMember()
+
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) =>
+      !item.requiredPermission || permissions.includes(item.requiredPermission),
+  )
 
   const handleLogout = () => {
     tokenStorage.clear()
@@ -38,16 +46,18 @@ export const Layout = () => {
             <SidebarGroupLabel>主選單</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <NavLink to="/">
-                    {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive}>
-                        <Home />
-                        <span>首頁</span>
-                      </SidebarMenuButton>
-                    )}
-                  </NavLink>
-                </SidebarMenuItem>
+                {visibleNavItems.map((item) => (
+                  <SidebarMenuItem key={item.path}>
+                    <NavLink to={item.path} end>
+                      {({ isActive }) => (
+                        <SidebarMenuButton isActive={isActive}>
+                          <item.icon />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      )}
+                    </NavLink>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

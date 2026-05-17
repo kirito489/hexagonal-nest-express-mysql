@@ -109,6 +109,26 @@ describe('Auth E2E', () => {
       expect(body.data.member.roleName).toBe('member');
     });
 
+    it('登入成功 → 觸發 memberRecord.update 寫入 lastLoginAt', async () => {
+      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
+      mockPrisma.memberRecord.update.mockClear();
+
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+
+      // 等 fire-and-forget 的 Promise tick 跑完
+      await new Promise((r) => setImmediate(r));
+
+      const updateCalls = mockPrisma.memberRecord.update.mock.calls;
+      const lastLoginUpdate = updateCalls.find(
+        (call) =>
+          (call[0] as { data?: { lastLoginAt?: unknown } })?.data
+            ?.lastLoginAt !== undefined,
+      );
+      expect(lastLoginUpdate).toBeDefined();
+    });
+
     it('無效 email 格式 → 400 Zod 驗證錯誤', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/auth/login')

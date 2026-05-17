@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { LoginService } from './LoginService';
 import { FeatureFlagService } from '../FeatureFlagService';
 import { LoadMemberPort } from '../../port/out/member/LoadMemberPort';
+import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
 import { SaveAuthLogPort } from '../../port/out/auth/SaveAuthLogPort';
 import { AccountLockPort } from '../../port/out/auth/AccountLockPort';
 import { IpBlockPort } from '../../port/out/security/IpBlockPort';
@@ -56,6 +57,14 @@ const mockSaveAuthLog = {
   saveAuthLog: jest.fn(),
 } as jest.Mocked<SaveAuthLogPort>;
 
+const mockSaveMember = {
+  createMember: jest.fn(),
+  updateMember: jest.fn(),
+  saveMemberWithPassword: jest.fn(),
+  deleteMember: jest.fn(),
+  updateLastLoginAt: jest.fn().mockResolvedValue(undefined),
+} as jest.Mocked<SaveMemberPort>;
+
 const mockAccountLock = {
   isLocked: jest.fn().mockResolvedValue(false),
   lockAccount: jest.fn(),
@@ -103,6 +112,7 @@ const makeFeatureFlags = (overrides: Partial<Record<string, boolean>> = {}) =>
 const makeService = (flags?: FeatureFlagService) =>
   new LoginService(
     mockLoadMember,
+    mockSaveMember,
     mockSaveAuthLog,
     mockAccountLock,
     mockIpBlock,
@@ -134,6 +144,39 @@ describe('LoginService', () => {
     expect(result.refreshToken).toBe('mock-token');
     expect(result.member.id).toBe(MEMBER_ID);
     expect(mockJwt.sign).toHaveBeenCalledTimes(2);
+  });
+
+  it('登入成功 → 觸發 updateLastLoginAt（fire-and-forget）', async () => {
+    (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+      makeMember(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    mockSaveMember.updateLastLoginAt.mockClear();
+
+    await makeService().execute({
+      email: 'admin@test.com',
+      password: 'Password1!',
+    });
+
+    expect(mockSaveMember.updateLastLoginAt).toHaveBeenCalledWith(MEMBER_ID);
+    expect(mockSaveMember.updateLastLoginAt).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateLastLoginAt 失敗不應阻擋登入流程（catch + warn）', async () => {
+    (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+      makeMember(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    mockSaveMember.updateLastLoginAt.mockRejectedValueOnce(
+      new Error('DB down'),
+    );
+
+    const result = await makeService().execute({
+      email: 'admin@test.com',
+      password: 'Password1!',
+    });
+
+    expect(result.accessToken).toBe('mock-token');
   });
 
   it('會員不存在 → 拋出 UnauthorizedException', async () => {
