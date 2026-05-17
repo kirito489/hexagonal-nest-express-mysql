@@ -1390,7 +1390,7 @@ paths:
                               example: 一般使用者
                             isAssignable:
                               type: boolean
-                              description: 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（如 roleCode='SUPERADMIN' 的系統管理者角色）
+                              description: 是否可被一般帳號指派。false 時前端 select 仍顯示但 disabled（由後端依角色屬性判斷）
                               example: true
                       meta:
                         type: object
@@ -1461,7 +1461,7 @@ paths:
                         example: 一般使用者
                       isAssignable:
                         type: boolean
-                        description: 是否可被一般帳號指派；roleCode='SUPERADMIN' 為 false
+                        description: 是否可被一般帳號指派；false 時前端 select 仍顯示但 disabled（由後端依角色屬性判斷）
                         example: true
                   timestamp:
                     type: string

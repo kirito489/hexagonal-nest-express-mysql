@@ -35,12 +35,15 @@ export const useRolesUrlState = (): RolesUrlState & {
 } => {
   const [searchParams, setSearchParams] = useSearchParams()
 
+  // edit / view 互斥：使用者可能手動編 URL 同時帶兩者，state 推導端就解掉，
+  // 呼叫端不必再寫 `&& !editEnabled` 兜底
+  const editParam = searchParams.get('edit') ?? undefined
   const state: RolesUrlState = {
     page: parseInt(searchParams.get('page'), DEFAULT_PAGE),
     limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
     name: searchParams.get('name') ?? '',
-    edit: searchParams.get('edit') ?? undefined,
-    view: searchParams.get('view') ?? undefined,
+    edit: editParam,
+    view: editParam ? undefined : (searchParams.get('view') ?? undefined),
   }
 
   const update = useCallback(

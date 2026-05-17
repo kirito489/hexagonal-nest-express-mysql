@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { paths } from '@app/api-client'
 
 import { Button } from '@/components/ui/button'
@@ -10,12 +9,14 @@ import { DataTablePagination } from '@/components/data-table/DataTablePagination
 import { useApiQuery } from '@/api/client'
 import { useCurrentMember } from '@/lib/use-current-member'
 import { useHasPermission } from '@/lib/use-has-permission'
+import { useDetailDialog } from '@/lib/use-detail-dialog'
 import { useMembersQuery } from './hooks/use-members-query'
 import { useMembersUrlState } from './hooks/use-members-url-state'
 import { useMemberMutations } from './hooks/use-member-mutations'
 import { MembersSearchBar } from './components/MembersSearchBar'
 import { MembersTable, type MemberRow } from './components/MembersTable'
 import { MemberFormDialog } from './components/MemberFormDialog'
+import { MemberViewDialog } from './components/MemberViewDialog'
 import { DeleteMemberDialog } from './components/DeleteMemberDialog'
 import type { CreateMemberForm } from './lib/member-form-schema'
 
@@ -27,6 +28,20 @@ type MembersData = NonNullable<
   paths['/members']['get']['responses'][200]['content']['application/json']['data']
 >
 
+// 由 raw detail data → dialog 初值的純函式；放外面避免 useCallback dep
+const mapDetailToForm = (data: {
+  email?: string
+  member?: string
+  roleId?: string
+  status?: boolean
+}): Partial<CreateMemberForm> => ({
+  email: data.email ?? '',
+  member: data.member ?? '',
+  password: '',
+  roleId: data.roleId ?? '',
+  status: data.status ?? true,
+})
+
 export const MembersPage = () => {
   // 所有 hook 都先 unconditional 呼叫，再做條件 return（守 react-hooks/rules-of-hooks）
   const canView = useHasPermission(PERM_VIEW)
@@ -35,6 +50,7 @@ export const MembersPage = () => {
   const queryClient = useQueryClient()
 
   const url = useMembersUrlState()
+  const { closeEdit, closeView, openEdit, openView } = url
   const membersQuery = useMembersQuery({
     page: url.page,
     limit: url.limit,
@@ -46,38 +62,23 @@ export const MembersPage = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<MemberRow | null>(null)
 
-  // edit / view dialog 都由 URL 控制，重整能恢復；兩個 query 共用同一 endpoint，
-  // 但用 enabled 控制誰實際發 request，避免兩個 GET 同時打
-  const editEnabled = Boolean(url.edit)
-  const viewEnabled = Boolean(url.view) && !editEnabled
+  // edit / view 共用一支 GET，用 enabled 控制誰實際發 request
   const detailId = url.edit ?? url.view ?? ''
   const detailQuery = useApiQuery(
     'GET',
     '/members/{id}',
     { params: { path: { id: detailId } } },
-    { enabled: editEnabled || viewEnabled },
+    { enabled: Boolean(url.edit) || Boolean(url.view) },
   )
-
-  // 404 / 403 → 關掉對應 dialog + toast
-  const { closeEdit, closeView } = url
-  useEffect(() => {
-    if (!detailQuery.isError) return
-    toast.error('找不到該會員或無權限存取')
-    if (editEnabled) closeEdit()
-    if (viewEnabled) closeView()
-  }, [detailQuery.isError, editEnabled, viewEnabled, closeEdit, closeView])
-
-  const detailInitialValues = useMemo(() => {
-    const data = detailQuery.data
-    if (!data) return undefined
-    return {
-      email: data.email ?? '',
-      member: data.member ?? '',
-      password: '',
-      roleId: data.roleId ?? '',
-      status: data.status ?? true,
-    }
-  }, [detailQuery.data])
+  const detail = useDetailDialog({
+    editId: url.edit,
+    viewId: url.view,
+    closeEdit,
+    closeView,
+    query: detailQuery,
+    mapToInitial: mapDetailToForm,
+    errorMessage: '找不到該會員或無權限存取',
+  })
 
   const handleToggleStatus = useCallback(
     async (member: MemberRow, nextStatus: boolean) => {
@@ -103,16 +104,16 @@ export const MembersPage = () => {
 
   const handleEdit = useCallback(
     (member: MemberRow) => {
-      if (member.id) url.openEdit(member.id)
+      if (member.id) openEdit(member.id)
     },
-    [url],
+    [openEdit],
   )
 
   const handleView = useCallback(
     (member: MemberRow) => {
-      if (member.id) url.openView(member.id)
+      if (member.id) openView(member.id)
     },
-    [url],
+    [openView],
   )
 
   const handleDeleteRequest = useCallback((member: MemberRow) => {
@@ -146,7 +147,7 @@ export const MembersPage = () => {
       params: { path: { id: url.edit } },
       body: body as CreateMemberForm,
     })
-    url.closeEdit()
+    closeEdit()
   }
 
   const handleConfirmDelete = async (member: MemberRow) => {
@@ -213,21 +214,18 @@ export const MembersPage = () => {
       />
 
       <MemberFormDialog
-        open={editEnabled && !detailQuery.isLoading && !!detailInitialValues}
+        open={detail.editEnabled && !detail.isLoading && !!detail.initialValues}
         mode="edit"
-        initialValues={detailInitialValues}
+        initialValues={detail.initialValues}
         isSubmitting={mutations.update.isPending}
-        onClose={url.closeEdit}
+        onClose={closeEdit}
         onSubmit={handleUpdateSubmit}
       />
 
-      <MemberFormDialog
-        open={viewEnabled && !detailQuery.isLoading && !!detailInitialValues}
-        mode="view"
-        initialValues={detailInitialValues}
-        isSubmitting={false}
-        onClose={url.closeView}
-        onSubmit={() => {}}
+      <MemberViewDialog
+        open={detail.viewEnabled && !detail.isLoading && !!detail.initialValues}
+        values={detail.initialValues}
+        onClose={closeView}
       />
 
       <DeleteMemberDialog

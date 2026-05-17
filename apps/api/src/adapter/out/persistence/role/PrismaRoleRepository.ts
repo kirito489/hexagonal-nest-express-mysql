@@ -15,12 +15,15 @@ import {
   RoleRepositoryPort,
 } from '../../../../application/port/out/role/RoleRepositoryPort';
 import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
+import { RoleCode } from '../../../../domain/value-object/Role';
 
 /**
- * roleCode === 'SUPERADMIN' 的系統角色不可被一般帳號指派。
+ * RoleCode.SUPERADMIN 的系統角色不可被一般帳號指派。
  * 規則集中在 repo 層，未來新增「不可指派 roleCode」清單只改這一處
  */
-const NON_ASSIGNABLE_ROLE_CODES = new Set(['SUPERADMIN']);
+const NON_ASSIGNABLE_ROLE_CODES: ReadonlySet<string> = new Set([
+  RoleCode.SUPERADMIN,
+]);
 
 const toRoleOption = (row: {
   id: string;

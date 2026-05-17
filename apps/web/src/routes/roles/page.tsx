@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { paths } from '@app/api-client'
 
 import { Button } from '@/components/ui/button'
@@ -10,12 +9,14 @@ import { DataTablePagination } from '@/components/data-table/DataTablePagination
 import { useApiQuery } from '@/api/client'
 import { useHasPermission } from '@/lib/use-has-permission'
 import { useCurrentMember } from '@/lib/use-current-member'
+import { useDetailDialog } from '@/lib/use-detail-dialog'
 import { useRolesQuery } from './hooks/use-roles-query'
 import { useRolesUrlState } from './hooks/use-roles-url-state'
 import { useRoleMutations } from './hooks/use-role-mutations'
 import { RolesSearchBar } from './components/RolesSearchBar'
 import { RolesTable, type RoleRow } from './components/RolesTable'
 import { RoleFormDialog } from './components/RoleFormDialog'
+import { RoleViewDialog } from './components/RoleViewDialog'
 import { DeleteRoleDialog } from './components/DeleteRoleDialog'
 import {
   normalizePermissionCodes,
@@ -29,6 +30,17 @@ const PERM_EDIT = 'BACKEND:ROLE:EDIT'
 type RolesData = NonNullable<
   paths['/roles']['get']['responses'][200]['content']['application/json']['data']
 >
+
+// 由 raw detail data → dialog 初值的純函式；放外面避免 useCallback dep
+const mapDetailToForm = (data: {
+  name?: string
+  permissionCodes?: string[]
+  status?: boolean
+}): RoleFormValues => ({
+  name: data.name ?? '',
+  permissionCodes: data.permissionCodes ?? [],
+  status: data.status ?? true,
+})
 
 export const RolesPage = () => {
   // hook 先 unconditional 呼叫，再做條件 return（守 react-hooks/rules-of-hooks）
@@ -50,33 +62,22 @@ export const RolesPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<RoleRow | null>(null)
 
   // edit / view 共用同一支 GET endpoint；用 enabled 控制誰實際發 request
-  const editEnabled = Boolean(url.edit)
-  const viewEnabled = Boolean(url.view) && !editEnabled
   const detailId = url.edit ?? url.view ?? ''
   const detailQuery = useApiQuery(
     'GET',
     '/roles/{id}',
     { params: { path: { id: detailId } } },
-    { enabled: editEnabled || viewEnabled },
+    { enabled: Boolean(url.edit) || Boolean(url.view) },
   )
-
-  // 404 / 403 → 關掉對應 dialog
-  useEffect(() => {
-    if (!detailQuery.isError) return
-    toast.error('找不到該角色或無權限存取')
-    if (editEnabled) closeEdit()
-    if (viewEnabled) closeView()
-  }, [detailQuery.isError, editEnabled, viewEnabled, closeEdit, closeView])
-
-  const detailInitialValues = useMemo<RoleFormValues | undefined>(() => {
-    const data = detailQuery.data
-    if (!data) return undefined
-    return {
-      name: data.name ?? '',
-      permissionCodes: data.permissionCodes ?? [],
-      status: data.status ?? true,
-    }
-  }, [detailQuery.data])
+  const detail = useDetailDialog({
+    editId: url.edit,
+    viewId: url.view,
+    closeEdit,
+    closeView,
+    query: detailQuery,
+    mapToInitial: mapDetailToForm,
+    errorMessage: '找不到該角色或無權限存取',
+  })
 
   const handleToggleStatus = useCallback(
     async (role: RoleRow, nextStatus: boolean) => {
@@ -211,21 +212,18 @@ export const RolesPage = () => {
       />
 
       <RoleFormDialog
-        open={editEnabled && !detailQuery.isLoading && !!detailInitialValues}
+        open={detail.editEnabled && !detail.isLoading && !!detail.initialValues}
         mode="edit"
-        initialValues={detailInitialValues}
+        initialValues={detail.initialValues}
         isSubmitting={mutations.update.isPending}
         onClose={closeEdit}
         onSubmit={handleUpdateSubmit}
       />
 
-      <RoleFormDialog
-        open={viewEnabled && !detailQuery.isLoading && !!detailInitialValues}
-        mode="view"
-        initialValues={detailInitialValues}
-        isSubmitting={false}
+      <RoleViewDialog
+        open={detail.viewEnabled && !detail.isLoading && !!detail.initialValues}
+        values={detail.initialValues}
         onClose={closeView}
-        onSubmit={() => {}}
       />
 
       <DeleteRoleDialog
