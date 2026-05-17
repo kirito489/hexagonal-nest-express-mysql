@@ -78,22 +78,3 @@ export const isViewLockedByEdit = (
   return selected.has(group.edit.permissionCode)
 }
 
-/**
- * 確保「EDIT 蘊含 VIEW」：若 codes 含某 module 的 EDIT 但缺 VIEW，自動補入
- * 最後依字母排序、去重；供 form schema transform 與「全選」操作收尾使用
- */
-export const normalizePermissionCodes = (
-  codes: readonly string[],
-  items: readonly PermissionItem[],
-): string[] => {
-  const groups = groupPermissions(items)
-  const set = new Set(codes)
-  for (const platform of groups) {
-    for (const m of platform.modules) {
-      if (m.edit && set.has(m.edit.permissionCode) && m.view) {
-        set.add(m.view.permissionCode)
-      }
-    }
-  }
-  return Array.from(set).sort()
-}

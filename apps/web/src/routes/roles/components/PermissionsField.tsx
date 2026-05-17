@@ -55,36 +55,44 @@ export const PermissionsField = ({
     )
   }
 
-  const toggleCode = (code: string, checked: boolean) => {
+  // 對 selected 做變動：clone → 變動 → sort → onChange，三個 toggle 共用這個樣板
+  const mutateSelected = (apply: (next: Set<string>) => void) => {
     const next = new Set(selected)
-    if (checked) next.add(code)
-    else next.delete(code)
+    apply(next)
     onChange(Array.from(next).sort())
+  }
+
+  const toggleCode = (code: string, checked: boolean) => {
+    mutateSelected((next) => {
+      if (checked) next.add(code)
+      else next.delete(code)
+    })
   }
 
   // EDIT 勾選時自動把 VIEW 也加入；UI 已防止反向取消 VIEW，這裡僅作 onChange 來源處理
   const toggleEdit = (group: ModuleGroup, checked: boolean) => {
-    if (!group.edit) return
-    const next = new Set(selected)
-    if (checked) {
-      next.add(group.edit.permissionCode)
-      if (group.view) next.add(group.view.permissionCode)
-    } else {
-      next.delete(group.edit.permissionCode)
-    }
-    onChange(Array.from(next).sort())
+    const edit = group.edit
+    if (!edit) return
+    mutateSelected((next) => {
+      if (checked) {
+        next.add(edit.permissionCode)
+        if (group.view) next.add(group.view.permissionCode)
+      } else {
+        next.delete(edit.permissionCode)
+      }
+    })
   }
 
   const toggleGroup = (group: ModuleGroup, checked: boolean) => {
-    const next = new Set(selected)
-    if (checked) {
-      if (group.view) next.add(group.view.permissionCode)
-      if (group.edit) next.add(group.edit.permissionCode)
-    } else {
-      if (group.view) next.delete(group.view.permissionCode)
-      if (group.edit) next.delete(group.edit.permissionCode)
-    }
-    onChange(Array.from(next).sort())
+    mutateSelected((next) => {
+      if (checked) {
+        if (group.view) next.add(group.view.permissionCode)
+        if (group.edit) next.add(group.edit.permissionCode)
+      } else {
+        if (group.view) next.delete(group.view.permissionCode)
+        if (group.edit) next.delete(group.edit.permissionCode)
+      }
+    })
   }
 
   return (
@@ -96,10 +104,13 @@ export const PermissionsField = ({
           </div>
           <div className="space-y-2">
             {platform.modules.map((g) => {
-              const viewChecked = !!g.view && selected.has(g.view.permissionCode)
-              const editChecked = !!g.edit && selected.has(g.edit.permissionCode)
+              // 提前 narrow 成 const，閉包內就不必再 ! non-null assertion
+              const view = g.view
+              const edit = g.edit
+              const viewChecked = !!view && selected.has(view.permissionCode)
+              const editChecked = !!edit && selected.has(edit.permissionCode)
               const allChecked =
-                (!g.view || viewChecked) && (!g.edit || editChecked)
+                (!view || viewChecked) && (!edit || editChecked)
               const viewLocked = isViewLockedByEdit(g, selected)
               return (
                 <div
@@ -119,7 +130,7 @@ export const PermissionsField = ({
                     </Button>
                   </div>
                   <div className="flex flex-col gap-2 pl-1">
-                    {g.view ? (
+                    {view ? (
                       viewLocked ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -129,7 +140,7 @@ export const PermissionsField = ({
                                 disabled
                                 aria-label={`${g.module} 檢視（已鎖定）`}
                               />
-                              <span>{g.view.name}</span>
+                              <span>{view.name}</span>
                             </label>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -141,24 +152,26 @@ export const PermissionsField = ({
                           <Checkbox
                             checked={viewChecked}
                             disabled={disabled}
-                            onCheckedChange={(c) =>
-                              toggleCode(g.view!.permissionCode, c === true)
+                            onCheckedChange={(checked) =>
+                              toggleCode(view.permissionCode, checked === true)
                             }
                             aria-label={`${g.module} 檢視`}
                           />
-                          <span>{g.view.name}</span>
+                          <span>{view.name}</span>
                         </label>
                       )
                     ) : null}
-                    {g.edit ? (
+                    {edit ? (
                       <label className="inline-flex w-fit cursor-pointer items-center gap-2 text-sm">
                         <Checkbox
                           checked={editChecked}
                           disabled={disabled}
-                          onCheckedChange={(c) => toggleEdit(g, c === true)}
+                          onCheckedChange={(checked) =>
+                            toggleEdit(g, checked === true)
+                          }
                           aria-label={`${g.module} 編輯`}
                         />
-                        <span>{g.edit.name}</span>
+                        <span>{edit.name}</span>
                       </label>
                     ) : null}
                   </div>

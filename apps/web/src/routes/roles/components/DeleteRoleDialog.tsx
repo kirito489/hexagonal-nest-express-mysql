@@ -24,7 +24,7 @@ export const DeleteRoleDialog = ({
   onConfirm,
 }: DeleteRoleDialogProps) => {
   return (
-    <AlertDialog open={!!role} onOpenChange={(o) => !o && onCancel()}>
+    <AlertDialog open={!!role} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>確認刪除角色</AlertDialogTitle>

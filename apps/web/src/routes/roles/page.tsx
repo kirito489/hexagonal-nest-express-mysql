@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import type { paths } from '@app/api-client'
 
 import { Button } from '@/components/ui/button'
 import { DataTablePagination } from '@/components/data-table/DataTablePagination'
@@ -24,6 +25,11 @@ import {
 const PERM_VIEW = 'BACKEND:ROLE:VIEW'
 const PERM_EDIT = 'BACKEND:ROLE:EDIT'
 
+// 從 generated schema 推出 GET /roles 的 data 形狀，optimistic update 不走 escape hatch
+type RolesData = NonNullable<
+  paths['/roles']['get']['responses'][200]['content']['application/json']['data']
+>
+
 export const RolesPage = () => {
   // hook 先 unconditional 呼叫，再做條件 return（守 react-hooks/rules-of-hooks）
   const canView = useHasPermission(PERM_VIEW)
@@ -32,6 +38,7 @@ export const RolesPage = () => {
   const queryClient = useQueryClient()
 
   const url = useRolesUrlState()
+  const { openEdit, closeEdit } = url
   const rolesQuery = useRolesQuery({
     page: url.page,
     limit: url.limit,
@@ -51,24 +58,57 @@ export const RolesPage = () => {
     { enabled: editEnabled },
   )
 
-  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState
+  // edit GET 失敗（404 / 403）→ 關閉 dialog + toast；放 useEffect 避免 render 階段 setState。
+  // closeEdit 已由 useRolesUrlState 以 useCallback 穩定，可安全進 deps
   useEffect(() => {
     if (editEnabled && editQuery.isError) {
       toast.error('找不到該角色或無權限存取')
-      url.closeEdit()
+      closeEdit()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editEnabled, editQuery.isError])
+  }, [editEnabled, editQuery.isError, closeEdit])
 
   const editInitialValues = useMemo<RoleFormValues | undefined>(() => {
-    const d = editQuery.data
-    if (!d) return undefined
+    const data = editQuery.data
+    if (!data) return undefined
     return {
-      name: d.name ?? '',
-      permissionCodes: d.permissionCodes ?? [],
-      status: d.status ?? true,
+      name: data.name ?? '',
+      permissionCodes: data.permissionCodes ?? [],
+      status: data.status ?? true,
     }
   }, [editQuery.data])
+
+  const handleToggleStatus = useCallback(
+    async (role: RoleRow, nextStatus: boolean) => {
+      if (!role.id) return
+      // optimistic：把所有 GET /roles 變體中對應 row 的 status 翻轉
+      queryClient.setQueriesData<RolesData>(
+        { queryKey: ['GET', '/roles'] },
+        (old) => mutateRowStatus(old, role.id!, nextStatus),
+      )
+      try {
+        // 單一 PATCH 只送 status，不影響 name / permissions；
+        // 與 form 編輯共用 update mutation（toast 文案統一為「角色已更新」）
+        await mutations.update.mutateAsync({
+          params: { path: { id: role.id } },
+          body: { status: nextStatus },
+        })
+      } catch {
+        // mutation hook 已 toast.error + invalidate；這裡 catch 只為了不讓 await 拋
+      }
+    },
+    [mutations.update, queryClient],
+  )
+
+  const handleEdit = useCallback(
+    (role: RoleRow) => {
+      if (role.id) openEdit(role.id)
+    },
+    [openEdit],
+  )
+
+  const handleDeleteRequest = useCallback((role: RoleRow) => {
+    setDeleteTarget(role)
+  }, [])
 
   // 條件 return 放在所有 hook 之後
   if (!canView && !meLoading) {
@@ -81,25 +121,6 @@ export const RolesPage = () => {
     limit: url.limit,
     total: 0,
     totalPages: 1,
-  }
-
-  const handleToggleStatus = async (role: RoleRow, nextStatus: boolean) => {
-    if (!role.id) return
-    // optimistic：把所有 GET /roles 變體中對應 row 的 status 翻轉
-    queryClient.setQueriesData<RolesData>(
-      { queryKey: ['GET', '/roles'] },
-      (old) => mutateRowStatus(old, role.id!, nextStatus),
-    )
-    try {
-      // 單一 PATCH 只送 status，不影響 name / permissions
-      await mutations.toggleStatus.mutateAsync({
-        params: { path: { id: role.id } },
-        body: { status: nextStatus },
-      })
-    } catch {
-      // mutation hook 自己已 toast.error；invalidate 重抓回正確狀態
-      void queryClient.invalidateQueries({ queryKey: ['GET', '/roles'] })
-    }
   }
 
   const handleCreateSubmit = async (values: RoleFormValues) => {
@@ -123,7 +144,7 @@ export const RolesPage = () => {
         status: values.status,
       },
     })
-    url.closeEdit()
+    closeEdit()
   }
 
   const handleConfirmDelete = async (role: RoleRow) => {
@@ -159,8 +180,8 @@ export const RolesPage = () => {
         data={list}
         isLoading={rolesQuery.isLoading}
         canEdit={canEdit}
-        onEdit={(r) => r.id && url.openEdit(r.id)}
-        onDelete={(r) => setDeleteTarget(r)}
+        onEdit={handleEdit}
+        onDelete={handleDeleteRequest}
         onToggleStatus={handleToggleStatus}
       />
 
@@ -185,7 +206,7 @@ export const RolesPage = () => {
         mode="edit"
         initialValues={editInitialValues}
         isSubmitting={mutations.update.isPending}
-        onClose={url.closeEdit}
+        onClose={closeEdit}
         onSubmit={handleUpdateSubmit}
       />
 
@@ -199,18 +220,11 @@ export const RolesPage = () => {
   )
 }
 
-type RolesData =
-  | {
-      list?: Array<{ id?: string; status?: boolean; [k: string]: unknown }>
-      meta?: unknown
-    }
-  | undefined
-
 const mutateRowStatus = (
-  data: RolesData,
+  data: RolesData | undefined,
   id: string,
   nextStatus: boolean,
-): RolesData => {
+): RolesData | undefined => {
   if (!data?.list) return data
   return {
     ...data,
