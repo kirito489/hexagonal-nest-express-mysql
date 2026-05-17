@@ -85,5 +85,5 @@
 
 - [x] 11.1 將開發過程踩到的非 spec 行為整理為 `tasks/lessons.md` 條目：(1) 表單 schema 不要用 `.transform()` 避開 form 型別衝突；(2) 分組多選 checkbox 用垂直 stack；(3) propose 階段先核對 API contract 不要假設純前端
 - [x] 11.2 `pnpm-lock.yaml` 無變動（既有 `radix-ui` mega-package 已含 Checkbox / Tooltip，shadcn add 只新增 component file 無新 npm 依賴）
-- [ ] 11.3 commit（使用者執行，AI 不主動跑 `git commit`）
-- [ ] 11.4 邀請 `openspec-archive-change` 走完整封存流程（commit 後執行）
+- [x] 11.3 commit（使用者執行，AI 不主動跑 `git commit`）— 後端 a2e17dd + 前端 0722943
+- [x] 11.4 邀請 `openspec-archive-change` 走完整封存流程（commit 後執行）
