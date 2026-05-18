@@ -74,5 +74,5 @@
 ## 11. 收尾
 
 - [x] 11.1 `tasks/lessons.md` 補「Facade 不要直接呼 Port，補 UseCase / Service 層」條目
-- [ ] 11.2 commit（使用者執行）
-- [ ] 11.3 邀請 `openspec-archive-change` 走完整封存流程
+- [x] 11.2 commit（使用者執行）— 699a8dd
+- [x] 11.3 邀請 `openspec-archive-change` 走完整封存流程
