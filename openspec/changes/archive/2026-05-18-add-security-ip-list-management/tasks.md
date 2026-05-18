@@ -45,35 +45,35 @@
 
 ## 8. 前端 / 共用 hooks
 
-- [ ] 8.1 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-query.ts`（list paginated + search）
-- [ ] 8.2 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-mutations.ts`（create / update / remove；toast + invalidate `['GET', '/security/ip-whitelist']`）
-- [ ] 8.3 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-url-state.ts`（page / limit / search / edit / view）
-- [ ] 8.4 同樣三個 hooks for blacklist（`routes/security/ip-blacklist/hooks/`）
+- [x] 8.1 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-query.ts`（list paginated + search）
+- [x] 8.2 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-mutations.ts`（create / update / remove；toast + invalidate `['GET', '/security/ip-whitelist']`）
+- [x] 8.3 新增 `routes/security/ip-whitelist/hooks/use-ip-whitelist-url-state.ts`（page / limit / search / edit / view）
+- [x] 8.4 同樣三個 hooks for blacklist（`routes/security/ip-blacklist/hooks/`）
 
 ## 9. 前端 / Dialog 元件
 
-- [ ] 9.1 新增 `routes/security/ip-whitelist/components/IpWhitelistFormDialog.tsx`：create/edit/view 三 mode、IP（create 可編、edit/view disabled）+ description
-- [ ] 9.2 新增 `routes/security/ip-whitelist/lib/ip-whitelist-form-schema.ts`：zod schema
-- [ ] 9.3 同樣 dialog + schema for blacklist（field 是 reason）
-- [ ] 9.4 共用 delete AlertDialog inline 在 page.tsx（與既有 members / roles 同 pattern），AlertDialogDescription 含「此操作無法復原（硬刪除）」
+- [x] 9.1 新增 `routes/security/ip-whitelist/components/IpWhitelistFormDialog.tsx`：create/edit/view 三 mode、IP（create 可編、edit/view disabled）+ description
+- [x] 9.2 新增 `routes/security/ip-whitelist/lib/ip-whitelist-form-schema.ts`：zod schema
+- [x] 9.3 同樣 dialog + schema for blacklist（field 是 reason）
+- [x] 9.4 共用 delete AlertDialog inline 在 page.tsx（與既有 members / roles 同 pattern），AlertDialogDescription 含「此操作無法復原（硬刪除）」
 
 ## 10. 前端 / Table 元件
 
-- [ ] 10.1 新增 `routes/security/ip-whitelist/components/IpWhitelistTable.tsx`：5 欄
-- [ ] 10.2 新增 `routes/security/ip-whitelist/components/IpWhitelistSearchBar.tsx`：search (debounce 300ms) + 重置
-- [ ] 10.3 同樣 table + searchbar for blacklist（6 欄含 isAutoBlock badge）
+- [x] 10.1 新增 `routes/security/ip-whitelist/components/IpWhitelistTable.tsx`：5 欄
+- [x] 10.2 新增 `routes/security/ip-whitelist/components/IpWhitelistSearchBar.tsx`：search (debounce 300ms) + 重置
+- [x] 10.3 同樣 table + searchbar for blacklist（6 欄含 isAutoBlock badge）
 
 ## 11. 前端 / Page orchestrator
 
-- [ ] 11.1 新增 `routes/security/ip-whitelist/page.tsx`：權限檢查（`useCurrentMember().roleCode !== 'SUPERADMIN'` → Navigate to /）+ list + dialogs
-- [ ] 11.2 新增 `routes/security/ip-blacklist/page.tsx`：同上
-- [ ] 11.3 兩個 page 使用 `useDetailDialog` hook 處理 edit / view 共用 GET（沿用 members / roles pattern）
+- [x] 11.1 新增 `routes/security/ip-whitelist/page.tsx`：權限檢查（`useCurrentMember().roleCode !== 'SUPERADMIN'` → Navigate to /）+ list + dialogs
+- [x] 11.2 新增 `routes/security/ip-blacklist/page.tsx`：同上
+- [x] 11.3 兩個 page 使用 `useDetailDialog` hook 處理 edit / view 共用 GET（沿用 members / roles pattern）
 
 ## 12. 整合
 
-- [ ] 12.1 `routes/_nav-items.ts`：加 group「安全」+ 兩條 NAV_ITEMS（ShieldCheck / ShieldBan、requiredRoleCode SUPERADMIN）
-- [ ] 12.2 `App.tsx`：加 `/security/ip-whitelist` / `/security/ip-blacklist` 兩條 route
-- [ ] 12.3 mutation toast 文案統一繁中（白名單已新增 / 黑名單已新增 / 已更新 / 已刪除）
+- [x] 12.1 `routes/_nav-items.ts`：加 group「安全」+ 兩條 NAV_ITEMS（ShieldCheck / ShieldBan、requiredRoleCode SUPERADMIN）
+- [x] 12.2 `App.tsx`：加 `/security/ip-whitelist` / `/security/ip-blacklist` 兩條 route
+- [x] 12.3 mutation toast 文案統一繁中（白名單已新增 / 黑名單已新增 / 已更新 / 已刪除）
 
 ## 13. 驗證
 
@@ -89,5 +89,5 @@
 ## 14. 收尾
 
 - [x] 14.1 本次無新 lesson（按既有 hexagonal 四層 pattern 接做，無踩坑）
-- [ ] 14.2 commit（使用者執行）
-- [ ] 14.3 邀請 `openspec-archive-change`
+- [x] 14.2 commit（使用者執行）
+- [x] 14.3 邀請 `openspec-archive-change`

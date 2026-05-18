@@ -62,15 +62,58 @@
 
 ### Requirement: 從白名單移除 IP
 
-`DELETE /api/security/ip-whitelist/:ip` SHALL 從白名單移除指定 IP。
+`DELETE /api/security/ip-whitelist/:id` SHALL 從白名單移除指定紀錄。
 
-- Path 參數 `ip` 經 `ipSchema` 驗證。
+- Path 參數：`id: string` (uuid)，由 `ParseUUIDPipe` 驗證。
+- 維持硬刪（Prisma `delete({ where: { id } })`；schema 無 deletedAt 欄位）。
+- 紀錄不存在時 MUST 不報錯（靜默通過，與 member / role delete 行為一致）。
 - Response 204，無 body。
 
 #### Scenario: 刪除成功
 
-- **WHEN** SUPERADMIN 打 `DELETE /api/security/ip-whitelist/192.168.1.1`
-- **THEN** 回 204
+- **WHEN** SUPERADMIN 打 `DELETE /api/security/ip-whitelist/<uuid>`，且該記錄存在
+- **THEN** 回 204，DB row 直接消失（硬刪）
+
+#### Scenario: 記錄不存在靜默通過
+
+- **WHEN** 該 uuid 對應的 whitelist 不存在
+- **THEN** 回 204（不拋 404）
+
+### Requirement: 查詢單筆 IP 白名單
+
+`GET /api/security/ip-whitelist/:id` SHALL 回單筆 IP 白名單記錄，給編輯 dialog 帶初值用。
+
+- Path 參數：`id: string` (uuid)。
+- Response 200，body `{ success: true, data: IpListItem, timestamp }`：`{ id, ipAddress, description, createdBy, createdAt }`。
+- 找不到記錄 MUST 回 404，body `code: 'IP_LIST_NOT_FOUND'`。
+
+#### Scenario: 找到記錄
+
+- **WHEN** SUPERADMIN 打 `GET /api/security/ip-whitelist/<uuid>`，且該記錄存在
+- **THEN** 回 200，body `data` 為 IpListItem shape
+
+#### Scenario: 找不到記錄
+
+- **WHEN** 該 uuid 對應的 whitelist 不存在
+- **THEN** 回 404，body `code: 'IP_LIST_NOT_FOUND'`
+
+### Requirement: 更新 IP 白名單
+
+`PATCH /api/security/ip-whitelist/:id` SHALL 更新指定 IP 白名單的可變欄位。
+
+- Request body：`{ description?: string }`。`ipAddress` MUST NOT 可變（要改 IP 則刪除重建）。
+- Response 204，無 body。
+- 找不到記錄 MUST 回 404 `IP_LIST_NOT_FOUND`。
+
+#### Scenario: 更新成功
+
+- **WHEN** SUPERADMIN 對某 whitelist 記錄發送 `PATCH /api/security/ip-whitelist/<uuid>` body `{ description: '新備註' }`
+- **THEN** 回 204，DB 中該記錄 `description` 更新
+
+#### Scenario: 找不到記錄
+
+- **WHEN** 該 uuid 對應的 whitelist 不存在
+- **THEN** 回 404，body `code: 'IP_LIST_NOT_FOUND'`
 
 ### Requirement: IP 黑名單列表
 
@@ -98,14 +141,57 @@
 
 ### Requirement: 從黑名單移除 IP
 
-`DELETE /api/security/ip-blacklist/:ip` SHALL 從黑名單移除指定 IP，行為與白名單對應。
+`DELETE /api/security/ip-blacklist/:id` SHALL 從黑名單移除指定紀錄，與白名單對應。
 
+- Path 參數：`id: string` (uuid)。
 - Response 204。
+- 維持硬刪、靜默處理「記錄不存在」。
 
 #### Scenario: 刪除成功
 
-- **WHEN** SUPERADMIN 打 `DELETE /api/security/ip-blacklist/1.2.3.4`
+- **WHEN** SUPERADMIN 打 `DELETE /api/security/ip-blacklist/<uuid>`
 - **THEN** 回 204
+
+#### Scenario: 記錄不存在靜默通過
+
+- **WHEN** 該 uuid 對應的 blacklist 不存在
+- **THEN** 回 204
+
+### Requirement: 查詢單筆 IP 黑名單
+
+`GET /api/security/ip-blacklist/:id` SHALL 回單筆 IP 黑名單記錄。
+
+- Path 參數：`id: string` (uuid)。
+- Response 200，body `{ success: true, data: IpBlacklistItem, timestamp }`：`{ id, ipAddress, reason, isAutoBlock, createdBy, createdAt }`。
+- 找不到記錄 MUST 回 404 `IP_LIST_NOT_FOUND`。
+
+#### Scenario: 找到記錄
+
+- **WHEN** SUPERADMIN 打 `GET /api/security/ip-blacklist/<uuid>`，且該記錄存在
+- **THEN** 回 200，body `data` 為 IpBlacklistItem shape
+
+#### Scenario: 找不到記錄
+
+- **WHEN** 該 uuid 對應的 blacklist 不存在
+- **THEN** 回 404，body `code: 'IP_LIST_NOT_FOUND'`
+
+### Requirement: 更新 IP 黑名單
+
+`PATCH /api/security/ip-blacklist/:id` SHALL 更新指定 IP 黑名單的可變欄位。
+
+- Request body：`{ reason?: string }`。`ipAddress` / `isAutoBlock` MUST NOT 可變。
+- Response 204，無 body。
+- 找不到記錄 MUST 回 404 `IP_LIST_NOT_FOUND`。
+
+#### Scenario: 更新成功
+
+- **WHEN** SUPERADMIN 對某 blacklist 記錄發送 `PATCH /api/security/ip-blacklist/<uuid>` body `{ reason: '新理由' }`
+- **THEN** 回 204，DB 中該記錄 `reason` 更新
+
+#### Scenario: 找不到記錄
+
+- **WHEN** 該 uuid 對應的 blacklist 不存在
+- **THEN** 回 404，body `code: 'IP_LIST_NOT_FOUND'`
 
 ### Requirement: 帳號解鎖
 

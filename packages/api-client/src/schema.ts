@@ -1756,7 +1756,8 @@ export interface paths {
         put?: never;
         /**
          * 新增 IP 至白名單
-         * @description 將指定 IP 加入白名單（僅限 ADMIN）。
+         * @description 將指定 IP 加入白名單。IP 已存在時會 upsert 更新 description / createdBy。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         post: {
             parameters: {
@@ -2052,7 +2053,8 @@ export interface paths {
         put?: never;
         /**
          * 新增 IP 至黑名單
-         * @description 將指定 IP 加入黑名單（僅限 ADMIN）。
+         * @description 將指定 IP 加入黑名單。IP 已存在時會 upsert 更新 reason / createdBy / isAutoBlock=false。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         post: {
             parameters: {
