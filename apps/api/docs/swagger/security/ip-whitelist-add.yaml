@@ -36,18 +36,19 @@ responses:
               example: true
             data:
               type: object
-              required: [message]
+              required: [id]
               properties:
-                message:
+                id:
                   type: string
-                  description: 顯示給使用者的提示訊息
+                  format: uuid
+                  description: 新建（或既有）IP 紀錄的 uuid
             timestamp:
               type: string
               format: date-time
         example:
           success: true
           data:
-            message: IP 192.168.1.1 已加入白名單
+            id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
           timestamp: '2024-01-01T00:00:00.000Z'
 
   '400':

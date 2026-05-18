@@ -1035,6 +1035,10 @@ paths:
                       roleName:
                         type: string
                         description: 角色名稱
+                      roleCode:
+                        type: string
+                        description: 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用
+                        example: SUPERADMIN
                       status:
                         type: boolean
                         description: 啟用狀態
@@ -1073,6 +1077,7 @@ paths:
                   member: 王小明
                   roleId: 22222222-2222-4222-8222-222222222222
                   roleName: 管理者
+                  roleCode: SUPERADMIN
                   status: true
                   isDefault: false
                   lastLoginAt: '2026-04-30T10:00:00.000Z'
@@ -1772,9 +1777,35 @@ paths:
       tags:
         - Security
       summary: 查詢 IP 白名單
-      description: 取得所有 IP 白名單記錄（僅限 ADMIN）。
+      description: |
+        分頁取得 IP 白名單記錄；支援 IP 模糊搜尋。
+        需要 `SUPERADMIN` 角色（粗粒度 role gate，非細粒度 permission）。
+        需要 JWT Bearer Token 認證。
       security:
         - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 頁碼
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: 每頁筆數（未指定用 env DEFAULT_PAGE_LIMIT）
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: IP 模糊搜尋（contains）；trim 後為空字串視為未提供
       responses:
         '200':
           description: 查詢成功
@@ -1791,47 +1822,50 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    type: array
-                    description: IP 白名單清單
-                    items:
-                      type: object
-                      required:
-                        - id
-                        - ipAddress
-                        - createdAt
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                          description: 紀錄 ID
-                        ipAddress:
-                          type: string
-                          description: IP 位址
-                        description:
-                          type: string
-                          nullable: true
-                          description: 備註說明
-                        createdBy:
-                          type: string
-                          format: uuid
-                          nullable: true
-                          description: 建立者帳號 ID
-                        createdAt:
-                          type: string
-                          format: date-time
-                          description: 建立時間（UTC）
+                    type: object
+                    required:
+                      - list
+                      - meta
+                    properties:
+                      list:
+                        type: array
+                        description: IP 白名單清單
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            ipAddress:
+                              type: string
+                            description:
+                              type: string
+                              nullable: true
+                            createdBy:
+                              type: string
+                              format: uuid
+                              nullable: true
+                            createdAt:
+                              type: string
+                              format: date-time
+                      meta:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                            example: 1
+                          limit:
+                            type: integer
+                            example: 10
+                          total:
+                            type: integer
+                            example: 42
+                          totalPages:
+                            type: integer
+                            example: 5
                   timestamp:
                     type: string
                     format: date-time
-              example:
-                success: true
-                data:
-                  - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-                    ipAddress: 192.168.1.1
-                    description: 辦公室 IP
-                    createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
-                    createdAt: '2024-01-01T00:00:00.000Z'
-                timestamp: '2024-01-01T00:00:00.000Z'
         '401':
           $ref: '#/components/responses/NoToken'
         '403':
@@ -1880,18 +1914,19 @@ paths:
                   data:
                     type: object
                     required:
-                      - message
+                      - id
                     properties:
-                      message:
+                      id:
                         type: string
-                        description: 顯示給使用者的提示訊息
+                        format: uuid
+                        description: 新建（或既有）IP 紀錄的 uuid
                   timestamp:
                     type: string
                     format: date-time
               example:
                 success: true
                 data:
-                  message: IP 192.168.1.1 已加入白名單
+                  id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
                 timestamp: '2024-01-01T00:00:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1931,9 +1966,32 @@ paths:
       tags:
         - Security
       summary: 查詢 IP 黑名單
-      description: 取得所有 IP 黑名單記錄（僅限 ADMIN）。
+      description: |
+        分頁取得 IP 黑名單記錄；支援 IP 模糊搜尋。
+        需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
       security:
         - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: IP 模糊搜尋（contains）
       responses:
         '200':
           description: 查詢成功
@@ -1950,52 +2008,47 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    type: array
-                    description: IP 黑名單清單
-                    items:
-                      type: object
-                      required:
-                        - id
-                        - ipAddress
-                        - isAutoBlock
-                        - createdAt
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                          description: 紀錄 ID
-                        ipAddress:
-                          type: string
-                          description: IP 位址
-                        reason:
-                          type: string
-                          nullable: true
-                          description: 封鎖原因
-                        isAutoBlock:
-                          type: boolean
-                          description: 是否為系統自動封鎖
-                        createdBy:
-                          type: string
-                          format: uuid
-                          nullable: true
-                          description: 建立者帳號 ID
-                        createdAt:
-                          type: string
-                          format: date-time
-                          description: 建立時間（UTC）
+                    type: object
+                    required:
+                      - list
+                      - meta
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            ipAddress:
+                              type: string
+                            reason:
+                              type: string
+                              nullable: true
+                            isAutoBlock:
+                              type: boolean
+                            createdBy:
+                              type: string
+                              format: uuid
+                              nullable: true
+                            createdAt:
+                              type: string
+                              format: date-time
+                      meta:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+                          total:
+                            type: integer
+                          totalPages:
+                            type: integer
                   timestamp:
                     type: string
                     format: date-time
-              example:
-                success: true
-                data:
-                  - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-                    ipAddress: 10.0.0.1
-                    reason: 異常登入嘗試
-                    isAutoBlock: false
-                    createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
-                    createdAt: '2024-01-01T00:00:00.000Z'
-                timestamp: '2024-01-01T00:00:00.000Z'
         '401':
           $ref: '#/components/responses/NoToken'
         '403':
@@ -2044,18 +2097,19 @@ paths:
                   data:
                     type: object
                     required:
-                      - message
+                      - id
                     properties:
-                      message:
+                      id:
                         type: string
-                        description: 顯示給使用者的提示訊息
+                        format: uuid
+                        description: 新建（或既有）IP 紀錄的 uuid
                   timestamp:
                     type: string
                     format: date-time
               example:
                 success: true
                 data:
-                  message: IP 10.0.0.1 已加入黑名單
+                  id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
                 timestamp: '2024-01-01T00:00:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -2095,7 +2149,9 @@ paths:
       tags:
         - Security
       summary: 解鎖帳號
-      description: 解除因登入失敗次數超過閾值而被鎖定的帳號（僅限 ADMIN）。
+      description: |
+        解除因登入失敗次數超過閾值而被鎖定的帳號。
+        需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
       security:
         - bearerAuth: []
       requestBody:
@@ -2113,36 +2169,8 @@ paths:
                   description: 要解鎖的帳號 Email
                   example: user@example.com
       responses:
-        '200':
-          description: 解鎖成功
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - timestamp
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    required:
-                      - message
-                    properties:
-                      message:
-                        type: string
-                        description: 顯示給使用者的提示訊息
-                  timestamp:
-                    type: string
-                    format: date-time
-              example:
-                success: true
-                data:
-                  message: 帳號 user@example.com 已解鎖
-                timestamp: '2024-01-01T00:00:00.000Z'
+        '204':
+          description: 解鎖成功（無 body）
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2150,6 +2178,26 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: 找不到該 email 對應的帳號
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 找不到該 email 對應的帳號
+                code: EMAIL_NOT_FOUND
+                timestamp: '2024-01-01T00:00:00.000Z'
+        '409':
+          description: 帳號未處於鎖定狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 帳號未處於鎖定狀態，無需解鎖
+                code: ACCOUNT_NOT_LOCKED
+                timestamp: '2024-01-01T00:00:00.000Z'
         '500':
           $ref: '#/components/responses/InternalServerError'

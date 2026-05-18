@@ -80,6 +80,10 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **`z.coerce.boolean()` 對字串 `'false'` 會 coerce 成 `true`，list query 不要用**：zod 的 coerce 底層走 JS `Boolean()`，凡是非空字串都是 truthy，所以 `?status=false` 進來會被 schema 變成 `true`，跟使用者意圖相反。**Why:** 2026-05-18 add-status-filter-to-list-pages change 動工前發現此風險，提前避開。**How to apply:** query 接 boolean filter 一律用 `z.enum(['true', 'false']).optional().transform((v) => v === undefined ? undefined : v === 'true')`，並在 Swagger 將 `type: boolean` 配 `enum: [true, false]` 限制；client 也只送這兩個合法值。陷阱避得早一點，未來 e2e 才不會踩。
 
+## Hexagonal 架構慣性
+
+- **不要讓 Facade 直接呼叫 Out Port，跳過 UseCase / Service 層**：早期 security 模組為了快速落地寫成 `Controller → Facade → Port`（無 use case / service），結果 domain 規則（IP 正規化、unlock 前的狀態檢查）沒地方放，只能擠 facade 或 controller。其他模組（member / role）都是 `Controller → Facade → UseCase → Service → Port`，重構時得補回兩層。**Why:** 2026-05-18 refactor-security-module 階段 4 補上 7 個 use case + 7 個 service；service 內才有空間寫 `EmailNotFoundException` / `AccountNotLockedException` 兩個 domain 檢查。**How to apply:** 新模組從一開始就完整四層；admin/management 類即使動作再簡單，service 層佔位也保留（未來補 domain rule 時零摩擦）。
+
 ## OpenSpec workflow
 
 - **propose 階段要先核對 API contract，不要假設「list 有的欄位 update 也支援」**：role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 update DTO 與 service 卻沒處理 `status`。提案寫成「純前端 change」，動工後才發現要連動改後端 + Swagger + api-client + unit spec + e2e。**Why:** 2026-05-18 add-role-management-page Phase 2 開動前才發現必須擴後端，artifacts 整份重改範圍。**How to apply:** 寫 proposal / design 前，先讀 `apps/api/src/adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端要做的互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充行為要在 proposal 的 Capabilities 列為 Modified / ADDED，並在 tasks.md 放在「前端開動前」的 phase。

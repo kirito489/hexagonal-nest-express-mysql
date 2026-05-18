@@ -1,58 +1,78 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  ACCOUNT_LOCK_PORT,
-  AccountLockPort,
-} from '../port/out/auth/AccountLockPort';
-import {
-  IP_LIST_PORT,
-  IpBlacklistItem,
-  IpListItem,
-  IpListPort,
-} from '../port/out/security/IpListPort';
+  ADD_IP_BLACKLIST_USE_CASE,
+  ADD_IP_WHITELIST_USE_CASE,
+  AddIpBlacklistCommand,
+  AddIpBlacklistUseCase,
+  AddIpWhitelistCommand,
+  AddIpWhitelistUseCase,
+  LIST_IP_BLACKLIST_USE_CASE,
+  LIST_IP_WHITELIST_USE_CASE,
+  ListIpBlacklistUseCase,
+  ListIpListQuery,
+  ListIpListResult,
+  ListIpWhitelistUseCase,
+  REMOVE_IP_BLACKLIST_USE_CASE,
+  REMOVE_IP_WHITELIST_USE_CASE,
+  RemoveIpBlacklistUseCase,
+  RemoveIpWhitelistUseCase,
+  UNLOCK_ACCOUNT_USE_CASE,
+  UnlockAccountUseCase,
+} from '../port/in/security/SecurityUseCases';
+import { IpBlacklistItem, IpListItem } from '../port/out/security/IpListPort';
 
 /**
  * 安全管理 Facade：IP 黑白名單 CRUD + 帳號解鎖。
+ * Facade 只負責把 controller 的呼叫分派到對應 use case，不放任何 domain 邏輯
  */
 @Injectable()
 export class SecurityFacade {
   constructor(
-    @Inject(IP_LIST_PORT) private readonly ipList: IpListPort,
-    @Inject(ACCOUNT_LOCK_PORT) private readonly accountLock: AccountLockPort,
+    @Inject(LIST_IP_WHITELIST_USE_CASE)
+    private readonly listIpWhitelist: ListIpWhitelistUseCase,
+    @Inject(ADD_IP_WHITELIST_USE_CASE)
+    private readonly addIpWhitelist: AddIpWhitelistUseCase,
+    @Inject(REMOVE_IP_WHITELIST_USE_CASE)
+    private readonly removeIpWhitelist: RemoveIpWhitelistUseCase,
+    @Inject(LIST_IP_BLACKLIST_USE_CASE)
+    private readonly listIpBlacklist: ListIpBlacklistUseCase,
+    @Inject(ADD_IP_BLACKLIST_USE_CASE)
+    private readonly addIpBlacklist: AddIpBlacklistUseCase,
+    @Inject(REMOVE_IP_BLACKLIST_USE_CASE)
+    private readonly removeIpBlacklist: RemoveIpBlacklistUseCase,
+    @Inject(UNLOCK_ACCOUNT_USE_CASE)
+    private readonly unlockAccountUseCase: UnlockAccountUseCase,
   ) {}
 
-  listWhitelist(): Promise<IpListItem[]> {
-    return this.ipList.listWhitelist();
+  listWhitelist(
+    params: ListIpListQuery,
+  ): Promise<ListIpListResult<IpListItem>> {
+    return this.listIpWhitelist.execute(params);
   }
 
-  addToWhitelist(
-    ip: string,
-    description?: string,
-    createdBy?: string,
-  ): Promise<void> {
-    return this.ipList.addToWhitelist(ip, description, createdBy);
+  addToWhitelist(command: AddIpWhitelistCommand): Promise<{ id: string }> {
+    return this.addIpWhitelist.execute(command);
   }
 
   removeFromWhitelist(ip: string): Promise<void> {
-    return this.ipList.removeFromWhitelist(ip);
+    return this.removeIpWhitelist.execute(ip);
   }
 
-  listBlacklist(): Promise<IpBlacklistItem[]> {
-    return this.ipList.listBlacklist();
+  listBlacklist(
+    params: ListIpListQuery,
+  ): Promise<ListIpListResult<IpBlacklistItem>> {
+    return this.listIpBlacklist.execute(params);
   }
 
-  addToBlacklist(
-    ip: string,
-    reason?: string,
-    createdBy?: string,
-  ): Promise<void> {
-    return this.ipList.addToBlacklist(ip, reason, false, createdBy);
+  addToBlacklist(command: AddIpBlacklistCommand): Promise<{ id: string }> {
+    return this.addIpBlacklist.execute(command);
   }
 
   removeFromBlacklist(ip: string): Promise<void> {
-    return this.ipList.removeFromBlacklist(ip);
+    return this.removeIpBlacklist.execute(ip);
   }
 
   unlockAccount(email: string): Promise<void> {
-    return this.accountLock.unlockAccount(email);
+    return this.unlockAccountUseCase.execute(email);
   }
 }

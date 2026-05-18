@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { GlobalExceptionFilter } from './GlobalExceptionFilter';
 import { SaveSystemLogPort } from '../../../../application/port/out/shared/SaveSystemLogPort';
+import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
+import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
 
 // buildSystemLogData uses getEnv() internally
 jest.mock('../../../../infrastructure/validate-env', () => ({
@@ -101,6 +103,32 @@ describe('GlobalExceptionFilter', () => {
     const body = (json.mock.calls[0] as [{ code: string; message: string }])[0];
     expect(body.code).toBe('INTERNAL_SERVER_ERROR');
     expect(body.message).toBe('Internal server error');
+  });
+
+  describe('Domain exception 對映', () => {
+    it('EmailNotFoundException → 404, EMAIL_NOT_FOUND', () => {
+      const { host, json, status } = makeHost();
+      filter.catch(new EmailNotFoundException(), host);
+
+      expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      const body = (
+        json.mock.calls[0] as [{ code: string; message: string }]
+      )[0];
+      expect(body.code).toBe('EMAIL_NOT_FOUND');
+      expect(body.message).toBe('找不到該 email 對應的帳號');
+    });
+
+    it('AccountNotLockedException → 409, ACCOUNT_NOT_LOCKED', () => {
+      const { host, json, status } = makeHost();
+      filter.catch(new AccountNotLockedException(), host);
+
+      expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+      const body = (
+        json.mock.calls[0] as [{ code: string; message: string }]
+      )[0];
+      expect(body.code).toBe('ACCOUNT_NOT_LOCKED');
+      expect(body.message).toBe('帳號未處於鎖定狀態，無需解鎖');
+    });
   });
 
   it('response 結構包含 success:false 與 timestamp', () => {

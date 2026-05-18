@@ -42,6 +42,12 @@ const ADMIN_RECORD = {
 const mockPrisma = {
   $connect: jest.fn(),
   $disconnect: jest.fn(),
+  // list endpoints 改用 $transaction([findMany, count])；陣列 form 直接 Promise.all
+  $transaction: jest.fn().mockImplementation((arg: unknown) => {
+    if (typeof arg === 'function')
+      return (arg as (tx: unknown) => unknown)(mockPrisma);
+    return Promise.all(arg as Promise<unknown>[]);
+  }),
   memberRecord: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -61,13 +67,15 @@ const mockPrisma = {
   ipWhitelistRecord: {
     findUnique: jest.fn().mockResolvedValue(null),
     findMany: jest.fn().mockResolvedValue([]),
-    upsert: jest.fn().mockResolvedValue({}),
+    count: jest.fn().mockResolvedValue(0),
+    upsert: jest.fn().mockResolvedValue({ id: 'wl-new-uuid' }),
     delete: jest.fn().mockResolvedValue({}),
   },
   ipBlacklistRecord: {
     findUnique: jest.fn().mockResolvedValue(null),
     findMany: jest.fn().mockResolvedValue([]),
-    upsert: jest.fn().mockResolvedValue({}),
+    count: jest.fn().mockResolvedValue(0),
+    upsert: jest.fn().mockResolvedValue({ id: 'bl-new-uuid' }),
     delete: jest.fn().mockResolvedValue({}),
   },
   authLogRecord: {
@@ -123,7 +131,7 @@ describe('Security E2E', () => {
   // ── IP 白名單 ──────────────────────────────
 
   describe('GET /api/security/ip-whitelist', () => {
-    it('Admin JWT → 200 + 回傳列表', async () => {
+    it('Admin JWT → 200 + { list, meta }', async () => {
       mockPrisma.ipWhitelistRecord.findMany.mockResolvedValue([
         {
           id: '1',
@@ -132,13 +140,35 @@ describe('Security E2E', () => {
           createdAt: new Date(),
         },
       ]);
+      mockPrisma.ipWhitelistRecord.count.mockResolvedValue(1);
 
       const res = await request(app.getHttpServer())
         .get('/api/security/ip-whitelist')
         .set('authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect((res.body as { data: unknown[] }).data).toHaveLength(1);
+      const body = res.body as {
+        data: {
+          list: Array<{ id: string }>;
+          meta: { page: number; total: number };
+        };
+      };
+      expect(body.data.list).toHaveLength(1);
+      expect(body.data.meta.page).toBe(1);
+      expect(body.data.meta.total).toBe(1);
+    });
+
+    it('search → where.ipAddress.contains 帶上', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/security/ip-whitelist?search=192.168')
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.ipWhitelistRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { ipAddress: { contains: '192.168' } },
+        }),
+      );
     });
 
     it('無 JWT → 401', async () => {
@@ -151,7 +181,7 @@ describe('Security E2E', () => {
   });
 
   describe('POST /api/security/ip-whitelist', () => {
-    it('Admin 新增白名單 → 201', async () => {
+    it('Admin 新增白名單 → 201 + { id }', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/security/ip-whitelist')
         .set('authorization', `Bearer ${token}`)
@@ -159,6 +189,8 @@ describe('Security E2E', () => {
 
       expect(res.status).toBe(201);
       expect(mockPrisma.ipWhitelistRecord.upsert).toHaveBeenCalled();
+      const body = res.body as { data: { id: string } };
+      expect(body.data.id).toBe('wl-new-uuid');
     });
 
     it('缺少 ip → 400', async () => {
@@ -196,7 +228,7 @@ describe('Security E2E', () => {
   });
 
   describe('POST /api/security/ip-blacklist', () => {
-    it('Admin 新增黑名單 → 201', async () => {
+    it('Admin 新增黑名單 → 201 + { id }', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/security/ip-blacklist')
         .set('authorization', `Bearer ${token}`)
@@ -204,6 +236,8 @@ describe('Security E2E', () => {
 
       expect(res.status).toBe(201);
       expect(mockPrisma.ipBlacklistRecord.upsert).toHaveBeenCalled();
+      const body = res.body as { data: { id: string } };
+      expect(body.data.id).toBe('bl-new-uuid');
     });
   });
 
@@ -220,17 +254,62 @@ describe('Security E2E', () => {
   // ── 帳號解鎖 ───────────────────────────────
 
   describe('POST /api/security/unlock-account', () => {
-    it('Admin 解鎖帳號 → 200', async () => {
+    it('Admin 解鎖鎖定帳號 → 204', async () => {
+      // loadMemberByEmail：找到 member
+      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
+        ...ADMIN_RECORD,
+        email: 'locked@test.com',
+        lockedAt: new Date(),
+      });
+      // isLocked：lockedAt != null
+      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
+        lockedAt: new Date(),
+      });
+
       const res = await request(app.getHttpServer())
         .post('/api/security/unlock-account')
         .set('authorization', `Bearer ${token}`)
         .send({ email: 'locked@test.com' });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(204);
       expect(mockPrisma.memberRecord.updateMany).toHaveBeenCalledWith({
         where: { email: 'locked@test.com' },
         data: { failedLoginCount: 0, lockedAt: null },
       });
+    });
+
+    it('email 不存在 → 404 EMAIL_NOT_FOUND', async () => {
+      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(null);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/security/unlock-account')
+        .set('authorization', `Bearer ${token}`)
+        .send({ email: 'unknown@test.com' });
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('EMAIL_NOT_FOUND');
+    });
+
+    it('帳號未鎖 → 409 ACCOUNT_NOT_LOCKED', async () => {
+      // loadMemberByEmail：找到
+      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
+        ...ADMIN_RECORD,
+        email: 'normal@test.com',
+        lockedAt: null,
+      });
+      // isLocked：lockedAt = null → false
+      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
+        lockedAt: null,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/security/unlock-account')
+        .set('authorization', `Bearer ${token}`)
+        .send({ email: 'normal@test.com' });
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('ACCOUNT_NOT_LOCKED');
+      expect(mockPrisma.memberRecord.updateMany).not.toHaveBeenCalled();
     });
 
     it('缺少 email → 400', async () => {

@@ -41,6 +41,10 @@ responses:
                 roleName:
                   type: string
                   description: 角色名稱
+                roleCode:
+                  type: string
+                  description: 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用
+                  example: SUPERADMIN
                 status:
                   type: boolean
                   description: 啟用狀態
@@ -77,6 +81,7 @@ responses:
             member: 王小明
             roleId: '22222222-2222-4222-8222-222222222222'
             roleName: 管理者
+            roleCode: SUPERADMIN
             status: true
             isDefault: false
             lastLoginAt: '2026-04-30T10:00:00.000Z'

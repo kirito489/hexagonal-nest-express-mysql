@@ -4,6 +4,8 @@ import {
   IpBlacklistItem,
   IpListItem,
   IpListPort,
+  ListIpParams,
+  ListIpResult,
 } from '../../../../application/port/out/security/IpListPort';
 
 /**
@@ -35,13 +37,15 @@ export class PrismaIpListRepository implements IpListPort {
     ip: string,
     description?: string,
     createdBy?: string,
-  ): Promise<void> {
-    await this.prisma.ipWhitelistRecord.upsert({
+  ): Promise<{ id: string }> {
+    const record = await this.prisma.ipWhitelistRecord.upsert({
       where: { ipAddress: ip },
       update: { description, createdBy },
       create: { ipAddress: ip, description, createdBy },
+      select: { id: true },
     });
     this.logger.log(`IP ${ip} 已加入白名單`);
+    return record;
   }
 
   async addToBlacklist(
@@ -49,13 +53,15 @@ export class PrismaIpListRepository implements IpListPort {
     reason?: string,
     isAutoBlock = false,
     createdBy?: string,
-  ): Promise<void> {
-    await this.prisma.ipBlacklistRecord.upsert({
+  ): Promise<{ id: string }> {
+    const record = await this.prisma.ipBlacklistRecord.upsert({
       where: { ipAddress: ip },
       update: { reason, isAutoBlock, createdBy },
       create: { ipAddress: ip, reason, isAutoBlock, createdBy },
+      select: { id: true },
     });
     this.logger.log(`IP ${ip} 已加入黑名單（自動封鎖: ${isAutoBlock}）`);
+    return record;
   }
 
   async removeFromWhitelist(ip: string): Promise<void> {
@@ -74,15 +80,37 @@ export class PrismaIpListRepository implements IpListPort {
       });
   }
 
-  async listWhitelist(): Promise<IpListItem[]> {
-    return this.prisma.ipWhitelistRecord.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async listWhitelist(params: ListIpParams): Promise<ListIpResult<IpListItem>> {
+    const where = params.search
+      ? { ipAddress: { contains: params.search } }
+      : {};
+    const [list, total] = await this.prisma.$transaction([
+      this.prisma.ipWhitelistRecord.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.ipWhitelistRecord.count({ where }),
+    ]);
+    return { list, total };
   }
 
-  async listBlacklist(): Promise<IpBlacklistItem[]> {
-    return this.prisma.ipBlacklistRecord.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async listBlacklist(
+    params: ListIpParams,
+  ): Promise<ListIpResult<IpBlacklistItem>> {
+    const where = params.search
+      ? { ipAddress: { contains: params.search } }
+      : {};
+    const [list, total] = await this.prisma.$transaction([
+      this.prisma.ipBlacklistRecord.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.ipBlacklistRecord.count({ where }),
+    ]);
+    return { list, total };
   }
 }

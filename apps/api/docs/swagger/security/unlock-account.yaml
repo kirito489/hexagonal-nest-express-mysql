@@ -1,6 +1,8 @@
 tags: [Security]
 summary: 解鎖帳號
-description: 解除因登入失敗次數超過閾值而被鎖定的帳號（僅限 ADMIN）。
+description: |
+  解除因登入失敗次數超過閾值而被鎖定的帳號。
+  需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
 
 security:
   - bearerAuth: []
@@ -20,32 +22,8 @@ requestBody:
             example: user@example.com
 
 responses:
-  '200':
-    description: 解鎖成功
-    content:
-      application/json:
-        schema:
-          type: object
-          required: [success, data, timestamp]
-          properties:
-            success:
-              type: boolean
-              example: true
-            data:
-              type: object
-              required: [message]
-              properties:
-                message:
-                  type: string
-                  description: 顯示給使用者的提示訊息
-            timestamp:
-              type: string
-              format: date-time
-        example:
-          success: true
-          data:
-            message: 帳號 user@example.com 已解鎖
-          timestamp: '2024-01-01T00:00:00.000Z'
+  '204':
+    description: 解鎖成功（無 body）
 
   '400':
     $ref: '../openapi.yaml#/components/responses/BadRequest'
@@ -57,7 +35,28 @@ responses:
     $ref: '../openapi.yaml#/components/responses/Forbidden'
 
   '404':
-    $ref: '../openapi.yaml#/components/responses/NotFound'
+    description: 找不到該 email 對應的帳號
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        example:
+          success: false
+          message: 找不到該 email 對應的帳號
+          code: EMAIL_NOT_FOUND
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '409':
+    description: 帳號未處於鎖定狀態
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        example:
+          success: false
+          message: 帳號未處於鎖定狀態，無需解鎖
+          code: ACCOUNT_NOT_LOCKED
+          timestamp: '2024-01-01T00:00:00.000Z'
 
   '500':
     $ref: '../openapi.yaml#/components/responses/InternalServerError'

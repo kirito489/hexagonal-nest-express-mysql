@@ -30,6 +30,8 @@ import { DefaultRoleNotEditableException } from '../../../../domain/exception/De
 import { RoleHasMembersException } from '../../../../domain/exception/RoleHasMembersException';
 import { InvalidPermissionCodeException } from '../../../../domain/exception/InvalidPermissionCodeException';
 import { InvalidPermissionCombinationException } from '../../../../domain/exception/InvalidPermissionCombinationException';
+import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
+import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
 
 export interface ApiErrorResponse {
   success: false;
@@ -109,6 +111,14 @@ const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
   [
     InvalidPermissionCombinationException,
     { status: HttpStatus.BAD_REQUEST, code: 'INVALID_PERMISSION_COMBINATION' },
+  ],
+  [
+    EmailNotFoundException,
+    { status: HttpStatus.NOT_FOUND, code: 'EMAIL_NOT_FOUND' },
+  ],
+  [
+    AccountNotLockedException,
+    { status: HttpStatus.CONFLICT, code: 'ACCOUNT_NOT_LOCKED' },
   ],
 ];
 

@@ -1,9 +1,33 @@
 tags: [Security]
 summary: 查詢 IP 黑名單
-description: 取得所有 IP 黑名單記錄（僅限 ADMIN）。
+description: |
+  分頁取得 IP 黑名單記錄；支援 IP 模糊搜尋。
+  需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
 
 security:
   - bearerAuth: []
+
+parameters:
+  - in: query
+    name: page
+    required: false
+    schema:
+      type: integer
+      minimum: 1
+      default: 1
+  - in: query
+    name: limit
+    required: false
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 200
+  - in: query
+    name: search
+    required: false
+    schema:
+      type: string
+    description: IP 模糊搜尋（contains）
 
 responses:
   '200':
@@ -18,48 +42,45 @@ responses:
               type: boolean
               example: true
             data:
-              type: array
-              description: IP 黑名單清單
-              items:
-                type: object
-                required: [id, ipAddress, isAutoBlock, createdAt]
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                    description: 紀錄 ID
-                  ipAddress:
-                    type: string
-                    description: IP 位址
-                  reason:
-                    type: string
-                    nullable: true
-                    description: 封鎖原因
-                  isAutoBlock:
-                    type: boolean
-                    description: 是否為系統自動封鎖
-                  createdBy:
-                    type: string
-                    format: uuid
-                    nullable: true
-                    description: 建立者帳號 ID
-                  createdAt:
-                    type: string
-                    format: date-time
-                    description: 建立時間（UTC）
+              type: object
+              required: [list, meta]
+              properties:
+                list:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      ipAddress:
+                        type: string
+                      reason:
+                        type: string
+                        nullable: true
+                      isAutoBlock:
+                        type: boolean
+                      createdBy:
+                        type: string
+                        format: uuid
+                        nullable: true
+                      createdAt:
+                        type: string
+                        format: date-time
+                meta:
+                  type: object
+                  properties:
+                    page:
+                      type: integer
+                    limit:
+                      type: integer
+                    total:
+                      type: integer
+                    totalPages:
+                      type: integer
             timestamp:
               type: string
               format: date-time
-        example:
-          success: true
-          data:
-            - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-              ipAddress: 10.0.0.1
-              reason: 異常登入嘗試
-              isAutoBlock: false
-              createdBy: b1b2c3d4-e5f6-7890-abcd-ef1234567890
-              createdAt: '2024-01-01T00:00:00.000Z'
-          timestamp: '2024-01-01T00:00:00.000Z'
 
   '401':
     $ref: '../openapi.yaml#/components/responses/NoToken'

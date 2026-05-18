@@ -44,6 +44,8 @@ import {
 
 export interface ProfileDetail extends MemberDetail {
   permissionCodes: string[];
+  /** 角色代碼（role.role_code，如 SUPERADMIN）；給前端 sidebar 粗粒度 role gate 用 */
+  roleCode: string;
 }
 
 @Injectable()
@@ -100,6 +102,10 @@ export class MemberFacade {
       this.getMemberUseCase.execute(id),
       this.loadMemberContextPort.loadMemberContext(id),
     ]);
-    return { ...detail, permissionCodes: context?.permissions ?? [] };
+    return {
+      ...detail,
+      permissionCodes: context?.permissions ?? [],
+      roleCode: context?.roleCode ?? '',
+    };
   }
 }

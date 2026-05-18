@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SecurityFacade } from '../../../../application/facade/SecurityFacade';
@@ -14,6 +15,7 @@ import {
   IpBlacklistItem,
   IpListItem,
 } from '../../../../application/port/out/security/IpListPort';
+import { ListIpListResult } from '../../../../application/port/in/security/SecurityUseCases';
 import { JwtAuthGuard } from '../guard/JwtAuthGuard';
 import { RolesGuard } from '../guard/RolesGuard';
 import { Roles } from '../decorator/roles.decorator';
@@ -24,6 +26,7 @@ import {
 } from '../decorator/current-member.decorator';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
 import { ipSchema } from './ip-schema';
+import { listIpListQuerySchema, ListIpListQuery } from './ListIpListQuery';
 import {
   AddIpWhitelistRequest,
   addIpWhitelistSchema,
@@ -38,9 +41,12 @@ import {
 } from './UnlockAccountRequest';
 
 /**
- * 安全管理 Controller（Admin only）：
- * - IP 黑白名單 CRUD
- * - 帳號解鎖
+ * 安全管理 Controller（SUPERADMIN only）：
+ * - IP 黑白名單 CRUD（分頁 + IP 模糊搜尋）
+ * - 帳號解鎖（成功 204、找不到 email 404、未鎖 409）
+ *
+ * 注意：security 模組刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate，
+ * 不走其他模組的 PermissionsGuard 細粒度權限
  */
 @Controller('security')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,23 +57,25 @@ export class SecurityController {
   // ── IP 白名單 ────────────────────────────────
 
   @Get('ip-whitelist')
-  async listWhitelist(): Promise<IpListItem[]> {
-    return this.securityFacade.listWhitelist();
+  listWhitelist(
+    @Query(new ZodValidationPipe(listIpListQuerySchema))
+    query: ListIpListQuery,
+  ): Promise<ListIpListResult<IpListItem>> {
+    return this.securityFacade.listWhitelist(query);
   }
 
   @Post('ip-whitelist')
   @HttpCode(HttpStatus.CREATED)
-  async addToWhitelist(
+  addToWhitelist(
     @Body(new ZodValidationPipe(addIpWhitelistSchema))
     dto: AddIpWhitelistRequest,
     @CurrentMember() member: MemberContext,
-  ): Promise<{ message: string }> {
-    await this.securityFacade.addToWhitelist(
-      dto.ip,
-      dto.description,
-      member.sub,
-    );
-    return { message: `IP ${dto.ip} 已加入白名單` };
+  ): Promise<{ id: string }> {
+    return this.securityFacade.addToWhitelist({
+      ip: dto.ip,
+      description: dto.description,
+      createdBy: member.sub,
+    });
   }
 
   @Delete('ip-whitelist/:ip')
@@ -81,19 +89,25 @@ export class SecurityController {
   // ── IP 黑名單 ────────────────────────────────
 
   @Get('ip-blacklist')
-  async listBlacklist(): Promise<IpBlacklistItem[]> {
-    return this.securityFacade.listBlacklist();
+  listBlacklist(
+    @Query(new ZodValidationPipe(listIpListQuerySchema))
+    query: ListIpListQuery,
+  ): Promise<ListIpListResult<IpBlacklistItem>> {
+    return this.securityFacade.listBlacklist(query);
   }
 
   @Post('ip-blacklist')
   @HttpCode(HttpStatus.CREATED)
-  async addToBlacklist(
+  addToBlacklist(
     @Body(new ZodValidationPipe(addIpBlacklistSchema))
     dto: AddIpBlacklistRequest,
     @CurrentMember() member: MemberContext,
-  ): Promise<{ message: string }> {
-    await this.securityFacade.addToBlacklist(dto.ip, dto.reason, member.sub);
-    return { message: `IP ${dto.ip} 已加入黑名單` };
+  ): Promise<{ id: string }> {
+    return this.securityFacade.addToBlacklist({
+      ip: dto.ip,
+      reason: dto.reason,
+      createdBy: member.sub,
+    });
   }
 
   @Delete('ip-blacklist/:ip')
@@ -107,12 +121,11 @@ export class SecurityController {
   // ── 帳號解鎖 ─────────────────────────────────
 
   @Post('unlock-account')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async unlockAccount(
     @Body(new ZodValidationPipe(unlockAccountSchema))
     dto: UnlockAccountRequest,
-  ): Promise<{ message: string }> {
+  ): Promise<void> {
     await this.securityFacade.unlockAccount(dto.email);
-    return { message: `帳號 ${dto.email} 已解鎖` };
   }
 }

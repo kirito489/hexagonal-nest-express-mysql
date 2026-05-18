@@ -7,6 +7,24 @@ import { RedisIpBlockAdapter } from '../adapter/out/redis/RedisIpBlockAdapter';
 import { ACCOUNT_LOCK_PORT } from '../application/port/out/auth/AccountLockPort';
 import { IP_BLOCK_PORT } from '../application/port/out/security/IpBlockPort';
 import { IP_LIST_PORT } from '../application/port/out/security/IpListPort';
+import {
+  ADD_IP_BLACKLIST_USE_CASE,
+  ADD_IP_WHITELIST_USE_CASE,
+  LIST_IP_BLACKLIST_USE_CASE,
+  LIST_IP_WHITELIST_USE_CASE,
+  REMOVE_IP_BLACKLIST_USE_CASE,
+  REMOVE_IP_WHITELIST_USE_CASE,
+  UNLOCK_ACCOUNT_USE_CASE,
+} from '../application/port/in/security/SecurityUseCases';
+import {
+  AddIpBlacklistService,
+  AddIpWhitelistService,
+  ListIpBlacklistService,
+  ListIpWhitelistService,
+  RemoveIpBlacklistService,
+  RemoveIpWhitelistService,
+  UnlockAccountService,
+} from '../application/service/security/SecurityServices';
 import { JwtModule } from './jwt.module';
 import { MemberModule } from './member.module';
 
@@ -26,6 +44,20 @@ import { MemberModule } from './member.module';
     { provide: IP_LIST_PORT, useExisting: PrismaIpListRepository },
     RedisIpBlockAdapter,
     { provide: IP_BLOCK_PORT, useExisting: RedisIpBlockAdapter },
+    // Security use cases
+    { provide: LIST_IP_WHITELIST_USE_CASE, useClass: ListIpWhitelistService },
+    { provide: ADD_IP_WHITELIST_USE_CASE, useClass: AddIpWhitelistService },
+    {
+      provide: REMOVE_IP_WHITELIST_USE_CASE,
+      useClass: RemoveIpWhitelistService,
+    },
+    { provide: LIST_IP_BLACKLIST_USE_CASE, useClass: ListIpBlacklistService },
+    { provide: ADD_IP_BLACKLIST_USE_CASE, useClass: AddIpBlacklistService },
+    {
+      provide: REMOVE_IP_BLACKLIST_USE_CASE,
+      useClass: RemoveIpBlacklistService,
+    },
+    { provide: UNLOCK_ACCOUNT_USE_CASE, useClass: UnlockAccountService },
     SecurityFacade,
   ],
   exports: [ACCOUNT_LOCK_PORT, IP_LIST_PORT, IP_BLOCK_PORT],

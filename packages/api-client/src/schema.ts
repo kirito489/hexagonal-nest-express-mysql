@@ -931,6 +931,7 @@ export interface paths {
                          *         "member": "王小明",
                          *         "roleId": "22222222-2222-4222-8222-222222222222",
                          *         "roleName": "管理者",
+                         *         "roleCode": "SUPERADMIN",
                          *         "status": true,
                          *         "isDefault": false,
                          *         "lastLoginAt": "2026-04-30T10:00:00.000Z",
@@ -968,6 +969,11 @@ export interface paths {
                                 roleId?: string;
                                 /** @description 角色名稱 */
                                 roleName?: string;
+                                /**
+                                 * @description 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用
+                                 * @example SUPERADMIN
+                                 */
+                                roleCode?: string;
                                 /** @description 啟用狀態 */
                                 status?: boolean;
                                 /** @description 預設帳號旗標 */
@@ -1685,11 +1691,20 @@ export interface paths {
         };
         /**
          * 查詢 IP 白名單
-         * @description 取得所有 IP 白名單記錄（僅限 ADMIN）。
+         * @description 分頁取得 IP 白名單記錄；支援 IP 模糊搜尋。
+         *     需要 `SUPERADMIN` 角色（粗粒度 role gate，非細粒度 permission）。
+         *     需要 JWT Bearer Token 認證。
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description 頁碼 */
+                    page?: number;
+                    /** @description 每頁筆數（未指定用 env DEFAULT_PAGE_LIMIT） */
+                    limit?: number;
+                    /** @description IP 模糊搜尋（contains）；trim 後為空字串視為未提供 */
+                    search?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1702,46 +1717,32 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        /**
-                         * @example {
-                         *       "success": true,
-                         *       "data": [
-                         *         {
-                         *           "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                         *           "ipAddress": "192.168.1.1",
-                         *           "description": "辦公室 IP",
-                         *           "createdBy": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                         *           "createdAt": "2024-01-01T00:00:00.000Z"
-                         *         }
-                         *       ],
-                         *       "timestamp": "2024-01-01T00:00:00.000Z"
-                         *     }
-                         */
                         "application/json": {
                             /** @example true */
                             success: boolean;
-                            /** @description IP 白名單清單 */
                             data: {
-                                /**
-                                 * Format: uuid
-                                 * @description 紀錄 ID
-                                 */
-                                id: string;
-                                /** @description IP 位址 */
-                                ipAddress: string;
-                                /** @description 備註說明 */
-                                description?: string | null;
-                                /**
-                                 * Format: uuid
-                                 * @description 建立者帳號 ID
-                                 */
-                                createdBy?: string | null;
-                                /**
-                                 * Format: date-time
-                                 * @description 建立時間（UTC）
-                                 */
-                                createdAt: string;
-                            }[];
+                                /** @description IP 白名單清單 */
+                                list: {
+                                    /** Format: uuid */
+                                    id?: string;
+                                    ipAddress?: string;
+                                    description?: string | null;
+                                    /** Format: uuid */
+                                    createdBy?: string | null;
+                                    /** Format: date-time */
+                                    createdAt?: string;
+                                }[];
+                                meta: {
+                                    /** @example 1 */
+                                    page?: number;
+                                    /** @example 10 */
+                                    limit?: number;
+                                    /** @example 42 */
+                                    total?: number;
+                                    /** @example 5 */
+                                    totalPages?: number;
+                                };
+                            };
                             /** Format: date-time */
                             timestamp: string;
                         };
@@ -1791,7 +1792,7 @@ export interface paths {
                          * @example {
                          *       "success": true,
                          *       "data": {
-                         *         "message": "IP 192.168.1.1 已加入白名單"
+                         *         "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                          *       },
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
@@ -1800,8 +1801,11 @@ export interface paths {
                             /** @example true */
                             success: boolean;
                             data: {
-                                /** @description 顯示給使用者的提示訊息 */
-                                message: string;
+                                /**
+                                 * Format: uuid
+                                 * @description 新建（或既有）IP 紀錄的 uuid
+                                 */
+                                id: string;
                             };
                             /** Format: date-time */
                             timestamp: string;
@@ -1875,11 +1879,17 @@ export interface paths {
         };
         /**
          * 查詢 IP 黑名單
-         * @description 取得所有 IP 黑名單記錄（僅限 ADMIN）。
+         * @description 分頁取得 IP 黑名單記錄；支援 IP 模糊搜尋。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    page?: number;
+                    limit?: number;
+                    /** @description IP 模糊搜尋（contains） */
+                    search?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1892,49 +1902,28 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        /**
-                         * @example {
-                         *       "success": true,
-                         *       "data": [
-                         *         {
-                         *           "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                         *           "ipAddress": "10.0.0.1",
-                         *           "reason": "異常登入嘗試",
-                         *           "isAutoBlock": false,
-                         *           "createdBy": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                         *           "createdAt": "2024-01-01T00:00:00.000Z"
-                         *         }
-                         *       ],
-                         *       "timestamp": "2024-01-01T00:00:00.000Z"
-                         *     }
-                         */
                         "application/json": {
                             /** @example true */
                             success: boolean;
-                            /** @description IP 黑名單清單 */
                             data: {
-                                /**
-                                 * Format: uuid
-                                 * @description 紀錄 ID
-                                 */
-                                id: string;
-                                /** @description IP 位址 */
-                                ipAddress: string;
-                                /** @description 封鎖原因 */
-                                reason?: string | null;
-                                /** @description 是否為系統自動封鎖 */
-                                isAutoBlock: boolean;
-                                /**
-                                 * Format: uuid
-                                 * @description 建立者帳號 ID
-                                 */
-                                createdBy?: string | null;
-                                /**
-                                 * Format: date-time
-                                 * @description 建立時間（UTC）
-                                 */
-                                createdAt: string;
-                            }[];
+                                list: {
+                                    /** Format: uuid */
+                                    id?: string;
+                                    ipAddress?: string;
+                                    reason?: string | null;
+                                    isAutoBlock?: boolean;
+                                    /** Format: uuid */
+                                    createdBy?: string | null;
+                                    /** Format: date-time */
+                                    createdAt?: string;
+                                }[];
+                                meta: {
+                                    page?: number;
+                                    limit?: number;
+                                    total?: number;
+                                    totalPages?: number;
+                                };
+                            };
                             /** Format: date-time */
                             timestamp: string;
                         };
@@ -1984,7 +1973,7 @@ export interface paths {
                          * @example {
                          *       "success": true,
                          *       "data": {
-                         *         "message": "IP 10.0.0.1 已加入黑名單"
+                         *         "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                          *       },
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
@@ -1993,8 +1982,11 @@ export interface paths {
                             /** @example true */
                             success: boolean;
                             data: {
-                                /** @description 顯示給使用者的提示訊息 */
-                                message: string;
+                                /**
+                                 * Format: uuid
+                                 * @description 新建（或既有）IP 紀錄的 uuid
+                                 */
+                                id: string;
                             };
                             /** Format: date-time */
                             timestamp: string;
@@ -2070,7 +2062,8 @@ export interface paths {
         put?: never;
         /**
          * 解鎖帳號
-         * @description 解除因登入失敗次數超過閾值而被鎖定的帳號（僅限 ADMIN）。
+         * @description 解除因登入失敗次數超過閾值而被鎖定的帳號。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         post: {
             parameters: {
@@ -2092,37 +2085,50 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description 解鎖成功 */
-                200: {
+                /** @description 解鎖成功（無 body） */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到該 email 對應的帳號 */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         /**
                          * @example {
-                         *       "success": true,
-                         *       "data": {
-                         *         "message": "帳號 user@example.com 已解鎖"
-                         *       },
+                         *       "success": false,
+                         *       "message": "找不到該 email 對應的帳號",
+                         *       "code": "EMAIL_NOT_FOUND",
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
                          */
-                        "application/json": {
-                            /** @example true */
-                            success: boolean;
-                            data: {
-                                /** @description 顯示給使用者的提示訊息 */
-                                message: string;
-                            };
-                            /** Format: date-time */
-                            timestamp: string;
-                        };
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                400: components["responses"]["BadRequest"];
-                401: components["responses"]["NoToken"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
+                /** @description 帳號未處於鎖定狀態 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "帳號未處於鎖定狀態，無需解鎖",
+                         *       "code": "ACCOUNT_NOT_LOCKED",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 500: components["responses"]["InternalServerError"];
             };
         };

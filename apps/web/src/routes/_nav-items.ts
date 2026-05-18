@@ -5,26 +5,36 @@ export type NavItem = {
   label: string
   path: string
   icon: LucideIcon
+  /** 屬於哪個 sidebar group（如「使用者與權限」「安全」）；未指定為「無 group」固定放最上 */
+  group?: string
   /** 需要的權限代碼；undefined 表示所有登入者都看得到 */
   requiredPermission?: string
+  /** 粗粒度 role gate（與 requiredPermission 並用，兩者皆通才顯示）；目前只用於 SUPERADMIN-only 模組 */
+  requiredRoleCode?: 'SUPERADMIN'
 }
 
 /**
- * Sidebar 導航項目宣告。新增模組時加一筆即可，Layout 會依
- * requiredPermission 與 useHasPermission 自動過濾可見項目
+ * Sidebar 導航項目宣告。新增模組時加一筆即可：
+ * - Layout 會依 requiredPermission + requiredRoleCode 過濾可見項目
+ * - 依 group 分塊渲染（整組空就不渲染整個 group）
  */
 export const NAV_ITEMS: NavItem[] = [
+  // 無 group → 獨立排在最上方
   { label: '首頁', path: '/', icon: Home },
+
+  // 使用者與權限
   {
     label: '會員管理',
     path: '/members',
     icon: Users,
+    group: '使用者與權限',
     requiredPermission: 'BACKEND:ACCOUNT:VIEW',
   },
   {
     label: '角色管理',
     path: '/roles',
     icon: Shield,
+    group: '使用者與權限',
     requiredPermission: 'BACKEND:ROLE:VIEW',
   },
 ]
