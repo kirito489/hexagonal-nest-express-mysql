@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Prisma } from '@prisma/client';
 import { createE2EApp, createMockRedis } from './test-app';
 
 // ──────────────────────────────────────────────
@@ -69,6 +70,7 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
     upsert: jest.fn().mockResolvedValue({ id: 'wl-new-uuid' }),
+    update: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
   },
   ipBlacklistRecord: {
@@ -76,6 +78,7 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
     upsert: jest.fn().mockResolvedValue({ id: 'bl-new-uuid' }),
+    update: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
   },
   authLogRecord: {
@@ -203,13 +206,107 @@ describe('Security E2E', () => {
     });
   });
 
-  describe('DELETE /api/security/ip-whitelist/:ip', () => {
-    it('Admin 移除白名單 → 204', async () => {
+  describe('GET /api/security/ip-whitelist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000aa01';
+
+    it('Admin 取單筆 → 200', async () => {
+      mockPrisma.ipWhitelistRecord.findUnique.mockResolvedValue({
+        id: TEST_UUID,
+        ipAddress: '10.0.0.1',
+        description: 'office',
+        createdBy: null,
+        createdAt: new Date(),
+      });
+
       const res = await request(app.getHttpServer())
-        .delete('/api/security/ip-whitelist/10.0.0.1')
+        .get(`/api/security/ip-whitelist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as { data: { id: string; ipAddress: string } };
+      expect(body.data.id).toBe(TEST_UUID);
+    });
+
+    it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
+      mockPrisma.ipWhitelistRecord.findUnique.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/security/ip-whitelist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+    });
+  });
+
+  describe('PATCH /api/security/ip-whitelist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000aa02';
+
+    it('Admin 更新成功 → 204', async () => {
+      mockPrisma.ipWhitelistRecord.update.mockResolvedValueOnce({});
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/security/ip-whitelist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`)
+        .send({ description: '新備註' });
+
+      expect(res.status).toBe(204);
+      expect(mockPrisma.ipWhitelistRecord.update).toHaveBeenCalledWith({
+        where: { id: TEST_UUID },
+        data: { description: '新備註' },
+      });
+    });
+
+    it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
+      const err = Object.assign(new Error('P2025'), { code: 'P2025' });
+      Object.setPrototypeOf(
+        err,
+        Prisma.PrismaClientKnownRequestError.prototype,
+      );
+      mockPrisma.ipWhitelistRecord.update.mockRejectedValueOnce(err);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/security/ip-whitelist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`)
+        .send({ description: 'x' });
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+    });
+  });
+
+  describe('DELETE /api/security/ip-whitelist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000aa03';
+
+    it('Admin 移除 → 204', async () => {
+      const res = await request(app.getHttpServer())
+        .delete(`/api/security/ip-whitelist/${TEST_UUID}`)
         .set('authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(204);
+      expect(mockPrisma.ipWhitelistRecord.delete).toHaveBeenCalledWith({
+        where: { id: TEST_UUID },
+      });
+    });
+
+    it('紀錄不存在仍 → 204（靜默通過，硬刪）', async () => {
+      mockPrisma.ipWhitelistRecord.delete.mockRejectedValueOnce(
+        new Error('P2025'),
+      );
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/security/ip-whitelist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(204);
+    });
+
+    it('非 uuid path param → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .delete('/api/security/ip-whitelist/not-a-uuid')
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
     });
   });
 
@@ -241,10 +338,100 @@ describe('Security E2E', () => {
     });
   });
 
-  describe('DELETE /api/security/ip-blacklist/:ip', () => {
-    it('Admin 移除黑名單 → 204', async () => {
+  describe('GET /api/security/ip-blacklist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000bb01';
+
+    it('Admin 取單筆 → 200', async () => {
+      mockPrisma.ipBlacklistRecord.findUnique.mockResolvedValue({
+        id: TEST_UUID,
+        ipAddress: '1.2.3.4',
+        reason: 'brute force',
+        isAutoBlock: false,
+        createdBy: null,
+        createdAt: new Date(),
+      });
+
       const res = await request(app.getHttpServer())
-        .delete('/api/security/ip-blacklist/192.168.1.100')
+        .get(`/api/security/ip-blacklist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        data: { id: string; ipAddress: string; isAutoBlock: boolean };
+      };
+      expect(body.data.id).toBe(TEST_UUID);
+      expect(body.data.isAutoBlock).toBe(false);
+    });
+
+    it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
+      mockPrisma.ipBlacklistRecord.findUnique.mockResolvedValue(null);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/security/ip-blacklist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+    });
+  });
+
+  describe('PATCH /api/security/ip-blacklist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000bb02';
+
+    it('Admin 更新成功 → 204', async () => {
+      mockPrisma.ipBlacklistRecord.update.mockResolvedValueOnce({});
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/security/ip-blacklist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`)
+        .send({ reason: '新理由' });
+
+      expect(res.status).toBe(204);
+      expect(mockPrisma.ipBlacklistRecord.update).toHaveBeenCalledWith({
+        where: { id: TEST_UUID },
+        data: { reason: '新理由' },
+      });
+    });
+
+    it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
+      const err = Object.assign(new Error('P2025'), { code: 'P2025' });
+      Object.setPrototypeOf(
+        err,
+        Prisma.PrismaClientKnownRequestError.prototype,
+      );
+      mockPrisma.ipBlacklistRecord.update.mockRejectedValueOnce(err);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/security/ip-blacklist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`)
+        .send({ reason: 'x' });
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+    });
+  });
+
+  describe('DELETE /api/security/ip-blacklist/:id', () => {
+    const TEST_UUID = '00000000-0000-4000-8000-00000000bb03';
+
+    it('Admin 移除 → 204', async () => {
+      const res = await request(app.getHttpServer())
+        .delete(`/api/security/ip-blacklist/${TEST_UUID}`)
+        .set('authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(204);
+      expect(mockPrisma.ipBlacklistRecord.delete).toHaveBeenCalledWith({
+        where: { id: TEST_UUID },
+      });
+    });
+
+    it('紀錄不存在仍 → 204', async () => {
+      mockPrisma.ipBlacklistRecord.delete.mockRejectedValueOnce(
+        new Error('P2025'),
+      );
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/security/ip-blacklist/${TEST_UUID}`)
         .set('authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(204);

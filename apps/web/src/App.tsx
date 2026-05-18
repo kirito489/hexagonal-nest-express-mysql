@@ -11,6 +11,8 @@ import { LoginPage } from '@/routes/login/page'
 import { HomePage } from '@/routes/home/page'
 import { MembersPage } from '@/routes/members/page'
 import { RolesPage } from '@/routes/roles/page'
+import { IpWhitelistPage } from '@/routes/security/ip-whitelist/page'
+import { IpBlacklistPage } from '@/routes/security/ip-blacklist/page'
 import { queryClient } from '@/api/query-client'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -34,6 +36,14 @@ export const App = () => {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/members" element={<MembersPage />} />
                 <Route path="/roles" element={<RolesPage />} />
+                <Route
+                  path="/security/ip-whitelist"
+                  element={<IpWhitelistPage />}
+                />
+                <Route
+                  path="/security/ip-blacklist"
+                  element={<IpBlacklistPage />}
+                />
               </Route>
             </Routes>
           </BrowserRouter>

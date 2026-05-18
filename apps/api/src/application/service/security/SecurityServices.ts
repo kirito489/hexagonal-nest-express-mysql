@@ -18,6 +18,8 @@ import {
   AddIpBlacklistUseCase,
   AddIpWhitelistCommand,
   AddIpWhitelistUseCase,
+  GetIpBlacklistUseCase,
+  GetIpWhitelistUseCase,
   ListIpBlacklistUseCase,
   ListIpListQuery,
   ListIpListResult,
@@ -25,6 +27,10 @@ import {
   RemoveIpBlacklistUseCase,
   RemoveIpWhitelistUseCase,
   UnlockAccountUseCase,
+  UpdateIpBlacklistCommand,
+  UpdateIpBlacklistUseCase,
+  UpdateIpWhitelistCommand,
+  UpdateIpWhitelistUseCase,
 } from '../../port/in/security/SecurityUseCases';
 import {
   buildPaginationMeta,
@@ -32,6 +38,7 @@ import {
 } from '../../../infrastructure/pagination';
 import { EmailNotFoundException } from '../../../domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '../../../domain/exception/AccountNotLockedException';
+import { IpListNotFoundException } from '../../../domain/exception/IpListNotFoundException';
 
 // ── IP 白名單 ────────────────────────────────
 
@@ -68,8 +75,30 @@ export class AddIpWhitelistService implements AddIpWhitelistUseCase {
 export class RemoveIpWhitelistService implements RemoveIpWhitelistUseCase {
   constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
 
-  execute(ip: string): Promise<void> {
-    return this.ipList.removeFromWhitelist(ip);
+  execute(id: string): Promise<void> {
+    return this.ipList.removeWhitelist(id);
+  }
+}
+
+@Injectable()
+export class GetIpWhitelistService implements GetIpWhitelistUseCase {
+  constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
+
+  async execute(id: string): Promise<IpListItem> {
+    const record = await this.ipList.findWhitelistById(id);
+    if (!record) throw new IpListNotFoundException();
+    return record;
+  }
+}
+
+@Injectable()
+export class UpdateIpWhitelistService implements UpdateIpWhitelistUseCase {
+  constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
+
+  execute(command: UpdateIpWhitelistCommand): Promise<void> {
+    return this.ipList.updateWhitelist(command.id, {
+      description: command.description,
+    });
   }
 }
 
@@ -111,8 +140,30 @@ export class AddIpBlacklistService implements AddIpBlacklistUseCase {
 export class RemoveIpBlacklistService implements RemoveIpBlacklistUseCase {
   constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
 
-  execute(ip: string): Promise<void> {
-    return this.ipList.removeFromBlacklist(ip);
+  execute(id: string): Promise<void> {
+    return this.ipList.removeBlacklist(id);
+  }
+}
+
+@Injectable()
+export class GetIpBlacklistService implements GetIpBlacklistUseCase {
+  constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
+
+  async execute(id: string): Promise<IpBlacklistItem> {
+    const record = await this.ipList.findBlacklistById(id);
+    if (!record) throw new IpListNotFoundException();
+    return record;
+  }
+}
+
+@Injectable()
+export class UpdateIpBlacklistService implements UpdateIpBlacklistUseCase {
+  constructor(@Inject(IP_LIST_PORT) private readonly ipList: IpListPort) {}
+
+  execute(command: UpdateIpBlacklistCommand): Promise<void> {
+    return this.ipList.updateBlacklist(command.id, {
+      reason: command.reason,
+    });
   }
 }
 

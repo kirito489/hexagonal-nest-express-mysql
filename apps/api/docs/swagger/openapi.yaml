@@ -258,7 +258,11 @@ paths:
     post:
       $ref: './security/ip-whitelist-add.yaml'
 
-  /security/ip-whitelist/{ip}:
+  /security/ip-whitelist/{id}:
+    get:
+      $ref: './security/ip-whitelist-get.yaml'
+    patch:
+      $ref: './security/ip-whitelist-update.yaml'
     delete:
       $ref: './security/ip-whitelist-delete.yaml'
 
@@ -268,7 +272,11 @@ paths:
     post:
       $ref: './security/ip-blacklist-add.yaml'
 
-  /security/ip-blacklist/{ip}:
+  /security/ip-blacklist/{id}:
+    get:
+      $ref: './security/ip-blacklist-get.yaml'
+    patch:
+      $ref: './security/ip-blacklist-update.yaml'
     delete:
       $ref: './security/ip-blacklist-delete.yaml'
 

@@ -1,4 +1,4 @@
-import { Home, Shield, Users } from 'lucide-react'
+import { Home, Shield, ShieldBan, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
@@ -36,5 +36,21 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Shield,
     group: '使用者與權限',
     requiredPermission: 'BACKEND:ROLE:VIEW',
+  },
+
+  // 安全（SUPERADMIN-only）
+  {
+    label: 'IP 白名單',
+    path: '/security/ip-whitelist',
+    icon: ShieldCheck,
+    group: '安全',
+    requiredRoleCode: 'SUPERADMIN',
+  },
+  {
+    label: 'IP 黑名單',
+    path: '/security/ip-blacklist',
+    icon: ShieldBan,
+    group: '安全',
+    requiredRoleCode: 'SUPERADMIN',
   },
 ]

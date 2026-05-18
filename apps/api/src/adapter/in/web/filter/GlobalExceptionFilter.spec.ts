@@ -10,6 +10,7 @@ import { GlobalExceptionFilter } from './GlobalExceptionFilter';
 import { SaveSystemLogPort } from '../../../../application/port/out/shared/SaveSystemLogPort';
 import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
+import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
 
 // buildSystemLogData uses getEnv() internally
 jest.mock('../../../../infrastructure/validate-env', () => ({
@@ -128,6 +129,18 @@ describe('GlobalExceptionFilter', () => {
       )[0];
       expect(body.code).toBe('ACCOUNT_NOT_LOCKED');
       expect(body.message).toBe('帳號未處於鎖定狀態，無需解鎖');
+    });
+
+    it('IpListNotFoundException → 404, IP_LIST_NOT_FOUND', () => {
+      const { host, json, status } = makeHost();
+      filter.catch(new IpListNotFoundException(), host);
+
+      expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      const body = (
+        json.mock.calls[0] as [{ code: string; message: string }]
+      )[0];
+      expect(body.code).toBe('IP_LIST_NOT_FOUND');
+      expect(body.message).toBe('找不到該 IP 名單紀錄');
     });
   });
 

@@ -32,6 +32,7 @@ import { InvalidPermissionCodeException } from '../../../../domain/exception/Inv
 import { InvalidPermissionCombinationException } from '../../../../domain/exception/InvalidPermissionCombinationException';
 import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
+import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
 
 export interface ApiErrorResponse {
   success: false;
@@ -119,6 +120,10 @@ const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
   [
     AccountNotLockedException,
     { status: HttpStatus.CONFLICT, code: 'ACCOUNT_NOT_LOCKED' },
+  ],
+  [
+    IpListNotFoundException,
+    { status: HttpStatus.NOT_FOUND, code: 'IP_LIST_NOT_FOUND' },
   ],
 ];
 

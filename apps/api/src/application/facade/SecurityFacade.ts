@@ -6,6 +6,10 @@ import {
   AddIpBlacklistUseCase,
   AddIpWhitelistCommand,
   AddIpWhitelistUseCase,
+  GET_IP_BLACKLIST_USE_CASE,
+  GET_IP_WHITELIST_USE_CASE,
+  GetIpBlacklistUseCase,
+  GetIpWhitelistUseCase,
   LIST_IP_BLACKLIST_USE_CASE,
   LIST_IP_WHITELIST_USE_CASE,
   ListIpBlacklistUseCase,
@@ -18,6 +22,12 @@ import {
   RemoveIpWhitelistUseCase,
   UNLOCK_ACCOUNT_USE_CASE,
   UnlockAccountUseCase,
+  UPDATE_IP_BLACKLIST_USE_CASE,
+  UPDATE_IP_WHITELIST_USE_CASE,
+  UpdateIpBlacklistCommand,
+  UpdateIpBlacklistUseCase,
+  UpdateIpWhitelistCommand,
+  UpdateIpWhitelistUseCase,
 } from '../port/in/security/SecurityUseCases';
 import { IpBlacklistItem, IpListItem } from '../port/out/security/IpListPort';
 
@@ -42,6 +52,14 @@ export class SecurityFacade {
     private readonly removeIpBlacklist: RemoveIpBlacklistUseCase,
     @Inject(UNLOCK_ACCOUNT_USE_CASE)
     private readonly unlockAccountUseCase: UnlockAccountUseCase,
+    @Inject(GET_IP_WHITELIST_USE_CASE)
+    private readonly getIpWhitelistUseCase: GetIpWhitelistUseCase,
+    @Inject(UPDATE_IP_WHITELIST_USE_CASE)
+    private readonly updateIpWhitelistUseCase: UpdateIpWhitelistUseCase,
+    @Inject(GET_IP_BLACKLIST_USE_CASE)
+    private readonly getIpBlacklistUseCase: GetIpBlacklistUseCase,
+    @Inject(UPDATE_IP_BLACKLIST_USE_CASE)
+    private readonly updateIpBlacklistUseCase: UpdateIpBlacklistUseCase,
   ) {}
 
   listWhitelist(
@@ -54,8 +72,16 @@ export class SecurityFacade {
     return this.addIpWhitelist.execute(command);
   }
 
-  removeFromWhitelist(ip: string): Promise<void> {
-    return this.removeIpWhitelist.execute(ip);
+  removeFromWhitelist(id: string): Promise<void> {
+    return this.removeIpWhitelist.execute(id);
+  }
+
+  getWhitelist(id: string): Promise<IpListItem> {
+    return this.getIpWhitelistUseCase.execute(id);
+  }
+
+  updateWhitelist(command: UpdateIpWhitelistCommand): Promise<void> {
+    return this.updateIpWhitelistUseCase.execute(command);
   }
 
   listBlacklist(
@@ -68,8 +94,16 @@ export class SecurityFacade {
     return this.addIpBlacklist.execute(command);
   }
 
-  removeFromBlacklist(ip: string): Promise<void> {
-    return this.removeIpBlacklist.execute(ip);
+  removeFromBlacklist(id: string): Promise<void> {
+    return this.removeIpBlacklist.execute(id);
+  }
+
+  getBlacklist(id: string): Promise<IpBlacklistItem> {
+    return this.getIpBlacklistUseCase.execute(id);
+  }
+
+  updateBlacklist(command: UpdateIpBlacklistCommand): Promise<void> {
+    return this.updateIpBlacklistUseCase.execute(command);
   }
 
   unlockAccount(email: string): Promise<void> {

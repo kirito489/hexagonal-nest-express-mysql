@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import {
   IpBlacklistItem,
   IpListItem,
@@ -7,6 +8,7 @@ import {
   ListIpParams,
   ListIpResult,
 } from '../../../../application/port/out/security/IpListPort';
+import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
 
 /**
  * IP 黑白名單持久化 Adapter，查詢 ip_whitelist / ip_blacklist 表。
@@ -64,20 +66,16 @@ export class PrismaIpListRepository implements IpListPort {
     return record;
   }
 
-  async removeFromWhitelist(ip: string): Promise<void> {
-    await this.prisma.ipWhitelistRecord
-      .delete({ where: { ipAddress: ip } })
-      .catch(() => {
-        // 不存在時忽略
-      });
+  async removeWhitelist(id: string): Promise<void> {
+    await this.prisma.ipWhitelistRecord.delete({ where: { id } }).catch(() => {
+      // 不存在時靜默通過（與 member / role delete 行為一致；硬刪）
+    });
   }
 
-  async removeFromBlacklist(ip: string): Promise<void> {
-    await this.prisma.ipBlacklistRecord
-      .delete({ where: { ipAddress: ip } })
-      .catch(() => {
-        // 不存在時忽略
-      });
+  async removeBlacklist(id: string): Promise<void> {
+    await this.prisma.ipBlacklistRecord.delete({ where: { id } }).catch(() => {
+      // 不存在時靜默通過（硬刪）
+    });
   }
 
   async listWhitelist(params: ListIpParams): Promise<ListIpResult<IpListItem>> {
@@ -112,5 +110,45 @@ export class PrismaIpListRepository implements IpListPort {
       this.prisma.ipBlacklistRecord.count({ where }),
     ]);
     return { list, total };
+  }
+
+  async findWhitelistById(id: string): Promise<IpListItem | null> {
+    return this.prisma.ipWhitelistRecord.findUnique({ where: { id } });
+  }
+
+  async findBlacklistById(id: string): Promise<IpBlacklistItem | null> {
+    return this.prisma.ipBlacklistRecord.findUnique({ where: { id } });
+  }
+
+  async updateWhitelist(
+    id: string,
+    data: { description?: string },
+  ): Promise<void> {
+    try {
+      await this.prisma.ipWhitelistRecord.update({ where: { id }, data });
+    } catch (err) {
+      // P2025 = record to update not found
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new IpListNotFoundException();
+      }
+      throw err;
+    }
+  }
+
+  async updateBlacklist(id: string, data: { reason?: string }): Promise<void> {
+    try {
+      await this.prisma.ipBlacklistRecord.update({ where: { id }, data });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new IpListNotFoundException();
+      }
+      throw err;
+    }
   }
 }

@@ -42,7 +42,23 @@ export interface AddIpWhitelistUseCase {
 
 export const REMOVE_IP_WHITELIST_USE_CASE = 'REMOVE_IP_WHITELIST_USE_CASE';
 export interface RemoveIpWhitelistUseCase {
-  execute(ip: string): Promise<void>;
+  execute(id: string): Promise<void>;
+}
+
+export const GET_IP_WHITELIST_USE_CASE = 'GET_IP_WHITELIST_USE_CASE';
+export interface GetIpWhitelistUseCase {
+  /** @throws IpListNotFoundException - id 不存在 */
+  execute(id: string): Promise<IpListItem>;
+}
+
+export const UPDATE_IP_WHITELIST_USE_CASE = 'UPDATE_IP_WHITELIST_USE_CASE';
+export interface UpdateIpWhitelistCommand {
+  id: string;
+  description?: string;
+}
+export interface UpdateIpWhitelistUseCase {
+  /** @throws IpListNotFoundException - id 不存在 */
+  execute(command: UpdateIpWhitelistCommand): Promise<void>;
 }
 
 // ── IP 黑名單 ────────────────────────────────
@@ -64,7 +80,23 @@ export interface AddIpBlacklistUseCase {
 
 export const REMOVE_IP_BLACKLIST_USE_CASE = 'REMOVE_IP_BLACKLIST_USE_CASE';
 export interface RemoveIpBlacklistUseCase {
-  execute(ip: string): Promise<void>;
+  execute(id: string): Promise<void>;
+}
+
+export const GET_IP_BLACKLIST_USE_CASE = 'GET_IP_BLACKLIST_USE_CASE';
+export interface GetIpBlacklistUseCase {
+  /** @throws IpListNotFoundException - id 不存在 */
+  execute(id: string): Promise<IpBlacklistItem>;
+}
+
+export const UPDATE_IP_BLACKLIST_USE_CASE = 'UPDATE_IP_BLACKLIST_USE_CASE';
+export interface UpdateIpBlacklistCommand {
+  id: string;
+  reason?: string;
+}
+export interface UpdateIpBlacklistUseCase {
+  /** @throws IpListNotFoundException - id 不存在 */
+  execute(command: UpdateIpBlacklistCommand): Promise<void>;
 }
 
 // ── 帳號解鎖 ─────────────────────────────────

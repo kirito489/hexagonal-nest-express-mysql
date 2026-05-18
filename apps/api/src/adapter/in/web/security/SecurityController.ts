@@ -6,6 +6,8 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -25,7 +27,6 @@ import {
   MemberContext,
 } from '../decorator/current-member.decorator';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
-import { ipSchema } from './ip-schema';
 import { listIpListQuerySchema, ListIpListQuery } from './ListIpListQuery';
 import {
   AddIpWhitelistRequest,
@@ -36,13 +37,21 @@ import {
   addIpBlacklistSchema,
 } from './AddIpBlacklistRequest';
 import {
+  UpdateIpWhitelistRequest,
+  updateIpWhitelistSchema,
+} from './UpdateIpWhitelistRequest';
+import {
+  UpdateIpBlacklistRequest,
+  updateIpBlacklistSchema,
+} from './UpdateIpBlacklistRequest';
+import {
   UnlockAccountRequest,
   unlockAccountSchema,
 } from './UnlockAccountRequest';
 
 /**
  * 安全管理 Controller（SUPERADMIN only）：
- * - IP 黑白名單 CRUD（分頁 + IP 模糊搜尋）
+ * - IP 黑白名單 CRUD（分頁 + IP 模糊搜尋 + by-id GET/PATCH/DELETE）
  * - 帳號解鎖（成功 204、找不到 email 404、未鎖 409）
  *
  * 注意：security 模組刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate，
@@ -78,12 +87,27 @@ export class SecurityController {
     });
   }
 
-  @Delete('ip-whitelist/:ip')
+  @Get('ip-whitelist/:id')
+  getWhitelist(@Param('id', ParseUUIDPipe) id: string): Promise<IpListItem> {
+    return this.securityFacade.getWhitelist(id);
+  }
+
+  @Patch('ip-whitelist/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateWhitelist(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateIpWhitelistSchema))
+    dto: UpdateIpWhitelistRequest,
+  ): Promise<void> {
+    await this.securityFacade.updateWhitelist({ id, ...dto });
+  }
+
+  @Delete('ip-whitelist/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeFromWhitelist(
-    @Param('ip', new ZodValidationPipe(ipSchema)) ip: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    await this.securityFacade.removeFromWhitelist(ip);
+    await this.securityFacade.removeFromWhitelist(id);
   }
 
   // ── IP 黑名單 ────────────────────────────────
@@ -110,12 +134,29 @@ export class SecurityController {
     });
   }
 
-  @Delete('ip-blacklist/:ip')
+  @Get('ip-blacklist/:id')
+  getBlacklist(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<IpBlacklistItem> {
+    return this.securityFacade.getBlacklist(id);
+  }
+
+  @Patch('ip-blacklist/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateBlacklist(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateIpBlacklistSchema))
+    dto: UpdateIpBlacklistRequest,
+  ): Promise<void> {
+    await this.securityFacade.updateBlacklist({ id, ...dto });
+  }
+
+  @Delete('ip-blacklist/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeFromBlacklist(
-    @Param('ip', new ZodValidationPipe(ipSchema)) ip: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    await this.securityFacade.removeFromBlacklist(ip);
+    await this.securityFacade.removeFromBlacklist(id);
   }
 
   // ── 帳號解鎖 ─────────────────────────────────

@@ -10,20 +10,28 @@ import { IP_LIST_PORT } from '../application/port/out/security/IpListPort';
 import {
   ADD_IP_BLACKLIST_USE_CASE,
   ADD_IP_WHITELIST_USE_CASE,
+  GET_IP_BLACKLIST_USE_CASE,
+  GET_IP_WHITELIST_USE_CASE,
   LIST_IP_BLACKLIST_USE_CASE,
   LIST_IP_WHITELIST_USE_CASE,
   REMOVE_IP_BLACKLIST_USE_CASE,
   REMOVE_IP_WHITELIST_USE_CASE,
   UNLOCK_ACCOUNT_USE_CASE,
+  UPDATE_IP_BLACKLIST_USE_CASE,
+  UPDATE_IP_WHITELIST_USE_CASE,
 } from '../application/port/in/security/SecurityUseCases';
 import {
   AddIpBlacklistService,
   AddIpWhitelistService,
+  GetIpBlacklistService,
+  GetIpWhitelistService,
   ListIpBlacklistService,
   ListIpWhitelistService,
   RemoveIpBlacklistService,
   RemoveIpWhitelistService,
   UnlockAccountService,
+  UpdateIpBlacklistService,
+  UpdateIpWhitelistService,
 } from '../application/service/security/SecurityServices';
 import { JwtModule } from './jwt.module';
 import { MemberModule } from './member.module';
@@ -58,6 +66,16 @@ import { MemberModule } from './member.module';
       useClass: RemoveIpBlacklistService,
     },
     { provide: UNLOCK_ACCOUNT_USE_CASE, useClass: UnlockAccountService },
+    { provide: GET_IP_WHITELIST_USE_CASE, useClass: GetIpWhitelistService },
+    {
+      provide: UPDATE_IP_WHITELIST_USE_CASE,
+      useClass: UpdateIpWhitelistService,
+    },
+    { provide: GET_IP_BLACKLIST_USE_CASE, useClass: GetIpBlacklistService },
+    {
+      provide: UPDATE_IP_BLACKLIST_USE_CASE,
+      useClass: UpdateIpBlacklistService,
+    },
     SecurityFacade,
   ],
   exports: [ACCOUNT_LOCK_PORT, IP_LIST_PORT, IP_BLOCK_PORT],

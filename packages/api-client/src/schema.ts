@@ -1824,36 +1824,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/security/ip-whitelist/{ip}": {
+    "/security/ip-whitelist/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 查詢單筆 IP 白名單
+         * @description 取單筆 IP 白名單記錄，給編輯 dialog 帶初值用。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 查詢成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /** Format: uuid */
+                                id?: string;
+                                ipAddress?: string;
+                                description?: string | null;
+                                /** Format: uuid */
+                                createdBy?: string | null;
+                                /** Format: date-time */
+                                createdAt?: string;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到 IP 名單紀錄 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "找不到該 IP 名單紀錄",
+                         *       "code": "IP_LIST_NOT_FOUND",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                500: components["responses"]["InternalServerError"];
+            };
+        };
         put?: never;
         post?: never;
         /**
          * 移除 IP 白名單
-         * @description 將指定 IP 從白名單移除（僅限 ADMIN）。
+         * @description 將指定紀錄從白名單移除（硬刪除）。記錄不存在時靜默通過（仍回 204）。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    /**
-                     * @description 要移除的 IP 位址
-                     * @example 192.168.1.1
-                     */
-                    ip: string;
+                    /** @description 要移除的紀錄 id */
+                    id: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description 移除成功（無回應內容） */
+                /** @description 移除成功（無回應內容）；記錄不存在時亦回 204 */
                 204: {
                     headers: {
                         [name: string]: unknown;
@@ -1867,7 +1926,63 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * 更新 IP 白名單
+         * @description 更新指定 IP 白名單記錄的可變欄位（目前僅 description）。
+         *     ipAddress 不可變（要改 IP 則刪除重建）。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description 備註說明；省略表示不變
+                         * @example 新辦公室 IP
+                         */
+                        description?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 更新成功（無 body） */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到 IP 名單紀錄 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "找不到該 IP 名單紀錄",
+                         *       "code": "IP_LIST_NOT_FOUND",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                500: components["responses"]["InternalServerError"];
+            };
+        };
         trace?: never;
     };
     "/security/ip-blacklist": {
@@ -2005,36 +2120,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/security/ip-blacklist/{ip}": {
+    "/security/ip-blacklist/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 查詢單筆 IP 黑名單
+         * @description 取單筆 IP 黑名單記錄，給編輯 dialog 帶初值用。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 查詢成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /** Format: uuid */
+                                id?: string;
+                                ipAddress?: string;
+                                reason?: string | null;
+                                isAutoBlock?: boolean;
+                                /** Format: uuid */
+                                createdBy?: string | null;
+                                /** Format: date-time */
+                                createdAt?: string;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到 IP 名單紀錄 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "找不到該 IP 名單紀錄",
+                         *       "code": "IP_LIST_NOT_FOUND",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                500: components["responses"]["InternalServerError"];
+            };
+        };
         put?: never;
         post?: never;
         /**
          * 移除 IP 黑名單
-         * @description 將指定 IP 從黑名單移除（僅限 ADMIN）。
+         * @description 將指定紀錄從黑名單移除（硬刪除）。記錄不存在時靜默通過（仍回 204）。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    /**
-                     * @description 要移除的 IP 位址
-                     * @example 10.0.0.1
-                     */
-                    ip: string;
+                    /** @description 要移除的紀錄 id */
+                    id: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description 移除成功（無回應內容） */
+                /** @description 移除成功（無回應內容）；記錄不存在時亦回 204 */
                 204: {
                     headers: {
                         [name: string]: unknown;
@@ -2048,7 +2223,63 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * 更新 IP 黑名單
+         * @description 更新指定 IP 黑名單記錄的可變欄位（目前僅 reason）。
+         *     ipAddress / isAutoBlock 不可變。
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description 封鎖原因；省略表示不變
+                         * @example 持續嘗試暴力破解
+                         */
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 更新成功（無 body） */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                /** @description 找不到 IP 名單紀錄 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "找不到該 IP 名單紀錄",
+                         *       "code": "IP_LIST_NOT_FOUND",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                500: components["responses"]["InternalServerError"];
+            };
+        };
         trace?: never;
     };
     "/security/unlock-account": {
