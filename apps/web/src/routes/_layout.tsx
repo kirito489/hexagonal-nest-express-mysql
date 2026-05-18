@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { LogOut } from 'lucide-react'
 
 import {
   Sidebar,
@@ -16,7 +18,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { SidebarUserMenu } from '@/components/SidebarUserMenu'
+import { tokenStorage } from '@/lib/storage'
 import { useCurrentMember } from '@/lib/use-current-member'
 import { NAV_ITEMS, type NavItem } from './_nav-items'
 
@@ -48,7 +50,15 @@ const groupNavItems = (
 
 // 後台共用 layout：左側 Sidebar、右側 main，登入後所有頁面共用
 export const Layout = () => {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { permissions, roleCode } = useCurrentMember()
+
+  const handleLogout = () => {
+    tokenStorage.clear()
+    queryClient.clear()
+    navigate('/login', { replace: true })
+  }
 
   // 過濾邏輯：requiredPermission + requiredRoleCode 兩個門檻都要通過
   const visibleNavItems = useMemo(
@@ -105,7 +115,14 @@ export const Layout = () => {
           ))}
         </SidebarContent>
         <SidebarFooter>
-          <SidebarUserMenu />
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleLogout}>
+                <LogOut />
+                <span>登出</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
