@@ -1,105 +1,38 @@
 import { useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
 
-const DEFAULT_PAGE = 1
-const DEFAULT_LIMIT = 10
+import { useListUrlState } from '@/lib/use-list-url-state'
 
-export type IpWhitelistUrlState = {
-  page: number
-  limit: number
-  search: string
-  edit: string | undefined
-  view: string | undefined
-}
-
-const parseInt = (v: string | null, fallback: number): number => {
-  if (!v) return fallback
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : fallback
-}
+type SearchKey = 'search'
 
 /**
- * IP 白名單列表頁 URL state：page / limit / search / edit / view 同步 query string；
- * edit 與 view 互斥（同 member / role 模式）
+ * IP 白名單列表頁 URL state：薄薄 wrap `useListUrlState`，
+ * 把 `searches.search` 攤平成 top-level `search` 對齊既有呼叫端
  */
-export const useIpWhitelistUrlState = (): IpWhitelistUrlState & {
-  setPage: (page: number) => void
-  setLimit: (limit: number) => void
-  setSearch: (search: string) => void
-  openEdit: (id: string) => void
-  closeEdit: () => void
-  openView: (id: string) => void
-  closeView: () => void
-} => {
-  const [searchParams, setSearchParams] = useSearchParams()
+export const useIpWhitelistUrlState = () => {
+  const core = useListUrlState<SearchKey>({ searchKeys: ['search'] })
 
-  const editParam = searchParams.get('edit') ?? undefined
-  const state: IpWhitelistUrlState = {
-    page: parseInt(searchParams.get('page'), DEFAULT_PAGE),
-    limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
-    search: searchParams.get('search') ?? '',
-    edit: editParam,
-    view: editParam ? undefined : (searchParams.get('view') ?? undefined),
-  }
-
-  const update = useCallback(
-    (mut: Partial<IpWhitelistUrlState>) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          const apply = (
-            key: keyof IpWhitelistUrlState,
-            value: string | number | undefined,
-            isDefault: (v: string | number | undefined) => boolean,
-          ) => {
-            if (value === undefined || value === '' || isDefault(value)) {
-              next.delete(key)
-            } else {
-              next.set(key, String(value))
-            }
-          }
-          if ('page' in mut) apply('page', mut.page, (v) => v === DEFAULT_PAGE)
-          if ('limit' in mut)
-            apply('limit', mut.limit, (v) => v === DEFAULT_LIMIT)
-          if ('search' in mut) apply('search', mut.search, () => false)
-          if ('edit' in mut) apply('edit', mut.edit, () => false)
-          if ('view' in mut) apply('view', mut.view, () => false)
-          return next
-        },
-        { replace: true },
-      )
-    },
-    [setSearchParams],
-  )
-
-  const setPage = useCallback((page: number) => update({ page }), [update])
-  const setLimit = useCallback(
-    (limit: number) => update({ limit, page: DEFAULT_PAGE }),
-    [update],
-  )
+  // 不能用 [core] 當 dep — core 是新 object，會讓 setSearch 每次 render 都新參考；
+  // 觸發呼叫端 SearchBar useEffect 每 render 跑 → 改 URL → 無限迴圈（Chrome navigation throttling）
+  const coreSetSearch = core.setSearch
   const setSearch = useCallback(
-    (search: string) => update({ search, page: DEFAULT_PAGE }),
-    [update],
+    (search: string) => coreSetSearch('search', search),
+    [coreSetSearch],
   )
-  const openEdit = useCallback(
-    (id: string) => update({ edit: id, view: undefined }),
-    [update],
-  )
-  const closeEdit = useCallback(() => update({ edit: undefined }), [update])
-  const openView = useCallback(
-    (id: string) => update({ view: id, edit: undefined }),
-    [update],
-  )
-  const closeView = useCallback(() => update({ view: undefined }), [update])
 
   return {
-    ...state,
-    setPage,
-    setLimit,
+    page: core.page,
+    limit: core.limit,
+    search: core.searches.search,
+    edit: core.edit,
+    view: core.view,
+    setPage: core.setPage,
+    setLimit: core.setLimit,
     setSearch,
-    openEdit,
-    closeEdit,
-    openView,
-    closeView,
+    openEdit: core.openEdit,
+    closeEdit: core.closeEdit,
+    openView: core.openView,
+    closeView: core.closeView,
   }
 }
+
+export type IpWhitelistUrlState = ReturnType<typeof useIpWhitelistUrlState>

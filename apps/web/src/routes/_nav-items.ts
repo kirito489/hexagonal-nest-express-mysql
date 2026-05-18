@@ -1,6 +1,8 @@
 import { Home, Shield, ShieldBan, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+import { ROLE_CODE, type RoleCode } from '@/lib/role-codes'
+
 export type NavItem = {
   label: string
   path: string
@@ -9,8 +11,8 @@ export type NavItem = {
   group?: string
   /** 需要的權限代碼；undefined 表示所有登入者都看得到 */
   requiredPermission?: string
-  /** 粗粒度 role gate（與 requiredPermission 並用，兩者皆通才顯示）；目前只用於 SUPERADMIN-only 模組 */
-  requiredRoleCode?: 'SUPERADMIN'
+  /** 粗粒度 role gate（與 requiredPermission 並用，兩者皆通才顯示） */
+  requiredRoleCode?: RoleCode
 }
 
 /**
@@ -44,13 +46,13 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/security/ip-whitelist',
     icon: ShieldCheck,
     group: '安全',
-    requiredRoleCode: 'SUPERADMIN',
+    requiredRoleCode: ROLE_CODE.SUPERADMIN,
   },
   {
     label: 'IP 黑名單',
     path: '/security/ip-blacklist',
     icon: ShieldBan,
     group: '安全',
-    requiredRoleCode: 'SUPERADMIN',
+    requiredRoleCode: ROLE_CODE.SUPERADMIN,
   },
 ]

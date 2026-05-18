@@ -970,10 +970,10 @@ export interface paths {
                                 /** @description 角色名稱 */
                                 roleName?: string;
                                 /**
-                                 * @description 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用
+                                 * @description 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用；context 取不到時為 null
                                  * @example SUPERADMIN
                                  */
-                                roleCode?: string;
+                                roleCode?: string | null;
                                 /** @description 啟用狀態 */
                                 status?: boolean;
                                 /** @description 預設帳號旗標 */

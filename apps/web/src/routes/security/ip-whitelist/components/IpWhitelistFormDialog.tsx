@@ -27,8 +27,7 @@ import {
 
 type IpWhitelistFormDialogProps = {
   open: boolean
-  /** view = 唯讀檢視；edit = 改 description；create = IP + description 都可改 */
-  mode: 'create' | 'edit' | 'view'
+  mode: 'create' | 'edit'
   initialValues?: Partial<IpWhitelistForm>
   isSubmitting: boolean
   onClose: () => void
@@ -48,9 +47,8 @@ export const IpWhitelistFormDialog = ({
   onClose,
   onSubmit,
 }: IpWhitelistFormDialogProps) => {
-  const isView = mode === 'view'
-  const ipDisabled = isView || mode === 'edit'
-  const descDisabled = isView
+  // IP 在 edit 時 disabled（後端不允許改 IP，要改就刪除後重建）
+  const ipDisabled = mode === 'edit'
 
   const form = useForm<IpWhitelistForm>({
     resolver: standardSchemaResolver(ipWhitelistFormSchema),
@@ -66,22 +64,16 @@ export const IpWhitelistFormDialog = ({
   })
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create'
-              ? '新增白名單'
-              : mode === 'edit'
-                ? '編輯白名單'
-                : '檢視白名單'}
+            {mode === 'create' ? '新增白名單' : '編輯白名單'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
               ? '加入新的 IP 到白名單'
-              : mode === 'edit'
-                ? '更新備註說明（IP 不可變更，要改 IP 請刪除後重建）'
-                : '檢視白名單紀錄（唯讀）'}
+              : '更新備註說明（IP 不可變更，要改 IP 請刪除後重建）'}
           </DialogDescription>
         </DialogHeader>
 
@@ -111,11 +103,7 @@ export const IpWhitelistFormDialog = ({
                 <FormItem>
                   <FormLabel>備註</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="例如：辦公室 IP"
-                      disabled={descDisabled}
-                      {...field}
-                    />
+                    <Input placeholder="例如：辦公室 IP" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -124,17 +112,15 @@ export const IpWhitelistFormDialog = ({
 
             <DialogFooter className="mt-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                {isView ? '關閉' : '取消'}
+                取消
               </Button>
-              {!isView && (
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? '儲存中…'
-                    : mode === 'create'
-                      ? '新增'
-                      : '儲存'}
-                </Button>
-              )}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? '儲存中…'
+                  : mode === 'create'
+                    ? '新增'
+                    : '儲存'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

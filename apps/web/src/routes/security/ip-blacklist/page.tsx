@@ -1,21 +1,10 @@
 import { useCallback, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { DataTablePagination } from '@/components/data-table/DataTablePagination'
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
 import { useApiQuery } from '@/api/client'
-import { useCurrentMember } from '@/lib/use-current-member'
 import { useDetailDialog } from '@/lib/use-detail-dialog'
 import { useIpBlacklistQuery } from './hooks/use-ip-blacklist-query'
 import { useIpBlacklistUrlState } from './hooks/use-ip-blacklist-url-state'
@@ -26,6 +15,7 @@ import {
   type IpBlacklistRow,
 } from './components/IpBlacklistTable'
 import { IpBlacklistFormDialog } from './components/IpBlacklistFormDialog'
+import { IpBlacklistViewDialog } from './components/IpBlacklistViewDialog'
 import type { IpBlacklistForm } from './lib/ip-blacklist-form-schema'
 
 const mapDetailToForm = (data: {
@@ -37,7 +27,6 @@ const mapDetailToForm = (data: {
 })
 
 export const IpBlacklistPage = () => {
-  const { roleCode, isLoading: meLoading } = useCurrentMember()
   const url = useIpBlacklistUrlState()
   const { closeEdit, closeView, openEdit, openView } = url
   const listQuery = useIpBlacklistQuery({
@@ -83,10 +72,6 @@ export const IpBlacklistPage = () => {
     setDeleteTarget(row)
   }, [])
 
-  if (!meLoading && roleCode !== 'SUPERADMIN') {
-    return <Navigate to="/" replace />
-  }
-
   const list: IpBlacklistRow[] = listQuery.data?.list ?? []
   const meta = listQuery.data?.meta ?? {
     page: url.page,
@@ -111,10 +96,12 @@ export const IpBlacklistPage = () => {
     closeEdit()
   }
 
-  const handleConfirmDelete = async (row: IpBlacklistRow) => {
-    if (!row.id) return
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget?.id) return
     try {
-      await mutations.remove.mutateAsync({ params: { path: { id: row.id } } })
+      await mutations.remove.mutateAsync({
+        params: { path: { id: deleteTarget.id } },
+      })
       setDeleteTarget(null)
     } catch {
       // mutation hook 已 toast.error
@@ -174,44 +161,29 @@ export const IpBlacklistPage = () => {
         onSubmit={handleUpdateSubmit}
       />
 
-      <IpBlacklistFormDialog
+      <IpBlacklistViewDialog
         open={detail.viewEnabled && !detail.isLoading && !!detail.initialValues}
-        mode="view"
-        initialValues={detail.initialValues}
-        isSubmitting={false}
+        values={detail.initialValues}
         onClose={closeView}
-        onSubmit={() => {}}
       />
 
-      <AlertDialog
+      <DeleteConfirmDialog
         open={!!deleteTarget}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認刪除黑名單</AlertDialogTitle>
-            <AlertDialogDescription>
-              即將刪除
-              <span className="text-foreground font-mono">
-                {' '}
-                {deleteTarget?.ipAddress ?? '—'}{' '}
-              </span>
-              。此操作為硬刪除，無法復原；確認繼續嗎？
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={mutations.remove.isPending}>
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={mutations.remove.isPending}
-              onClick={() => deleteTarget && handleConfirmDelete(deleteTarget)}
-            >
-              {mutations.remove.isPending ? '刪除中…' : '確認刪除'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title="確認刪除黑名單"
+        description={
+          <>
+            即將刪除
+            <span className="text-foreground font-mono">
+              {' '}
+              {deleteTarget?.ipAddress ?? '—'}{' '}
+            </span>
+            。此操作無法復原；確認繼續嗎？
+          </>
+        }
+        isDeleting={mutations.remove.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

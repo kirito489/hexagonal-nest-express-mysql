@@ -1,13 +1,4 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
 import type { MemberRow } from './MembersTable'
 
 type DeleteMemberDialogProps = {
@@ -24,29 +15,22 @@ export const DeleteMemberDialog = ({
   onConfirm,
 }: DeleteMemberDialogProps) => {
   return (
-    <AlertDialog open={!!member} onOpenChange={(o) => !o && onCancel()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>確認刪除會員</AlertDialogTitle>
-          <AlertDialogDescription>
-            即將刪除
-            <span className="text-foreground font-medium">
-              {' '}
-              {member?.member ?? '—'}{' '}
-            </span>
-            ({member?.email ?? '—'})。確認繼續嗎？
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={isDeleting}
-            onClick={() => member && onConfirm(member)}
-          >
-            {isDeleting ? '刪除中…' : '確認刪除'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={!!member}
+      title="確認刪除會員"
+      description={
+        <>
+          即將刪除
+          <span className="text-foreground font-medium">
+            {' '}
+            {member?.member ?? '—'}{' '}
+          </span>
+          ({member?.email ?? '—'})。確認繼續嗎？
+        </>
+      }
+      isDeleting={isDeleting}
+      onCancel={onCancel}
+      onConfirm={() => member && onConfirm(member)}
+    />
   )
 }

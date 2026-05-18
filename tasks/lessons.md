@@ -100,6 +100,9 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
   ```
 
   Reqs 數量可從 `grep -c "^### Requirement:" openspec/specs/<spec>/spec.md` 取得。
+  禁止用自訂前綴（如 `- +` / `- ~`）— 統一樣板才有樣板價值。
+
+- **archive 前先把 swagger / api-client / 前端通通同步完，archive commit 純粹是搬檔 + 落 master spec**：曾發生 archive commit 還夾帶 `swagger:bundle` 重打、`api-client generate` 重生、swagger 描述對齊等 — 這些屬於 feat / refactor 沒收尾的尾巴，應在那邊完成。混在 archive 會讓未來想 cherry-pick / revert 歸檔動作時連帶動到 swagger，污染歷史。**Why:** 2026-05-18 `9bdb354` 歸檔 add-security-ip-list-management 時夾帶 swagger 修正 + bundle 重打 + api-client 重生 被 review 點到。**How to apply:** archive 前 checklist（按順序）：(1) `pnpm --filter @app/api swagger:bundle`；(2) `pnpm --filter @app/api-client generate`；(3) `pnpm typecheck && pnpm lint && pnpm test`；(4) 全綠後 commit feat / refactor；(5) 再跑 `openspec-archive-change`。若 archive 跑完 `git status` 還看到 swagger 或 schema.ts 有變動，是步驟 1-3 沒做乾淨，要回去補。
 
 ## Swagger
 
@@ -116,6 +119,8 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 ## 前端 / React hooks
 
 - **自訂 hook 回傳的函式若會進到呼叫端 useEffect deps，必須 `useCallback` 包起來，否則陷無限迴圈**：每次 render 都建新 function instance → 進 deps 後 effect 每 render 都跑 → effect 內若呼叫會改父 state / URL 的 setter（如 `setSearchParams`）就觸發父層 re-render → 新 function instance → 又跑 → Chrome 直接擋 `Throttling navigation to prevent the browser from hanging`。`useRef` 持有的狀態用 `useCallback([], )` 包是安全的（mount 時建一次，閉包讀 `ref.current` 永遠是最新值）。**Why:** 2026-05-18 add-status-filter-to-list-pages review 全修把 SearchBar 的 `isFirstRun` ref 抽成 `useIsFirstRun` helper，回傳 `() => { ... }` 沒用 `useCallback`；SearchBar 把 `consumeFirstRun` 放進 deps 後 `/members` / `/roles` 一進場就被 throttling，URL 連改數十次。**How to apply:** 任何 `useXxx()` 回傳函式都檢查「呼叫端是否會放進 deps」；只要可能就一律 `useCallback`，jsdoc 寫明「必須 useCallback，否則無限迴圈」當路標。對 lint：react-compiler 不會幫你抓這條，要靠紀律 + e2e 進場時實際開頁面看 console 有無 throttling 警告。
+
+- **`useCallback` dep 不要放整個 hook 回傳的 object，要 destructure 出 method 再放**：上一條的延伸。寫 wrapper hook 時很容易：`const { ... } = useFooHook()` → 為了讓 wrapper 的 setter 也 stable 寫 `useCallback(..., [coreObject])` — 但 `coreObject` 每次 render 都是新 reference，wrapper setter 每 render 失效，跟「沒包 useCallback」效果一樣（無限迴圈）。**Why:** 2026-05-18 抽 `useListUrlState` 後寫 4 個 wrapper hook（`use-members-url-state` / `use-roles-url-state` / `use-ip-{white,black}list-url-state`）都用 `[core]` 當 dep，一進 `/security/ip-whitelist` 立刻 throttling。**How to apply:** `const { setX: coreSetX } = core; const wrapper = useCallback(..., [coreSetX])` — 把 method destructure 成 local const 再放 dep。或乾脆別寫 wrapper、呼叫端直接 `core.setX(...)`。對 lint：`react-hooks/exhaustive-deps` 看到 `core.setX` 會要求整個 `core`；destructure 後它看到單一變數就會接受。
 
 ## 前端 / React + zod + react-hook-form
 

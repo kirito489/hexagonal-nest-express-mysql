@@ -43,7 +43,8 @@ responses:
                   description: 角色名稱
                 roleCode:
                   type: string
-                  description: 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用
+                  nullable: true
+                  description: 角色代碼（如 SUPERADMIN），給前端 sidebar 粗粒度 role gate 用；context 取不到時為 null
                   example: SUPERADMIN
                 status:
                   type: boolean

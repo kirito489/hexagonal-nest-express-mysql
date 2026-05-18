@@ -27,7 +27,7 @@ import {
 
 type IpBlacklistFormDialogProps = {
   open: boolean
-  mode: 'create' | 'edit' | 'view'
+  mode: 'create' | 'edit'
   initialValues?: Partial<IpBlacklistForm>
   isSubmitting: boolean
   onClose: () => void
@@ -47,8 +47,8 @@ export const IpBlacklistFormDialog = ({
   onClose,
   onSubmit,
 }: IpBlacklistFormDialogProps) => {
-  const isView = mode === 'view'
-  const ipDisabled = isView || mode === 'edit'
+  // IP 在 edit 時 disabled（後端不允許改 IP，要改就刪除後重建）
+  const ipDisabled = mode === 'edit'
 
   const form = useForm<IpBlacklistForm>({
     resolver: standardSchemaResolver(ipBlacklistFormSchema),
@@ -64,22 +64,16 @@ export const IpBlacklistFormDialog = ({
   })
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create'
-              ? '新增黑名單'
-              : mode === 'edit'
-                ? '編輯黑名單'
-                : '檢視黑名單'}
+            {mode === 'create' ? '新增黑名單' : '編輯黑名單'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
               ? '加入新的 IP 到黑名單'
-              : mode === 'edit'
-                ? '更新封鎖原因（IP 不可變更，要改 IP 請刪除後重建）'
-                : '檢視黑名單紀錄（唯讀）'}
+              : '更新封鎖原因（IP 不可變更，要改 IP 請刪除後重建）'}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,11 +103,7 @@ export const IpBlacklistFormDialog = ({
                 <FormItem>
                   <FormLabel>封鎖原因</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="例如：暴力破解嘗試"
-                      disabled={isView}
-                      {...field}
-                    />
+                    <Input placeholder="例如：暴力破解嘗試" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,17 +112,15 @@ export const IpBlacklistFormDialog = ({
 
             <DialogFooter className="mt-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                {isView ? '關閉' : '取消'}
+                取消
               </Button>
-              {!isView && (
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? '儲存中…'
-                    : mode === 'create'
-                      ? '新增'
-                      : '儲存'}
-                </Button>
-              )}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? '儲存中…'
+                  : mode === 'create'
+                    ? '新增'
+                    : '儲存'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

@@ -6,6 +6,7 @@ import { Tooltip as TooltipPrimitive } from 'radix-ui'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { RequireAuth } from '@/components/RequireAuth'
+import { RequireRole } from '@/components/RequireRole'
 import { Layout } from '@/routes/_layout'
 import { LoginPage } from '@/routes/login/page'
 import { HomePage } from '@/routes/home/page'
@@ -15,6 +16,7 @@ import { IpWhitelistPage } from '@/routes/security/ip-whitelist/page'
 import { IpBlacklistPage } from '@/routes/security/ip-blacklist/page'
 import { queryClient } from '@/api/query-client'
 import { Toaster } from '@/components/ui/sonner'
+import { ROLE_CODE } from '@/lib/role-codes'
 
 const TooltipProvider = TooltipPrimitive.Provider
 
@@ -38,11 +40,19 @@ export const App = () => {
                 <Route path="/roles" element={<RolesPage />} />
                 <Route
                   path="/security/ip-whitelist"
-                  element={<IpWhitelistPage />}
+                  element={
+                    <RequireRole roleCode={ROLE_CODE.SUPERADMIN}>
+                      <IpWhitelistPage />
+                    </RequireRole>
+                  }
                 />
                 <Route
                   path="/security/ip-blacklist"
-                  element={<IpBlacklistPage />}
+                  element={
+                    <RequireRole roleCode={ROLE_CODE.SUPERADMIN}>
+                      <IpBlacklistPage />
+                    </RequireRole>
+                  }
                 />
               </Route>
             </Routes>

@@ -1,13 +1,4 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
 import type { RoleRow } from './RolesTable'
 
 type DeleteRoleDialogProps = {
@@ -24,29 +15,22 @@ export const DeleteRoleDialog = ({
   onConfirm,
 }: DeleteRoleDialogProps) => {
   return (
-    <AlertDialog open={!!role} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>確認刪除角色</AlertDialogTitle>
-          <AlertDialogDescription>
-            即將刪除
-            <span className="text-foreground font-medium">
-              {' '}
-              {role?.name ?? '—'}{' '}
-            </span>
-            （目前使用人數：{role?.memberCount ?? 0}）。確認繼續嗎？
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={isDeleting}
-            onClick={() => role && onConfirm(role)}
-          >
-            {isDeleting ? '刪除中…' : '確認刪除'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={!!role}
+      title="確認刪除角色"
+      description={
+        <>
+          即將刪除
+          <span className="text-foreground font-medium">
+            {' '}
+            {role?.name ?? '—'}{' '}
+          </span>
+          （目前使用人數：{role?.memberCount ?? 0}）。確認繼續嗎？
+        </>
+      }
+      isDeleting={isDeleting}
+      onCancel={onCancel}
+      onConfirm={() => role && onConfirm(role)}
+    />
   )
 }

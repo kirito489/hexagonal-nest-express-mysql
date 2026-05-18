@@ -1,127 +1,58 @@
 import { useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
 
+import {
+  useListUrlState,
+  type ListUrlState,
+  type ListUrlStateActions,
+} from '@/lib/use-list-url-state'
 import { parseStatusParam, type StatusFilter } from '@/lib/status-filter'
 
-const DEFAULT_PAGE = 1
-const DEFAULT_LIMIT = 10
-
-export type MembersUrlState = {
-  page: number
-  limit: number
-  name: string
-  email: string
-  status: StatusFilter
-  /** 編輯中 member 的 uuid；undefined 表示 dialog 關閉 */
-  edit: string | undefined
-  /** 檢視中 member 的 uuid（唯讀 dialog）；與 edit 互斥 */
-  view: string | undefined
-}
-
-const parseInt = (v: string | null, fallback: number): number => {
-  if (!v) return fallback
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : fallback
-}
+type SearchKey = 'name' | 'email'
 
 /**
- * 列表頁的 URL state hook：page / limit / name / email / edit 都同步到 query string
+ * 會員列表頁 URL state：薄薄 wrap `useListUrlState`，
+ * 把 status 從 raw string 轉成 StatusFilter type
  */
-export const useMembersUrlState = (): MembersUrlState & {
-  setPage: (page: number) => void
-  setLimit: (limit: number) => void
-  setSearch: (name: string, email: string) => void
-  setStatus: (status: StatusFilter) => void
-  openEdit: (id: string) => void
-  closeEdit: () => void
-  openView: (id: string) => void
-  closeView: () => void
-} => {
-  const [searchParams, setSearchParams] = useSearchParams()
+export const useMembersUrlState = () => {
+  const core = useListUrlState<SearchKey>({
+    searchKeys: ['name', 'email'],
+    extraKeys: ['status'],
+  })
 
-  // edit / view 互斥：使用者可能手動編 URL 同時帶兩者，state 推導端就解掉，
-  // 呼叫端不必再寫 `&& !editEnabled` 兜底
-  const editParam = searchParams.get('edit') ?? undefined
-  const state: MembersUrlState = {
-    page: parseInt(searchParams.get('page'), DEFAULT_PAGE),
-    limit: parseInt(searchParams.get('limit'), DEFAULT_LIMIT),
-    name: searchParams.get('name') ?? '',
-    email: searchParams.get('email') ?? '',
-    status: parseStatusParam(searchParams.get('status')),
-    edit: editParam,
-    view: editParam ? undefined : (searchParams.get('view') ?? undefined),
-  }
+  const status = parseStatusParam(core.extras.status ?? null)
 
-  const update = useCallback(
-    (mut: Partial<MembersUrlState>) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          const apply = (
-            key: keyof MembersUrlState,
-            value: string | number | undefined,
-            isDefault: (v: string | number | undefined) => boolean,
-          ) => {
-            if (value === undefined || value === '' || isDefault(value)) {
-              next.delete(key)
-            } else {
-              next.set(key, String(value))
-            }
-          }
-          if ('page' in mut)
-            apply('page', mut.page, (v) => v === DEFAULT_PAGE)
-          if ('limit' in mut)
-            apply('limit', mut.limit, (v) => v === DEFAULT_LIMIT)
-          if ('name' in mut) apply('name', mut.name, () => false)
-          if ('email' in mut) apply('email', mut.email, () => false)
-          if ('status' in mut) apply('status', mut.status, () => false)
-          if ('edit' in mut) apply('edit', mut.edit, () => false)
-          if ('view' in mut) apply('view', mut.view, () => false)
-          return next
-        },
-        { replace: true },
-      )
-    },
-    [setSearchParams],
-  )
-
-  // setter 一律包 useCallback：給呼叫端的 useEffect deps 用，避免被迫 disable exhaustive-deps
-  const setPage = useCallback((page: number) => update({ page }), [update])
-  const setLimit = useCallback(
-    (limit: number) => update({ limit, page: DEFAULT_PAGE }),
-    [update],
-  )
+  // destructure 後再放 dep — 直接放 [core] 會每 render 失效（core object 不 stable），
+  // 觸發呼叫端 SearchBar useEffect 無限迴圈
+  const { setSearches: coreSetSearches, setExtra: coreSetExtra } = core
   const setSearch = useCallback(
-    (name: string, email: string) =>
-      update({ name, email, page: DEFAULT_PAGE }),
-    [update],
+    (name: string, email: string) => coreSetSearches({ name, email }),
+    [coreSetSearches],
   )
-  // 切 status 與切搜尋一樣 reset page=1
   const setStatus = useCallback(
-    (status: StatusFilter) => update({ status, page: DEFAULT_PAGE }),
-    [update],
+    (next: StatusFilter) => coreSetExtra('status', next),
+    [coreSetExtra],
   )
-  // edit / view 互斥：開一個就關掉另一個，避免 dialog 疊在一起
-  const openEdit = useCallback(
-    (id: string) => update({ edit: id, view: undefined }),
-    [update],
-  )
-  const closeEdit = useCallback(() => update({ edit: undefined }), [update])
-  const openView = useCallback(
-    (id: string) => update({ view: id, edit: undefined }),
-    [update],
-  )
-  const closeView = useCallback(() => update({ view: undefined }), [update])
 
   return {
-    ...state,
-    setPage,
-    setLimit,
+    page: core.page,
+    limit: core.limit,
+    name: core.searches.name,
+    email: core.searches.email,
+    status,
+    edit: core.edit,
+    view: core.view,
+    setPage: core.setPage,
+    setLimit: core.setLimit,
     setSearch,
     setStatus,
-    openEdit,
-    closeEdit,
-    openView,
-    closeView,
+    openEdit: core.openEdit,
+    closeEdit: core.closeEdit,
+    openView: core.openView,
+    closeView: core.closeView,
   }
 }
+
+// 保留型別 export 給呼叫端 import
+export type MembersUrlState = ReturnType<typeof useMembersUrlState>
+// 預留：未來 list state 模組想要 generic core 時直接重 export
+export type { ListUrlState, ListUrlStateActions }
