@@ -43,8 +43,7 @@ export interface ApiErrorResponse {
 
 // Domain exception → { HTTP status, error code } 映射表
 // 新增 domain exception 時只需在此加一筆，不用再追長串 if/else if
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type DomainExceptionCtor = new (...args: any[]) => Error;
+type DomainExceptionCtor = new (...args: never[]) => Error;
 
 const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
   readonly [DomainExceptionCtor, { status: HttpStatus; code: string }]

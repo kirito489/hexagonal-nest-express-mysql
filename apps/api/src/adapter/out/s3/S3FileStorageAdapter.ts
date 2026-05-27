@@ -43,11 +43,11 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
   }
 
   async upload(options: UploadFileOptions): Promise<string> {
-    this.assertInitialized();
+    const { client, bucket } = this.requireReady();
 
-    await this.client!.send(
+    await client.send(
       new PutObjectCommand({
-        Bucket: this.bucket!,
+        Bucket: bucket,
         Key: options.key,
         Body: options.buffer,
         ContentType: options.mimeType,
@@ -58,26 +58,29 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
   }
 
   async getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
-    this.assertInitialized();
+    const { client, bucket } = this.requireReady();
 
     return getSignedUrl(
-      this.client!,
-      new GetObjectCommand({ Bucket: this.bucket!, Key: key }),
+      client,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
       { expiresIn: expiresInSeconds },
     );
   }
 
   async delete(key: string): Promise<void> {
-    this.assertInitialized();
+    const { client, bucket } = this.requireReady();
 
-    await this.client!.send(
-      new DeleteObjectCommand({ Bucket: this.bucket!, Key: key }),
-    );
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   }
 
-  private readonly assertInitialized = (): void => {
+  /**
+   * 取得已初始化的 client 與 bucket；未初始化時拋錯
+   * 用回傳型別代替 `!`，讓 TypeScript narrow 為 non-null
+   */
+  private requireReady(): { client: S3Client; bucket: string } {
     if (!this.client || !this.bucket) {
       throw new Error('S3 Client 未初始化');
     }
-  };
+    return { client: this.client, bucket: this.bucket };
+  }
 }

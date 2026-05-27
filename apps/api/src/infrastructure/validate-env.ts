@@ -133,14 +133,28 @@ const envSchema = z.object({
   APPLICATION_SYSTEM_ADMIN_PASSWORD_COMPLEXITY: z.coerce
     .number()
     .int()
-    .min(0)
-    .max(4)
+    .pipe(
+      z.union([
+        z.literal(0),
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+      ]),
+    )
     .default(4),
   APPLICATION_OTHER_ADMIN_PASSWORD_COMPLEXITY: z.coerce
     .number()
     .int()
-    .min(0)
-    .max(4)
+    .pipe(
+      z.union([
+        z.literal(0),
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+      ]),
+    )
     .default(1),
   APPLICATION_PASSWORD_CHANGE_PERIOD: z.coerce.number().int().min(0).default(6),
   APPLICATION_IS_LOGOUT_AFTER_PASSWORD_RESET: z

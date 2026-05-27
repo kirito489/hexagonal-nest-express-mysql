@@ -1,5 +1,4 @@
 import { Request } from 'express';
-import { MemberContext } from '../decorator/current-member.decorator';
 import { sanitize, sanitizeUrl } from '../../../../infrastructure/sanitize';
 import { SystemLogData } from '../../../../application/port/out/shared/SaveSystemLogPort';
 
@@ -17,7 +16,7 @@ export function buildSystemLogData(
 ): SystemLogData {
   const { method, ip } = request;
   const url = sanitizeUrl(request.url);
-  const member = (request as Request & { member?: MemberContext }).member;
+  const member = request.member;
 
   return {
     memberId: member?.sub,

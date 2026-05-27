@@ -40,6 +40,21 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 - **PATCH/PUT 預設回傳 200，要 204 需明確加 `@HttpCode(HttpStatus.NO_CONTENT)`**：只有 POST 預設 201，其他方法預設皆 200。
 
+- **Express 5 的 Request augmentation 要用 `declare global { namespace Express }`，不要用 `declare module 'express-serve-static-core'`**：Express 5 的 `@types/express-serve-static-core` 把 `Request` 宣告在 `declare global { namespace Express { interface Request {} } }` 之內，不是 module export，所以擴自定欄位（如 `JwtAuthGuard` 掛上的 `member: MemberContext`）要走 global namespace augmentation：
+
+  ```ts
+  declare global {
+    namespace Express {
+      interface Request {
+        member?: MemberContext;
+      }
+    }
+  }
+  export {};
+  ```
+
+  寫 `declare module 'express-serve-static-core' { interface Request { ... } }` 會 **silent fail**：typecheck 過、但 augmentation 完全不生效，呼叫端 `request.member` 仍報 `TS2339: Property 'member' does not exist on type 'Request'`。**Why:** 2026-05-28 整頓 TypeScript 風格、把 4 處 `as Request & { member: MemberContext }` 換成 augmentation，首版用 `declare module` typecheck 立刻爆炸。**How to apply:** 在 `apps/api/src/types/*-augment.d.ts` 用 global namespace 形式擴 Request；檔案結尾加 `export {}` 讓 TS 視為 module（避免污染全域，但允許 import MemberContext 型別）。tsconfig 的 `include: ["src/**/*"]` 會自動載入，不需另外 reference。
+
 ## Domain Exception / GlobalExceptionFilter
 
 - **新增 domain exception 後，GlobalExceptionFilter 必須同步加 `instanceof` 分支**：否則 fallback 到 500。每個 domain exception 對應：(1) `src/domain/exception/` 檔案；(2) Filter 有 instanceof 判斷 + 正確 HttpStatus + `code`（SCREAMING_SNAKE_CASE）。

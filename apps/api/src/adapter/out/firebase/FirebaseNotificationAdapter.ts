@@ -59,8 +59,10 @@ export class FirebaseNotificationAdapter
       return { success: true, result };
     } catch (error) {
       const code =
-        error instanceof Error && 'code' in error
-          ? (error as Error & { code: string }).code
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
           : undefined;
       const isExpired =
         code === 'messaging/invalid-registration-token' ||

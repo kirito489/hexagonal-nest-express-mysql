@@ -7,7 +7,10 @@ import { getEnv } from '../../../infrastructure/validate-env';
 import { RoleCode } from '../../../domain/value-object/Role';
 
 // 高複雜度密碼策略適用的 roleCode 清單
-const HIGH_COMPLEXITY_ROLE_CODES = new Set<RoleCode>([RoleCode.SUPERADMIN]);
+// 用 ReadonlySet<string> 允許未驗證過的 roleCode 字串直接查詢，避免呼叫端再 `as RoleCode`
+const HIGH_COMPLEXITY_ROLE_CODES: ReadonlySet<string> = new Set([
+  RoleCode.SUPERADMIN,
+]);
 
 /**
  * 密碼策略服務：依 roleCode 套用對應複雜度
@@ -28,13 +31,11 @@ export class PasswordPolicyService implements OnModuleInit {
     };
     this.systemAdminPolicy = new PasswordPolicy({
       ...this.baseConfig,
-      complexityLevel:
-        env.APPLICATION_SYSTEM_ADMIN_PASSWORD_COMPLEXITY as PasswordPolicyConfig['complexityLevel'],
+      complexityLevel: env.APPLICATION_SYSTEM_ADMIN_PASSWORD_COMPLEXITY,
     });
     this.otherAdminPolicy = new PasswordPolicy({
       ...this.baseConfig,
-      complexityLevel:
-        env.APPLICATION_OTHER_ADMIN_PASSWORD_COMPLEXITY as PasswordPolicyConfig['complexityLevel'],
+      complexityLevel: env.APPLICATION_OTHER_ADMIN_PASSWORD_COMPLEXITY,
     });
   }
 
@@ -45,7 +46,7 @@ export class PasswordPolicyService implements OnModuleInit {
    */
   validateOrThrow(password: string, roleCode?: RoleCode | string | null): void {
     const policy =
-      roleCode && HIGH_COMPLEXITY_ROLE_CODES.has(roleCode as RoleCode)
+      roleCode && HIGH_COMPLEXITY_ROLE_CODES.has(roleCode)
         ? this.systemAdminPolicy
         : this.otherAdminPolicy;
     const result = policy.validate(password);

@@ -84,7 +84,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       const parsed = MemberContextSchema.safeParse(JSON.parse(cached));
       if (parsed.success) {
         if (!parsed.data.status) throw new AccountDisabledException();
-        (request as Request & { member: MemberContext }).member = parsed.data;
+        request.member = parsed.data;
         this.checkPasswordExpiry(parsed.data);
         return true;
       }
@@ -118,7 +118,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
         : null,
     };
 
-    (request as Request & { member: MemberContext }).member = memberContext;
+    request.member = memberContext;
 
     const now = Math.floor(Date.now() / 1000);
     const jwtTtl = payload.exp ? payload.exp - now : this.jwtExpiresIn;

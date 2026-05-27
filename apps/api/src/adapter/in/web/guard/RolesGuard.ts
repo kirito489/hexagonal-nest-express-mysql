@@ -9,7 +9,6 @@ import { Request } from 'express';
 import { RoleCode } from '../../../../domain/value-object/Role';
 import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
 import { ROLES_KEY } from '../decorator/roles.decorator';
-import { MemberContext } from '../decorator/current-member.decorator';
 
 /**
  * 角色守衛：必須搭配 JwtAuthGuard 一起使用（JwtAuthGuard 先跑）。
@@ -35,12 +34,12 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context
-      .switchToHttp()
-      .getRequest<Request & { member: MemberContext }>();
+    const request = context.switchToHttp().getRequest<Request>();
+    const userRoleCode = request.member?.roleCode;
 
-    // 用 roleCode（如 SUPERADMIN）比對，不要用 roleName（顯示名「管理者」）
-    if (!requiredRoles.includes(request.member?.roleCode as RoleCode)) {
+    // 用 roleCode（如 SUPERADMIN）比對，不要用 roleName（顯示名「管理者」）；
+    // .some 而非 .includes 避免把 string 強轉成 RoleCode
+    if (!userRoleCode || !requiredRoles.some((r) => r === userRoleCode)) {
       throw new ForbiddenException('權限不足');
     }
 
