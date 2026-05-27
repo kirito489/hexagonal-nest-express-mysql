@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { getEnv } from '../../infrastructure/validate-env';
+import { getEnv } from '../../../infrastructure/validate-env';
 
 export type FeatureFlagName =
   | 'adminRoleEnabled'

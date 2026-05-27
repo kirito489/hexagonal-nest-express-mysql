@@ -29,8 +29,8 @@ import {
   SAVE_AUTH_LOG_PORT,
   SaveAuthLogPort,
 } from '../../port/out/auth/SaveAuthLogPort';
-import { PasswordPolicyService } from '../PasswordPolicyService';
-import { FeatureFlagService } from '../FeatureFlagService';
+import { PasswordPolicyService } from '../shared/PasswordPolicyService';
+import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { getEnv } from '../../../infrastructure/validate-env';
 
 /**

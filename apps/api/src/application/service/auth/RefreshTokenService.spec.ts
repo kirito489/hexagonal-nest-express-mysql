@@ -3,7 +3,7 @@ import { RefreshTokenService } from './RefreshTokenService';
 import { TokenBlacklistPort } from '../../port/out/auth/TokenBlacklistPort';
 import { LoadMemberContextPort } from '../../port/out/member/LoadMemberContextPort';
 import { SaveAuthLogPort } from '../../port/out/auth/SaveAuthLogPort';
-import { FeatureFlagService } from '../FeatureFlagService';
+import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { InvalidRefreshTokenException } from '../../../domain/exception/InvalidRefreshTokenException';
 import { AccountDisabledException } from '../../../domain/exception/AccountDisabledException';
 

@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { FeatureFlagService } from '../application/service/FeatureFlagService';
+import { FeatureFlagService } from '../application/service/shared/FeatureFlagService';
 
 /**
  * @Global() — FeatureFlagService 全域可用，

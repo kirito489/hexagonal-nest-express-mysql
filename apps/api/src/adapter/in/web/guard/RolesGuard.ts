@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { RoleCode } from '../../../../domain/value-object/Role';
-import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
+import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
 import { ROLES_KEY } from '../decorator/roles.decorator';
 import { MemberContext } from '../decorator/current-member.decorator';
 

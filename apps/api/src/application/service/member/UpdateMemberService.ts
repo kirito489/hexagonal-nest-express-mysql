@@ -18,7 +18,7 @@ import {
   CLEAR_MEMBER_CONTEXT_PORT,
   ClearMemberContextPort,
 } from '../../port/out/member/ClearMemberContextPort';
-import { PasswordPolicyService } from '../PasswordPolicyService';
+import { PasswordPolicyService } from '../shared/PasswordPolicyService';
 import { Email } from '../../../domain/value-object/Email';
 import { MemberNotFoundException } from '../../../domain/exception/MemberNotFoundException';
 import { EmailAlreadyExistsException } from '../../../domain/exception/EmailAlreadyExistsException';

@@ -15,7 +15,7 @@ import {
   SaveMemberPort,
 } from '../../port/out/member/SaveMemberPort';
 import { LOAD_ROLE_PORT, LoadRolePort } from '../../port/out/role/LoadRolePort';
-import { PasswordPolicyService } from '../PasswordPolicyService';
+import { PasswordPolicyService } from '../shared/PasswordPolicyService';
 import { Member } from '../../../domain/model/Member';
 import { Email } from '../../../domain/value-object/Email';
 import { EmailAlreadyExistsException } from '../../../domain/exception/EmailAlreadyExistsException';

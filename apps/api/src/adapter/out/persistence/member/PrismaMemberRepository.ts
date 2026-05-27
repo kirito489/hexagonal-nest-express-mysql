@@ -16,6 +16,7 @@ import {
 } from '../../../../application/port/out/member/LoadMemberContextPort';
 import { Member } from '../../../../domain/model/Member';
 import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
+import { MemberMapper } from './mapper/MemberMapper';
 
 @Injectable()
 export class PrismaMemberRepository
@@ -32,18 +33,7 @@ export class PrismaMemberRepository
       where: { email, deletedAt: null },
       include: { role: { select: { name: true } } },
     });
-    if (!r) return null;
-    return Member.reconstitute(
-      r.id,
-      r.email,
-      r.member,
-      r.password,
-      r.roleId,
-      r.status,
-      r.isDefault,
-      r.createdAt,
-      r.role.name,
-    );
+    return r ? MemberMapper.toDomainWithRoleName(r) : null;
   }
 
   async loadMemberById(id: string): Promise<MemberRecordDto | null> {
@@ -52,36 +42,14 @@ export class PrismaMemberRepository
       where: { id, deletedAt: null },
       include: { role: { select: { id: true, name: true } } },
     });
-    if (!r) return null;
-    return {
-      id: r.id,
-      email: r.email,
-      member: r.member,
-      roleId: r.roleId,
-      roleName: r.role.name,
-      status: r.status,
-      isDefault: r.isDefault,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      lastLoginAt: r.lastLoginAt,
-    };
+    return r ? MemberMapper.toRecordDto(r) : null;
   }
 
   async loadMemberDomainById(id: string): Promise<Member | null> {
     const r = await this.prisma.memberRecord.findUnique({
       where: { id, deletedAt: null },
     });
-    if (!r) return null;
-    return Member.reconstitute(
-      r.id,
-      r.email,
-      r.member,
-      r.password,
-      r.roleId,
-      r.status,
-      r.isDefault,
-      r.createdAt,
-    );
+    return r ? MemberMapper.toDomain(r) : null;
   }
 
   async listMembers(params: ListMembersParams): Promise<ListMembersPage> {
@@ -102,18 +70,7 @@ export class PrismaMemberRepository
     ]);
 
     return {
-      data: rows.map((r) => ({
-        id: r.id,
-        email: r.email,
-        member: r.member,
-        roleId: r.roleId,
-        roleName: r.role.name,
-        status: r.status,
-        isDefault: r.isDefault,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-        lastLoginAt: r.lastLoginAt,
-      })),
+      data: rows.map((r) => MemberMapper.toRecordDto(r)),
       total,
     };
   }
@@ -262,17 +219,6 @@ export class PrismaMemberRepository
         },
       },
     });
-    if (!member) return null;
-    return {
-      id: member.id,
-      email: member.email,
-      roleName: member.role.name,
-      roleCode: member.role.roleCode ?? '',
-      permissions: member.role.permissions.map(
-        (rp) => rp.permission.permissionCode,
-      ),
-      status: member.status,
-      lastPasswordChange: member.lastPasswordChange,
-    };
+    return member ? MemberMapper.toContextData(member) : null;
   }
 }

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './JwtAuthGuard';
-import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
+import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
 import { TokenBlacklistPort } from '../../../../application/port/out/auth/TokenBlacklistPort';
 import { MemberContextCachePort } from '../../../../application/port/out/member/MemberContextCachePort';
 import { LoadMemberContextPort } from '../../../../application/port/out/member/LoadMemberContextPort';

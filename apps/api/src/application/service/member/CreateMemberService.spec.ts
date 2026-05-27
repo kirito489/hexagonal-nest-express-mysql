@@ -3,7 +3,7 @@ import { CreateMemberService } from './CreateMemberService';
 import { LoadMemberPort } from '../../port/out/member/LoadMemberPort';
 import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
 import { LoadRolePort } from '../../port/out/role/LoadRolePort';
-import { PasswordPolicyService } from '../PasswordPolicyService';
+import { PasswordPolicyService } from '../shared/PasswordPolicyService';
 import { EmailAlreadyExistsException } from '../../../domain/exception/EmailAlreadyExistsException';
 import { RoleNotFoundException } from '../../../domain/exception/RoleNotFoundException';
 

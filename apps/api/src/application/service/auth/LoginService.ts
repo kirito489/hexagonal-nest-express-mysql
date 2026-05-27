@@ -42,7 +42,7 @@ import {
   SESSION_ACTIVITY_PORT,
   SessionActivityPort,
 } from '../../port/out/auth/SessionActivityPort';
-import { FeatureFlagService } from '../FeatureFlagService';
+import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { JwtPayload } from '../../port/jwt-payload';
 import { getEnv } from '../../../infrastructure/validate-env';
 

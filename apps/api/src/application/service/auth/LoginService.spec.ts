@@ -2,7 +2,7 @@ import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginService } from './LoginService';
-import { FeatureFlagService } from '../FeatureFlagService';
+import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { LoadMemberPort } from '../../port/out/member/LoadMemberPort';
 import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
 import { SaveAuthLogPort } from '../../port/out/auth/SaveAuthLogPort';

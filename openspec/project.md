@@ -108,7 +108,7 @@ apps/api/src/
 
 ### 後端慣例
 
-- **Module naming**：Controller + DTO → `adapter/in/web/<module>/`；Prisma repository → `adapter/out/persistence/<module>/`；service → `application/service/<module>/`。Guard / Filter / Decorator 等共用 infrastructure 放各自頂層目錄。
+- **Module naming**：Controller + DTO → `adapter/in/web/<module>/`；Prisma repository → `adapter/out/persistence/<module>/`；service → `application/service/<module>/`（跨模組共用 service 放 `application/service/shared/`）。Guard / Filter / Decorator 等共用 infrastructure 放各自頂層目錄。
 - **Facade**：每個 domain area 對外只暴露 `*Facade`（如 `AuthFacade`、`MemberFacade`），Controller 透過 facade 操作，不直接打 service。
 - **Domain exception → HTTP**：domain exception 是 plain `Error` 子類；HTTP 狀態映射在 `src/adapter/in/web/filter/GlobalExceptionFilter.ts`，新增 exception 必須同步加 `instanceof` 分支與 `code`（SCREAMING_SNAKE_CASE）。
 - **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。

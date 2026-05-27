@@ -24,7 +24,7 @@ import { TransformInterceptor } from './adapter/in/web/interceptor/TransformInte
 import { IpBlacklistGuard } from './adapter/in/web/guard/IpBlacklistGuard';
 import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
-import { HealthController } from './adapter/in/web/HealthController';
+import { HealthController } from './adapter/in/web/health/HealthController';
 import { getEnv } from './infrastructure/validate-env';
 
 @Module({

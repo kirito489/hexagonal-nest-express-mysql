@@ -2,9 +2,9 @@ import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import {
   PasswordPolicy,
   PasswordPolicyConfig,
-} from '../../domain/value-object/PasswordPolicy';
-import { getEnv } from '../../infrastructure/validate-env';
-import { RoleCode } from '../../domain/value-object/Role';
+} from '../../../domain/value-object/PasswordPolicy';
+import { getEnv } from '../../../infrastructure/validate-env';
+import { RoleCode } from '../../../domain/value-object/Role';
 
 // 高複雜度密碼策略適用的 roleCode 清單
 const HIGH_COMPLEXITY_ROLE_CODES = new Set<RoleCode>([RoleCode.SUPERADMIN]);

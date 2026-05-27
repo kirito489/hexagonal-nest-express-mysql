@@ -1,6 +1,6 @@
 import { FeatureFlagService } from './FeatureFlagService';
 
-jest.mock('../../infrastructure/validate-env', () => ({
+jest.mock('../../../infrastructure/validate-env', () => ({
   getEnv: () => ({
     APPLICATION_ADMIN_ROLE_ENABLED: true,
     APPLICATION_AUTH_LOG_ENABLED: false,

@@ -6,7 +6,7 @@ import { LogoutService } from '../application/service/auth/LogoutService';
 import { ForgotPasswordService } from '../application/service/auth/ForgotPasswordService';
 import { ResetPasswordService } from '../application/service/auth/ResetPasswordService';
 import { RefreshTokenService } from '../application/service/auth/RefreshTokenService';
-import { PasswordPolicyService } from '../application/service/PasswordPolicyService';
+import { PasswordPolicyService } from '../application/service/shared/PasswordPolicyService';
 import { PrismaPasswordResetTokenRepository } from '../adapter/out/persistence/auth/PrismaPasswordResetTokenRepository';
 import { LOGIN_USE_CASE } from '../application/port/in/auth/LoginUseCase';
 import { LOGOUT_USE_CASE } from '../application/port/in/auth/LogoutUseCase';

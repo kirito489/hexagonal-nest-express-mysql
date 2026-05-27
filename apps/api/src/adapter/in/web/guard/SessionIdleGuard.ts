@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
+import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
 import {
   SESSION_ACTIVITY_PORT,
   SessionActivityPort,

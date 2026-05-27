@@ -12,7 +12,7 @@ import { UpdateMemberService } from '../application/service/member/UpdateMemberS
 import { DeleteMemberService } from '../application/service/member/DeleteMemberService';
 import { ListRoleOptionsService } from '../application/service/member/ListRoleOptionsService';
 import { GetRoleOptionService } from '../application/service/member/GetRoleOptionService';
-import { PasswordPolicyService } from '../application/service/PasswordPolicyService';
+import { PasswordPolicyService } from '../application/service/shared/PasswordPolicyService';
 import { PrismaMemberRepository } from '../adapter/out/persistence/member/PrismaMemberRepository';
 import { LIST_MEMBERS_USE_CASE } from '../application/port/in/member/ListMembersUseCase';
 import { GET_MEMBER_USE_CASE } from '../application/port/in/member/GetMemberUseCase';

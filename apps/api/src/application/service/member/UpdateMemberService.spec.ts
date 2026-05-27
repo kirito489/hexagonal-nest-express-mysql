@@ -4,7 +4,7 @@ import { LoadMemberPort } from '../../port/out/member/LoadMemberPort';
 import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
 import { LoadRolePort } from '../../port/out/role/LoadRolePort';
 import { ClearMemberContextPort } from '../../port/out/member/ClearMemberContextPort';
-import { PasswordPolicyService } from '../PasswordPolicyService';
+import { PasswordPolicyService } from '../shared/PasswordPolicyService';
 import { Member } from '../../../domain/model/Member';
 import { CannotDisableSelfException } from '../../../domain/exception/CannotDisableSelfException';
 import { DefaultMemberNotEditableException } from '../../../domain/exception/DefaultMemberNotEditableException';

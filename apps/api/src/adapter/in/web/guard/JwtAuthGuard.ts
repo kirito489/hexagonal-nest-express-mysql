@@ -21,7 +21,7 @@ import {
   MEMBER_CONTEXT_CACHE_PORT,
   MemberContextCachePort,
 } from '../../../../application/port/out/member/MemberContextCachePort';
-import { FeatureFlagService } from '../../../../application/service/FeatureFlagService';
+import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
 import { JwtPayload } from '../../../../application/port/jwt-payload';
 import { getEnv } from '../../../../infrastructure/validate-env';
 import {

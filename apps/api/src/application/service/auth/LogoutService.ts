@@ -13,7 +13,7 @@ import {
   SAVE_AUTH_LOG_PORT,
   SaveAuthLogPort,
 } from '../../port/out/auth/SaveAuthLogPort';
-import { FeatureFlagService } from '../FeatureFlagService';
+import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { JwtPayload } from '../../port/jwt-payload';
 import { getEnv } from '../../../infrastructure/validate-env';
 

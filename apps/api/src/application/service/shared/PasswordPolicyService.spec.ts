@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { PasswordPolicyService } from './PasswordPolicyService';
-import { RoleCode } from '../../domain/value-object/Role';
+import { RoleCode } from '../../../domain/value-object/Role';
 
-jest.mock('../../infrastructure/validate-env', () => ({
+jest.mock('../../../infrastructure/validate-env', () => ({
   getEnv: () => ({
     APPLICATION_PASSWORD_MIN_LENGTH: 8,
     APPLICATION_PASSWORD_MAX_LENGTH: 32,
