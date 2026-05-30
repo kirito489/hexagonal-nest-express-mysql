@@ -42,6 +42,9 @@ export interface ApiErrorResponse {
   timestamp: string;
 }
 
+// 未預期 fallback 500 的 error code：resolveError 產生與 Sentry 上報判斷共用，避免字面值散落
+const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
+
 // Domain exception → { HTTP status, error code } 映射表
 // 新增 domain exception 時只需在此加一筆，不用再追長串 if/else if
 type DomainExceptionCtor = new (...args: never[]) => Error;
@@ -153,7 +156,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // 僅上報未預期的 fallback 500；domain exception 與 HttpException 為可預期錯誤，不上報以免噪音。
     // Sentry 未啟用時 captureException 為 no-op。
-    if (code === 'INTERNAL_SERVER_ERROR') {
+    if (code === INTERNAL_SERVER_ERROR_CODE) {
       Sentry.captureException(exception);
     }
 
@@ -220,7 +223,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: INTERNAL_SERVER_ERROR_CODE,
     };
   }
 }
