@@ -49,6 +49,7 @@ class BootFilteredLogger implements LoggerService {
   }
 }
 
+import helmet from 'helmet';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import cookieParser = require('cookie-parser');
 import * as swaggerUi from 'swagger-ui-express';
@@ -80,6 +81,11 @@ const bootstrap = async (): Promise<void> => {
     new ExpressAdapter(),
     { bufferLogs: true },
   );
+
+  // 設定 HTTP 安全標頭（X-Frame-Options、HSTS、X-Content-Type-Options 等）。
+  // 關閉 CSP：本服務為純 API + 獨立前端，且 /api/docs 的 Swagger UI 依賴 inline
+  // script/style，預設 CSP 會將其擋下；其餘標頭維持預設保護。
+  app.use(helmet({ contentSecurityPolicy: false }));
 
   app.use(cookieParser(env.COOKIE_SECRET));
 
