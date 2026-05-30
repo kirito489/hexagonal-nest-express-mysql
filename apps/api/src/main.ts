@@ -84,6 +84,21 @@ const bootstrap = async (): Promise<void> => {
     { bufferLogs: true },
   );
 
+  // trust proxy：決定 request.ip 是否採信 X-Forwarded-For。IP 黑白名單與登入失敗封鎖
+  // 都依賴 request.ip，設定不當會導致黑名單失效或白名單誤判。字串 env 轉成 Express 接受的型別：
+  // 'true'/'false' → boolean、純數字 → 信任跳數、其餘（如 'loopback' / CIDR）→ 原字串。
+  const trustProxy = env.TRUST_PROXY;
+  app.set(
+    'trust proxy',
+    trustProxy === 'true'
+      ? true
+      : trustProxy === 'false'
+        ? false
+        : /^\d+$/.test(trustProxy)
+          ? Number(trustProxy)
+          : trustProxy,
+  );
+
   // 設定 HTTP 安全標頭（X-Frame-Options、HSTS、X-Content-Type-Options 等）。
   // 關閉 CSP：本服務為純 API + 獨立前端，且 /api/docs 的 Swagger UI 依賴 inline
   // script/style，預設 CSP 會將其擋下；其餘標頭維持預設保護。

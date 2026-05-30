@@ -29,7 +29,13 @@ export class IpBlacklistGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const ip = request.ip;
 
-    if (ip && (await this.ipList.isBlacklisted(ip))) {
+    // 封鎖類控制採 fail-closed：取不到可信來源 IP 時直接拒絕，
+    // 避免在 trust proxy 設定不當或 socket 異常時靜默放行（與白名單方向一致）。
+    if (!ip) {
+      throw new ForbiddenException('無法判定來源 IP，請求遭拒');
+    }
+
+    if (await this.ipList.isBlacklisted(ip)) {
       throw new ForbiddenException('IP 位址已被封鎖');
     }
 

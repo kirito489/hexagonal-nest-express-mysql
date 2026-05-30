@@ -27,10 +27,10 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
     const key = buildFailedLoginKey(this.redis.keyPrefix, email);
     const count = await this.redis.increment(key, this.COUNTER_TTL);
 
-    // 同步更新 DB 的 failedLoginCount
+    // 同步更新 DB 的 failedLoginCount（排除軟刪記錄，避免打到同 email 的舊帳號）
     await this.prisma.memberRecord
       .updateMany({
-        where: { email },
+        where: { email, deletedAt: null },
         data: { failedLoginCount: count },
       })
       .catch(() => {
@@ -46,7 +46,7 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
 
     await this.prisma.memberRecord
       .updateMany({
-        where: { email },
+        where: { email, deletedAt: null },
         data: { failedLoginCount: 0, lockedAt: null },
       })
       .catch(() => {
@@ -55,8 +55,9 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
   }
 
   async isLocked(email: string): Promise<boolean> {
-    const record = await this.prisma.memberRecord.findUnique({
-      where: { email },
+    // 軟刪 model 的 read path 一律加 deletedAt: null（findUnique 不支援非唯一條件 → 改 findFirst）
+    const record = await this.prisma.memberRecord.findFirst({
+      where: { email, deletedAt: null },
       select: { lockedAt: true },
     });
     return record?.lockedAt !== null && record?.lockedAt !== undefined;
@@ -64,7 +65,7 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
 
   async lockAccount(email: string): Promise<void> {
     await this.prisma.memberRecord.updateMany({
-      where: { email },
+      where: { email, deletedAt: null },
       data: { lockedAt: new Date() },
     });
   }
@@ -74,7 +75,7 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
     await this.redis.del(key);
 
     await this.prisma.memberRecord.updateMany({
-      where: { email },
+      where: { email, deletedAt: null },
       data: { failedLoginCount: 0, lockedAt: null },
     });
   }

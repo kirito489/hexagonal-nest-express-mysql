@@ -34,18 +34,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return delay;
     };
 
+    // connectTimeout 避免初次連線無限等待；pingInterval 定期送 PING 偵測 half-open
+    // （socket 開著卻無回應）連線並觸發 reconnect，降低指令卡死的風險。
+    const CONNECT_TIMEOUT_MS = 5000;
+    const PING_INTERVAL_MS = 30000;
+
     // 優先使用 REDIS_URL（適用 Redis Cloud、Heroku Redis 等雲端服務）
     this.client = (
       env.REDIS_URL
-        ? createClient({ url: env.REDIS_URL, socket: { reconnectStrategy } })
+        ? createClient({
+            url: env.REDIS_URL,
+            socket: { reconnectStrategy, connectTimeout: CONNECT_TIMEOUT_MS },
+            pingInterval: PING_INTERVAL_MS,
+          })
         : createClient({
             socket: {
               host: env.REDIS_HOST,
               port: env.REDIS_PORT,
               reconnectStrategy,
+              connectTimeout: CONNECT_TIMEOUT_MS,
             },
             password: env.REDIS_PASSWORD,
             database: env.REDIS_DB,
+            pingInterval: PING_INTERVAL_MS,
           })
     ) as RedisClientType;
 

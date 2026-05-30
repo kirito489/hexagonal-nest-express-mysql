@@ -49,12 +49,14 @@ export class GoogleRecaptchaAdapter
       });
       if (ip) params.append('remoteip', ip);
 
+      // 加 5 秒逾時：Google siteverify 卡住時不應拖住整個登入請求
       const res = await fetch(
         'https://www.google.com/recaptcha/api/siteverify',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: params.toString(),
+          signal: AbortSignal.timeout(5000),
         },
       );
 

@@ -65,7 +65,7 @@ apiClient.use({
       return response
     }
 
-    // refresh 成功 → 用新 token 重發原請求
+    // refresh 成功 → 用新 token 重發原請求（此重發刻意走裸 fetch，不再經過 middleware）
     const retried = await fetch(request.url, {
       method: request.method,
       headers: {
@@ -78,6 +78,10 @@ apiClient.use({
           : undefined,
       credentials: request.credentials,
     })
+    // 重發仍 401（例如 refresh 後 token 又被撤銷）→ middleware 不會再次攔截，需手動導向登入
+    if (retried.status === 401) {
+      redirectToLogin()
+    }
     return retried
   },
 })

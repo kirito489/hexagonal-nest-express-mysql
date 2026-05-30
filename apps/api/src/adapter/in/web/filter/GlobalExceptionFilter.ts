@@ -34,6 +34,7 @@ import { InvalidPermissionCombinationException } from '../../../../domain/except
 import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
 import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+import { DefaultRoleNotFoundException } from '../../../../domain/exception/DefaultRoleNotFoundException';
 
 export interface ApiErrorResponse {
   success: false;
@@ -127,6 +128,14 @@ const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
   [
     IpListNotFoundException,
     { status: HttpStatus.NOT_FOUND, code: 'IP_LIST_NOT_FOUND' },
+  ],
+  [
+    // 系統缺預設角色屬伺服器組態問題（seed 未跑），回 500 但給明確 code，不外洩 Prisma 細節
+    DefaultRoleNotFoundException,
+    {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      code: 'DEFAULT_ROLE_NOT_FOUND',
+    },
   ],
 ];
 

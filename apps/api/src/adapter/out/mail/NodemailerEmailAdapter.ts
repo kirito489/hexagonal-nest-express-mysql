@@ -28,6 +28,10 @@ export class NodemailerEmailAdapter implements SendEmailPort, OnModuleInit {
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
       auth: { user, pass },
+      // 逾時設定：SMTP 伺服器無回應時不應無限等待而拖住呼叫端
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
 
     this.logger.debug('[Email] Nodemailer 初始化完成');

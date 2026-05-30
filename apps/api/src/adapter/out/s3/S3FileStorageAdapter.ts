@@ -45,6 +45,7 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
   async upload(options: UploadFileOptions): Promise<string> {
     const { client, bucket } = this.requireReady();
 
+    // abortSignal 逾時：S3 無回應時中止請求，避免拖住連線池
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -52,6 +53,7 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
         Body: options.buffer,
         ContentType: options.mimeType,
       }),
+      { abortSignal: AbortSignal.timeout(15000) },
     );
 
     return `${this.publicUrl}/${options.key}`;
@@ -70,7 +72,9 @@ export class S3FileStorageAdapter implements FileStoragePort, OnModuleInit {
   async delete(key: string): Promise<void> {
     const { client, bucket } = this.requireReady();
 
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }), {
+      abortSignal: AbortSignal.timeout(10000),
+    });
   }
 
   /**

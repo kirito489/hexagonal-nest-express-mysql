@@ -24,6 +24,9 @@ const envSchema = z.object({
   REFRESH_SECRET: z.string().min(32),
   //預設 7 天
   REFRESH_TOKEN_EXPIRES_IN: z.coerce.number().default(604800),
+  // JWT issuer/audience：簽發與驗證一致，避免 token 被共用同 secret 的其他服務重放
+  JWT_ISSUER: z.string().default('hexagonal-api'),
+  JWT_AUDIENCE: z.string().default('hexagonal-web'),
   SESSION_SECRET: z
     .string()
     .min(32)
@@ -84,6 +87,12 @@ const envSchema = z.object({
   // ─── 速率限制 ───
   COMMON_RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   COMMON_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
+
+  // ─── 反向代理 ───
+  // Express trust proxy：決定 request.ip 是否採信 X-Forwarded-For。
+  // 預設 'loopback'（只信任本機、不採信外部 XFF）= 安全；部署在 LB/反向代理後面時，
+  // 依拓樸改為信任跳數（如 '1'）或具體 proxy CIDR，切勿用 'true'（會無條件採信偽造 XFF）。
+  TRUST_PROXY: z.string().default('loopback'),
 
   // ─── 功能開關（Feature Flags） ───
   APPLICATION_ADMIN_ROLE_ENABLED: z

@@ -39,7 +39,8 @@ export class ForgotPasswordService implements ForgotPasswordUseCase {
 
     // 即使帳號不存在也不回報，防止帳號列舉攻擊
     if (!member) {
-      this.logger.debug(`忘記密碼：email ${command.email} 不存在，靜默略過`);
+      // 不記錄 email 本身，避免 log 累積「哪些信箱未註冊」的列舉資訊
+      this.logger.debug('忘記密碼：查無此帳號，靜默略過');
       return;
     }
 

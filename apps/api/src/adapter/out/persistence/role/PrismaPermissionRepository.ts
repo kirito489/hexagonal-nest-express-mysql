@@ -25,24 +25,27 @@ export class PrismaPermissionRepository implements PermissionRepositoryPort {
   }
 
   async getPermissionsByRoleId(roleId: string): Promise<string[]> {
+    // 授權熱路徑：只取 permissionCode，不用 include 撈整列 permission
     const rolePerms = await this.prisma.rolePermission.findMany({
       where: { roleId },
-      include: { permission: true },
+      select: { permission: { select: { permissionCode: true } } },
     });
     return rolePerms.map((rp) => rp.permission.permissionCode);
   }
 
   async replacePermissions(roleId: string, codes: string[]): Promise<void> {
-    const permissions = await this.prisma.permission.findMany({
-      where: { permissionCode: { in: codes } },
-      select: { id: true },
-    });
-    await this.prisma.$transaction([
-      this.prisma.rolePermission.deleteMany({ where: { roleId } }),
-      this.prisma.rolePermission.createMany({
+    // 用 interactive transaction 把「查 permission id」一併納入交易，
+    // 避免先查後寫的競態（並發改同一 role 權限時讀到交易外的舊快照）
+    await this.prisma.$transaction(async (tx) => {
+      const permissions = await tx.permission.findMany({
+        where: { permissionCode: { in: codes } },
+        select: { id: true },
+      });
+      await tx.rolePermission.deleteMany({ where: { roleId } });
+      await tx.rolePermission.createMany({
         data: permissions.map((p) => ({ roleId, permissionId: p.id })),
-      }),
-    ]);
+      });
+    });
   }
 
   private toRecord(p: {

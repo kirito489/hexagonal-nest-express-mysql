@@ -14,6 +14,11 @@ import { ROLES_KEY } from '../decorator/roles.decorator';
  * 角色守衛：必須搭配 JwtAuthGuard 一起使用（JwtAuthGuard 先跑）。
  *
  * 當 APPLICATION_ADMIN_ROLE_ENABLED 關閉時，一律放行（跳過角色檢查）。
+ *
+ * ⚠️ 爆炸半徑：此 flag 關閉時，所有 @Roles() 端點（如 SecurityController 的 IP 黑白名單、
+ * 帳號解鎖）對「任何已登入者」開放。生產環境由 validate-env 強制 adminRoleEnabled=true
+ * 並在關閉時 process.exit(1) 守住；但本機 / dev 關閉時 security 模組形同不設防，請勿在
+ * 共用環境關閉此 flag。
  */
 @Injectable()
 export class RolesGuard implements CanActivate {

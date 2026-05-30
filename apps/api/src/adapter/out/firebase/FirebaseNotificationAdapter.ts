@@ -50,11 +50,18 @@ export class FirebaseNotificationAdapter
     }
 
     try {
-      const result = await this.app.messaging().send({
+      // FCM SDK 不支援 AbortSignal，以 Promise.race 加 10 秒逾時上限，避免無限等待
+      const sendPromise = this.app.messaging().send({
         token: fcmToken,
         notification: { title: payload.title, body: payload.body },
         data: payload.data ?? {},
       });
+      const result = await Promise.race([
+        sendPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('FCM 推播逾時')), 10000),
+        ),
+      ]);
 
       return { success: true, result };
     } catch (error) {

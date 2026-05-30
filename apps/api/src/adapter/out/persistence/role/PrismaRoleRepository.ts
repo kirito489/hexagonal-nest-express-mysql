@@ -15,6 +15,7 @@ import {
   RoleRepositoryPort,
 } from '../../../../application/port/out/role/RoleRepositoryPort';
 import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
+import { DefaultRoleNotFoundException } from '../../../../domain/exception/DefaultRoleNotFoundException';
 import { RoleCode } from '../../../../domain/value-object/Role';
 
 /**
@@ -42,9 +43,14 @@ export class PrismaRoleRepository implements LoadRolePort, RoleRepositoryPort {
   // ── LoadRolePort ──────────────────────────────
 
   async findDefaultRoleId(): Promise<string> {
-    const role = await this.prisma.role.findFirstOrThrow({
+    // 不用 findFirstOrThrow，避免 Prisma P2025 外洩到 service；轉成明確 domain exception
+    const role = await this.prisma.role.findFirst({
       where: { isDefault: true, status: true, deletedAt: null },
+      select: { id: true },
     });
+    if (!role) {
+      throw new DefaultRoleNotFoundException();
+    }
     return role.id;
   }
 

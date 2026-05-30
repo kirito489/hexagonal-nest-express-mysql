@@ -27,6 +27,7 @@ import {
   MemberContext,
 } from '../decorator/current-member.decorator';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 
 @Controller('auth')
@@ -69,7 +70,9 @@ export class AuthController {
     @Body(new ZodValidationPipe(logoutSchema)) dto: LogoutRequest,
     @CurrentMember() actor: MemberContext,
   ): Promise<void> {
-    const accessToken = req.headers.authorization?.slice(7) ?? '';
+    // 與 JwtAuthGuard.extractToken 一致：確認 Bearer 前綴再取 token
+    const auth = req.headers.authorization;
+    const accessToken = auth?.startsWith('Bearer ') ? auth.slice(7) : '';
     await this.authFacade.logout({
       accessToken,
       refreshToken: dto.refreshToken,
@@ -79,26 +82,29 @@ export class AuthController {
     });
   }
 
+  // 嚴格節流：防帳號列舉與 SMTP 轟炸（每來源每分鐘 3 次）。
+  // 同時壓低「存在 vs 不存在」回應時間差可被利用的次數。
   @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   async forgotPassword(
     @Body(new ZodValidationPipe(forgotPasswordSchema))
     dto: ForgotPasswordRequest,
-  ): Promise<{ message: string }> {
+  ): Promise<void> {
+    // 不論信箱是否存在皆回 204（防列舉），訊息文案由前端固定呈現
     await this.authFacade.forgotPassword({ email: dto.email });
-    return { message: '若此信箱已註冊，您將收到密碼重設信件' };
   }
 
   @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   async resetPassword(
     @Body(new ZodValidationPipe(resetPasswordSchema))
     dto: ResetPasswordRequest,
-  ): Promise<{ message: string }> {
+  ): Promise<void> {
     await this.authFacade.resetPassword({
       token: dto.token,
       newPassword: dto.newPassword,
     });
-    return { message: '密碼已成功重設' };
   }
 }

@@ -442,14 +442,16 @@ describe('Security E2E', () => {
 
   describe('POST /api/security/unlock-account', () => {
     it('Admin 解鎖鎖定帳號 → 204', async () => {
-      // loadMemberByEmail：找到 member
+      // loadMemberByEmail（findUnique）：找到 member
       mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
         ...ADMIN_RECORD,
         email: 'locked@test.com',
         lockedAt: new Date(),
       });
-      // isLocked：lockedAt != null
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
+      // isLocked 改用 findFirst（軟刪過濾）：回傳已鎖定狀態（guard 與 isLocked 共用）
+      mockPrisma.memberRecord.findFirst.mockResolvedValue({
+        ...ADMIN_RECORD,
+        email: 'locked@test.com',
         lockedAt: new Date(),
       });
 
@@ -460,7 +462,7 @@ describe('Security E2E', () => {
 
       expect(res.status).toBe(204);
       expect(mockPrisma.memberRecord.updateMany).toHaveBeenCalledWith({
-        where: { email: 'locked@test.com' },
+        where: { email: 'locked@test.com', deletedAt: null },
         data: { failedLoginCount: 0, lockedAt: null },
       });
     });
@@ -478,16 +480,13 @@ describe('Security E2E', () => {
     });
 
     it('帳號未鎖 → 409 ACCOUNT_NOT_LOCKED', async () => {
-      // loadMemberByEmail：找到
+      // loadMemberByEmail（findUnique）：找到
       mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
         ...ADMIN_RECORD,
         email: 'normal@test.com',
         lockedAt: null,
       });
-      // isLocked：lockedAt = null → false
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
-        lockedAt: null,
-      });
+      // isLocked 改用 findFirst：beforeEach 預設 ADMIN_RECORD（lockedAt: null）→ 視為未鎖
 
       const res = await request(app.getHttpServer())
         .post('/api/security/unlock-account')
@@ -521,26 +520,25 @@ describe('Security E2E', () => {
   // ── Auth: forgot-password / reset-password ─
 
   describe('POST /api/auth/forgot-password', () => {
-    it('已註冊 email → 200（不洩漏帳號是否存在）', async () => {
+    it('已註冊 email → 204（不洩漏帳號是否存在）', async () => {
       mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(ADMIN_RECORD);
 
       const res = await request(app.getHttpServer())
         .post('/api/auth/forgot-password')
         .send({ email: 'admin@test.com' });
 
-      expect(res.status).toBe(200);
-      const body = res.body as { data: { message: string } };
-      expect(body.data.message).toContain('收到密碼重設信件');
+      expect(res.status).toBe(204);
+      expect(mockPrisma.passwordResetTokenRecord.create).toHaveBeenCalled();
     });
 
-    it('不存在 email → 200（同樣回傳成功）', async () => {
+    it('不存在 email → 204（同樣回傳成功，防列舉）', async () => {
       mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(null);
 
       const res = await request(app.getHttpServer())
         .post('/api/auth/forgot-password')
         .send({ email: 'nobody@test.com' });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(204);
     });
 
     it('缺少 email → 400', async () => {

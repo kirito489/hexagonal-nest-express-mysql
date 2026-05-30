@@ -56,6 +56,9 @@ import {
  *
  * 注意：security 模組刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate，
  * 不走其他模組的 PermissionsGuard 細粒度權限
+ *
+ * ⚠️ 授權完全依賴 RolesGuard，而 RolesGuard 受 adminRoleEnabled flag 控制：該 flag 關閉時
+ * （僅可能於 dev，生產由 validate-env 強制開啟並在關閉時 process.exit）本模組對所有已登入者開放。
  */
 @Controller('security')
 @UseGuards(JwtAuthGuard, RolesGuard)
