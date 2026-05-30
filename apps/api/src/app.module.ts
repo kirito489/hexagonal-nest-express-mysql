@@ -24,7 +24,7 @@ import { TransformInterceptor } from './adapter/in/web/interceptor/TransformInte
 import { IpBlacklistGuard } from './adapter/in/web/guard/IpBlacklistGuard';
 import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
-import { HealthController } from './adapter/in/web/health/HealthController';
+import { HealthModule } from './modules/health.module';
 import { getEnv } from './infrastructure/validate-env';
 
 @Module({
@@ -138,8 +138,9 @@ import { getEnv } from './infrastructure/validate-env';
     RoleModule,
     MemberModule,
     AuthModule,
+    HealthModule,
   ],
-  controllers: [HealthController],
+  controllers: [],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: IpBlacklistGuard },

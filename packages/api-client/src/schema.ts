@@ -4,6 +4,178 @@
  */
 
 export interface paths {
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 存活探針（liveness）
+         * @description 確認 API 行程是否存活，永遠輕量回 200，不檢查任何外部依賴。
+         *     供 k8s livenessProbe / 負載平衡器存活檢查使用。無需認證。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 行程存活 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "status": "ok",
+                         *         "timestamp": "2024-01-01T00:00:00.000Z"
+                         *       },
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /**
+                                 * @description 固定為 ok
+                                 * @example ok
+                                 */
+                                status: string;
+                                /**
+                                 * Format: date-time
+                                 * @description 探針回應時間
+                                 */
+                                timestamp: string;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 就緒探針（readiness）
+         * @description 檢查 API 是否可服務流量：主動探測資料庫（SELECT 1）與 Redis（PING）。
+         *     任一依賴異常時回 503，供 k8s readinessProbe 暫停導流。無需認證。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 所有依賴正常 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "status": "ok",
+                         *         "info": {
+                         *           "database": {
+                         *             "status": "up"
+                         *           },
+                         *           "redis": {
+                         *             "status": "up"
+                         *           }
+                         *         },
+                         *         "error": {},
+                         *         "details": {
+                         *           "database": {
+                         *             "status": "up"
+                         *           },
+                         *           "redis": {
+                         *             "status": "up"
+                         *           }
+                         *         }
+                         *       },
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            /** @description terminus 健康檢查結果 */
+                            data: {
+                                /**
+                                 * @description 整體狀態（全部正常為 ok）
+                                 * @example ok
+                                 */
+                                status: string;
+                                /** @description 正常依賴的明細 */
+                                info: Record<string, never>;
+                                /** @description 異常依賴的明細（全部正常時為空物件） */
+                                error: Record<string, never>;
+                                /** @description 所有依賴的彙整明細 */
+                                details: Record<string, never>;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                /**
+                 * @description 一個以上依賴異常（DB 無法查詢或 Redis 無回應）。
+                 *     逐項細節經由全域例外過濾器收斂為標準錯誤格式，code 為 SERVICE_UNAVAILABLE。
+                 */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "Service Unavailable",
+                         *       "code": "SERVICE_UNAVAILABLE",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;

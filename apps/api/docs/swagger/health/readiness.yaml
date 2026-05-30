@@ -1,0 +1,69 @@
+tags: [Health]
+summary: 就緒探針（readiness）
+description: |
+  檢查 API 是否可服務流量：主動探測資料庫（SELECT 1）與 Redis（PING）。
+  任一依賴異常時回 503，供 k8s readinessProbe 暫停導流。無需認證。
+
+responses:
+  '200':
+    description: 所有依賴正常
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              description: terminus 健康檢查結果
+              required: [status, info, error, details]
+              properties:
+                status:
+                  type: string
+                  description: 整體狀態（全部正常為 ok）
+                  example: ok
+                info:
+                  type: object
+                  description: 正常依賴的明細
+                error:
+                  type: object
+                  description: 異常依賴的明細（全部正常時為空物件）
+                details:
+                  type: object
+                  description: 所有依賴的彙整明細
+            timestamp:
+              type: string
+              format: date-time
+        example:
+          success: true
+          data:
+            status: ok
+            info:
+              database:
+                status: up
+              redis:
+                status: up
+            error: {}
+            details:
+              database:
+                status: up
+              redis:
+                status: up
+          timestamp: '2024-01-01T00:00:00.000Z'
+
+  '503':
+    description: |
+      一個以上依賴異常（DB 無法查詢或 Redis 無回應）。
+      逐項細節經由全域例外過濾器收斂為標準錯誤格式，code 為 SERVICE_UNAVAILABLE。
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        example:
+          success: false
+          message: Service Unavailable
+          code: SERVICE_UNAVAILABLE
+          timestamp: '2024-01-01T00:00:00.000Z'

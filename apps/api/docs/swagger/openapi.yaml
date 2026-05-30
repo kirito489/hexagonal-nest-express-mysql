@@ -188,6 +188,14 @@ components:
             timestamp: '2024-01-01T00:00:00.000Z'
 
 paths:
+  /health:
+    get:
+      $ref: './health/liveness.yaml'
+
+  /health/ready:
+    get:
+      $ref: './health/readiness.yaml'
+
   /auth/login:
     post:
       $ref: './auth/login.yaml'

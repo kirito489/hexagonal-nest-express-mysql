@@ -72,6 +72,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client?.isOpen ?? false;
   }
 
+  /**
+   * 主動探測 Redis 是否真正回應（非僅看連線旗標）。
+   * 用於 readiness 健康檢查，可偵測 socket 開著但實際無回應的 half-open 狀態。
+   * @returns PING 收到 PONG 回 true；連線中斷或無回應回 false
+   */
+  async ping(): Promise<boolean> {
+    if (!this.client?.isOpen) return false;
+    try {
+      const pong = await this.client.ping();
+      return pong === 'PONG';
+    } catch {
+      return false;
+    }
+  }
+
   get keyPrefix(): string {
     return this._keyPrefix;
   }

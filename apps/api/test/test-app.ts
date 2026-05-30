@@ -24,6 +24,7 @@ export const createMockRedis = () => ({
   keyPrefix: 'nest:',
   onModuleInit: jest.fn(),
   onModuleDestroy: jest.fn(),
+  ping: jest.fn().mockResolvedValue(true),
   get: jest.fn().mockResolvedValue(null),
   set: jest.fn().mockResolvedValue(undefined),
   del: jest.fn().mockResolvedValue(undefined),
