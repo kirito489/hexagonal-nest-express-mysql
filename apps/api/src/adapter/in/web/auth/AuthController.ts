@@ -5,7 +5,6 @@ import {
   HttpStatus,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { AuthFacade } from '../../../../application/facade/AuthFacade';
 import { LoginResult } from '../../../../application/port/in/auth/LoginUseCase';
@@ -21,11 +20,11 @@ import {
   resetPasswordSchema,
 } from './ResetPasswordRequest';
 import { RefreshTokenRequest, refreshTokenSchema } from './RefreshTokenRequest';
-import { JwtAuthGuard } from '../guard/JwtAuthGuard';
 import {
   CurrentMember,
   MemberContext,
 } from '../decorator/current-member.decorator';
+import { Public } from '../decorator/public.decorator';
 import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
@@ -34,6 +33,7 @@ import { Request } from 'express';
 export class AuthController {
   constructor(private readonly authFacade: AuthFacade) {}
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -49,6 +49,7 @@ export class AuthController {
     });
   }
 
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
@@ -64,7 +65,6 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
   async logout(
     @Req() req: Request,
     @Body(new ZodValidationPipe(logoutSchema)) dto: LogoutRequest,
@@ -84,6 +84,7 @@ export class AuthController {
 
   // 嚴格節流：防帳號列舉與 SMTP 轟炸（每來源每分鐘 3 次）。
   // 同時壓低「存在 vs 不存在」回應時間差可被利用的次數。
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
@@ -95,6 +96,7 @@ export class AuthController {
     await this.authFacade.forgotPassword({ email: dto.email });
   }
 
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ default: { limit: 3, ttl: 60_000 } })

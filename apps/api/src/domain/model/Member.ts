@@ -12,6 +12,7 @@ export class Member {
     readonly isDefault: boolean,
     readonly createdAt: Date,
     private _roleName: string = '',
+    private _tokenVersion: number = 0,
   ) {}
 
   static create(
@@ -46,6 +47,7 @@ export class Member {
     isDefault: boolean,
     createdAt: Date,
     roleName = '',
+    tokenVersion = 0,
   ): Member {
     return new Member(
       MemberId.of(id),
@@ -57,6 +59,7 @@ export class Member {
       isDefault,
       createdAt,
       roleName,
+      tokenVersion,
     );
   }
 
@@ -102,5 +105,9 @@ export class Member {
 
   get roleName(): string {
     return this._roleName;
+  }
+
+  get tokenVersion(): number {
+    return this._tokenVersion;
   }
 }

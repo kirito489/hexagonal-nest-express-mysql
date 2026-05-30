@@ -18,6 +18,7 @@ import { FirebaseModule } from './modules/firebase.module';
 import { S3Module } from './modules/s3.module';
 import { MemberModule } from './modules/member.module';
 import { AuthModule } from './modules/auth.module';
+import { JwtModule } from './modules/jwt.module';
 import { RoleModule } from './modules/role.module';
 import { GlobalExceptionFilter } from './adapter/in/web/filter/GlobalExceptionFilter';
 import { LoggingInterceptor } from './adapter/in/web/interceptor/LoggingInterceptor';
@@ -25,6 +26,7 @@ import { TransformInterceptor } from './adapter/in/web/interceptor/TransformInte
 import { IpBlacklistGuard } from './adapter/in/web/guard/IpBlacklistGuard';
 import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
+import { JwtAuthGuard } from './adapter/in/web/guard/JwtAuthGuard';
 import { HealthModule } from './modules/health.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
@@ -148,6 +150,8 @@ import { getEnv } from './infrastructure/validate-env';
     RoleModule,
     MemberModule,
     AuthModule,
+    // 全域 JwtAuthGuard（APP_GUARD）需在 AppModule 直接取得 JwtService
+    JwtModule,
     HealthModule,
     // Sentry NestJS 整合（事件實際送出與否由 instrument.ts 的 enabled 控制）
     SentryModule.forRoot(),
@@ -160,6 +164,9 @@ import { getEnv } from './infrastructure/validate-env';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: IpBlacklistGuard },
     { provide: APP_GUARD, useClass: IpWhitelistGuard },
+    // 全域認證：排在 SessionIdleGuard 前（SessionIdle 依賴 request.member）。
+    // 公開路由用 @Public() 跳過；預設拒絕，避免新 controller 漏掛認證即裸奔。
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: SessionIdleGuard },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

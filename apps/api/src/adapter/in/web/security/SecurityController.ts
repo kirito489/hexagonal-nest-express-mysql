@@ -18,7 +18,6 @@ import {
   IpListItem,
 } from '../../../../application/port/out/security/IpListPort';
 import { ListIpListResult } from '../../../../application/port/in/security/SecurityUseCases';
-import { JwtAuthGuard } from '../guard/JwtAuthGuard';
 import { RolesGuard } from '../guard/RolesGuard';
 import { Roles } from '../decorator/roles.decorator';
 import { RoleCode } from '../../../../domain/value-object/Role';
@@ -61,7 +60,7 @@ import {
  * （僅可能於 dev，生產由 validate-env 強制開啟並在關閉時 process.exit）本模組對所有已登入者開放。
  */
 @Controller('security')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 @Roles(RoleCode.SUPERADMIN)
 export class SecurityController {
   constructor(private readonly securityFacade: SecurityFacade) {}

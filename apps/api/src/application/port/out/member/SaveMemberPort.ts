@@ -20,4 +20,7 @@ export interface SaveMemberPort {
 
   /** 更新最後登入時間（fire-and-forget） */
   updateLastLoginAt(id: string): Promise<void>;
+
+  /** token 版本 +1：refresh 重用偵測時撤銷該使用者所有既有 token */
+  incrementTokenVersion(id: string): Promise<void>;
 }

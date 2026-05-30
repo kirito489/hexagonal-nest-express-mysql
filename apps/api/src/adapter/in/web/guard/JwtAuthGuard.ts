@@ -7,6 +7,7 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import {
@@ -28,9 +29,16 @@ import {
   MemberContext,
   MemberContextSchema,
 } from '../decorator/current-member.decorator';
+import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
 import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
 import { PasswordChangeRequiredException } from '../../../../domain/exception/PasswordChangeRequiredException';
 
+/**
+ * 全域認證 Guard（APP_GUARD）。
+ * - `@Public()` 標記的路由與 `/api/metrics` 跳過認證。
+ * - 驗證 access token、檢查黑名單與帳號狀態，並把 MemberContext 掛到 request。
+ * - 比對 payload.tokenVersion 與 DB 現值，攔截被 refresh 重用連坐撤銷的舊 token。
+ */
 @Injectable()
 export class JwtAuthGuard implements CanActivate, OnModuleInit {
   private readonly logger = new Logger(JwtAuthGuard.name);
@@ -38,6 +46,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
   private permissionCacheTtl = 0;
 
   constructor(
+    private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
     @Inject(TOKEN_BLACKLIST_PORT)
     private readonly tokenBlacklist: TokenBlacklistPort,
@@ -56,8 +65,19 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractToken(request);
 
+    // @Public() 路由（login / refresh / forgot / reset / health）跳過認證
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
+    // Prometheus /api/metrics 由第三方 controller 提供、無法掛 @Public，以路徑略過
+    const url = request.originalUrl ?? request.url ?? '';
+    if (url.startsWith('/api/metrics')) return true;
+
+    const token = this.extractToken(request);
     if (!token) {
       throw new UnauthorizedException('缺少授權憑證，請先登入');
     }
@@ -74,7 +94,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       throw new UnauthorizedException('Token 驗證失敗');
     }
 
-    //防止 refresh token 被當 access token 使用
+    // 防止 refresh token 被當 access token 使用
     if (payload.type !== 'access') {
       throw new UnauthorizedException('Token 類型不正確');
     }
@@ -84,6 +104,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       const parsed = MemberContextSchema.safeParse(JSON.parse(cached));
       if (parsed.success) {
         if (!parsed.data.status) throw new AccountDisabledException();
+        this.assertTokenVersion(payload, parsed.data.tokenVersion);
         request.member = parsed.data;
         this.checkPasswordExpiry(parsed.data);
         return true;
@@ -105,6 +126,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       throw new UnauthorizedException('會員不存在');
     }
     if (!data.status) throw new AccountDisabledException();
+    this.assertTokenVersion(payload, data.tokenVersion);
 
     const memberContext: MemberContext = {
       sub: data.id,
@@ -113,6 +135,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       roleCode: data.roleCode,
       permissions: data.permissions,
       status: data.status,
+      tokenVersion: data.tokenVersion,
       lastPasswordChange: data.lastPasswordChange
         ? data.lastPasswordChange.toISOString()
         : null,
@@ -133,6 +156,16 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
 
     this.checkPasswordExpiry(memberContext);
     return true;
+  }
+
+  /** token 版本比對：payload 帶的版本與 DB 現值不符 → 已被連坐撤銷，拒絕 */
+  private assertTokenVersion(
+    payload: JwtPayload,
+    current: number | undefined,
+  ): void {
+    if ((payload.tokenVersion ?? 0) !== (current ?? 0)) {
+      throw new UnauthorizedException('Token 已失效，請重新登入');
+    }
   }
 
   private checkPasswordExpiry(member: MemberContext): void {

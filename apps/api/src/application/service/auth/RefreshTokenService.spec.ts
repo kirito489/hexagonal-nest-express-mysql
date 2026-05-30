@@ -3,6 +3,8 @@ import { RefreshTokenService } from './RefreshTokenService';
 import { TokenBlacklistPort } from '../../port/out/auth/TokenBlacklistPort';
 import { LoadMemberContextPort } from '../../port/out/member/LoadMemberContextPort';
 import { SaveAuthLogPort } from '../../port/out/auth/SaveAuthLogPort';
+import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
+import { ClearMemberContextPort } from '../../port/out/member/ClearMemberContextPort';
 import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { InvalidRefreshTokenException } from '../../../domain/exception/InvalidRefreshTokenException';
 import { AccountDisabledException } from '../../../domain/exception/AccountDisabledException';
@@ -34,6 +36,8 @@ describe('RefreshTokenService', () => {
   let loadMemberContext: jest.Mocked<LoadMemberContextPort>;
   let saveAuthLog: jest.Mocked<SaveAuthLogPort>;
   let featureFlags: { isEnabled: jest.Mock };
+  let saveMember: { incrementTokenVersion: jest.Mock };
+  let clearMemberContext: { clearMemberContext: jest.Mock };
 
   beforeEach(() => {
     jwt = {
@@ -49,6 +53,8 @@ describe('RefreshTokenService', () => {
     };
     saveAuthLog = { saveAuthLog: jest.fn() };
     featureFlags = { isEnabled: jest.fn().mockReturnValue(false) };
+    saveMember = { incrementTokenVersion: jest.fn() };
+    clearMemberContext = { clearMemberContext: jest.fn() };
 
     service = new RefreshTokenService(
       jwt as unknown as JwtService,
@@ -56,6 +62,8 @@ describe('RefreshTokenService', () => {
       loadMemberContext,
       saveAuthLog,
       featureFlags as unknown as FeatureFlagService,
+      saveMember as unknown as SaveMemberPort,
+      clearMemberContext as unknown as ClearMemberContextPort,
     );
   });
 
@@ -82,14 +90,35 @@ describe('RefreshTokenService', () => {
     expect(ttl).toBeLessThanOrEqual(3600);
   });
 
-  it('舊 refresh 已在黑名單 → InvalidRefreshTokenException（rotation 重用偵測前提）', async () => {
+  it('舊 refresh 已在黑名單（重用）→ Invalid + 連坐撤銷該使用者所有 session', async () => {
     blacklist.isBlacklisted.mockResolvedValueOnce(true);
+    jwt.verify.mockReturnValue({ sub: MEMBER_UUID, type: 'refresh' });
 
     await expect(
       service.execute({ refreshToken: 'reused' }),
     ).rejects.toBeInstanceOf(InvalidRefreshTokenException);
-    expect(jwt.verify).not.toHaveBeenCalled();
+    expect(saveMember.incrementTokenVersion).toHaveBeenCalledWith(MEMBER_UUID);
+    expect(clearMemberContext.clearMemberContext).toHaveBeenCalledWith(
+      MEMBER_UUID,
+    );
     expect(blacklist.addToBlacklist).not.toHaveBeenCalled();
+  });
+
+  it('payload.tokenVersion 與現值不符 → InvalidRefreshTokenException', async () => {
+    jwt.verify.mockReturnValue({
+      sub: MEMBER_UUID,
+      type: 'refresh',
+      tokenVersion: 0,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    loadMemberContext.loadMemberContext.mockResolvedValueOnce({
+      ...makeContext(),
+      tokenVersion: 1,
+    });
+
+    await expect(
+      service.execute({ refreshToken: 'old-version' }),
+    ).rejects.toBeInstanceOf(InvalidRefreshTokenException);
   });
 
   it('payload.type 不是 refresh → InvalidRefreshTokenException', async () => {

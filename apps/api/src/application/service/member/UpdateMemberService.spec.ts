@@ -56,6 +56,7 @@ const mockSaveMember = {
   saveMemberWithPassword: jest.fn(),
   deleteMember: jest.fn(),
   updateLastLoginAt: jest.fn(),
+  incrementTokenVersion: jest.fn(),
 } as jest.Mocked<SaveMemberPort>;
 
 const mockLoadRole = {

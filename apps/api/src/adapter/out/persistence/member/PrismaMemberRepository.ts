@@ -195,6 +195,13 @@ export class PrismaMemberRepository
     });
   }
 
+  async incrementTokenVersion(id: string): Promise<void> {
+    await this.prisma.memberRecord.updateMany({
+      where: { id, deletedAt: null },
+      data: { tokenVersion: { increment: 1 } },
+    });
+  }
+
   async updatePassword(memberId: string, passwordHash: string): Promise<void> {
     await this.prisma.memberRecord.update({
       where: { id: memberId },

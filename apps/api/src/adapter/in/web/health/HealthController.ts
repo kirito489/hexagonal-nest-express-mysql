@@ -4,9 +4,11 @@ import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import type { HealthCheckResult } from '@nestjs/terminus';
 import { DbHealthIndicator } from './indicators/DbHealthIndicator';
 import { RedisHealthIndicator } from './indicators/RedisHealthIndicator';
+import { Public } from '../decorator/public.decorator';
 
 @Controller('health')
 @SkipThrottle()
+@Public()
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,

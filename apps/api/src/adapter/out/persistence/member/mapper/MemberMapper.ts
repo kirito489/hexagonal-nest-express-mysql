@@ -40,6 +40,8 @@ export const MemberMapper = {
       row.status,
       row.isDefault,
       row.createdAt,
+      '',
+      row.tokenVersion ?? 0,
     );
   },
 
@@ -55,6 +57,7 @@ export const MemberMapper = {
       row.isDefault,
       row.createdAt,
       row.role.name,
+      row.tokenVersion ?? 0,
     );
   },
 
@@ -85,6 +88,7 @@ export const MemberMapper = {
         (rp) => rp.permission.permissionCode,
       ),
       status: row.status,
+      tokenVersion: row.tokenVersion ?? 0,
       lastPasswordChange: row.lastPasswordChange,
     };
   },

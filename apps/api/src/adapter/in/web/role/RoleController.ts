@@ -13,7 +13,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RoleFacade } from '../../../../application/facade/RoleFacade';
-import { JwtAuthGuard } from '../guard/JwtAuthGuard';
 import { PermissionsGuard } from '../guard/PermissionsGuard';
 import { Permissions } from '../decorator/permissions.decorator';
 import { PermissionCode } from '../../../../domain/value-object/Role';
@@ -23,7 +22,7 @@ import { createRoleSchema, CreateRoleRequest } from './CreateRoleRequest';
 import { updateRoleSchema, UpdateRoleRequest } from './UpdateRoleRequest';
 
 @Controller('roles')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(PermissionsGuard)
 export class RoleController {
   constructor(private readonly roleFacade: RoleFacade) {}
 

@@ -13,7 +13,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MemberFacade } from '../../../../application/facade/MemberFacade';
-import { JwtAuthGuard } from '../guard/JwtAuthGuard';
 import { PermissionsGuard } from '../guard/PermissionsGuard';
 import { Permissions } from '../decorator/permissions.decorator';
 import {
@@ -31,7 +30,7 @@ import { createMemberSchema, CreateMemberRequest } from './CreateMemberRequest';
 import { updateMemberSchema, UpdateMemberRequest } from './UpdateMemberRequest';
 
 @Controller('members')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(PermissionsGuard)
 export class MemberController {
   constructor(private readonly memberFacade: MemberFacade) {}
 

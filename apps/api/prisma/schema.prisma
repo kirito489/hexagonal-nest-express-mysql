@@ -79,6 +79,7 @@ model MemberRecord {
   status             Boolean   @default(true)
   isDefault          Boolean   @default(false) @map("is_default")
   failedLoginCount   Int       @default(0) @map("failed_login_count")
+  tokenVersion       Int       @default(0) @map("token_version")
   lockedAt           DateTime? @map("locked_at")
   lastPasswordChange DateTime? @map("last_password_change")
   createdBy          String?   @map("created_by") @db.VarChar(36)

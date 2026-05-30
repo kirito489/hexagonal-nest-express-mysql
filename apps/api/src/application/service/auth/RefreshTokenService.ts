@@ -18,6 +18,14 @@ import {
   SAVE_AUTH_LOG_PORT,
   SaveAuthLogPort,
 } from '../../port/out/auth/SaveAuthLogPort';
+import {
+  SAVE_MEMBER_PORT,
+  SaveMemberPort,
+} from '../../port/out/member/SaveMemberPort';
+import {
+  CLEAR_MEMBER_CONTEXT_PORT,
+  ClearMemberContextPort,
+} from '../../port/out/member/ClearMemberContextPort';
 import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { JwtPayload } from '../../port/jwt-payload';
 import { getEnv } from '../../../infrastructure/validate-env';
@@ -44,6 +52,10 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     @Inject(SAVE_AUTH_LOG_PORT)
     private readonly saveAuthLog: SaveAuthLogPort,
     private readonly featureFlags: FeatureFlagService,
+    @Inject(SAVE_MEMBER_PORT)
+    private readonly saveMember: SaveMemberPort,
+    @Inject(CLEAR_MEMBER_CONTEXT_PORT)
+    private readonly clearMemberContext: ClearMemberContextPort,
   ) {}
 
   async execute(command: RefreshTokenCommand): Promise<RefreshTokenResult> {
@@ -51,6 +63,8 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     const env = getEnv();
 
     if (await this.tokenBlacklist.isBlacklisted(refreshToken)) {
+      // 重用偵測：已輪替的 refresh 又被使用 → 疑似遭竊，撤銷該使用者所有 session
+      await this.revokeAllSessions(refreshToken, env.REFRESH_SECRET);
       throw new InvalidRefreshTokenException();
     }
 
@@ -75,12 +89,18 @@ export class RefreshTokenService implements RefreshTokenUseCase {
       throw new AccountDisabledException();
     }
 
+    // token 版本比對：被連坐撤銷的舊 token 在此擋下
+    const tokenVersion = context.tokenVersion ?? 0;
+    if ((payload.tokenVersion ?? 0) !== tokenVersion) {
+      throw new InvalidRefreshTokenException();
+    }
+
     const accessToken = this.jwtService.sign(
-      { sub: payload.sub, type: 'access' } satisfies JwtPayload,
+      { sub: payload.sub, type: 'access', tokenVersion } satisfies JwtPayload,
       { secret: env.ACCESS_SECRET, expiresIn: env.ACCESS_TOKEN_EXPIRES_IN },
     );
     const newRefreshToken = this.jwtService.sign(
-      { sub: payload.sub, type: 'refresh' } satisfies JwtPayload,
+      { sub: payload.sub, type: 'refresh', tokenVersion } satisfies JwtPayload,
       { secret: env.REFRESH_SECRET, expiresIn: env.REFRESH_TOKEN_EXPIRES_IN },
     );
 
@@ -105,6 +125,25 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     if (!exp) return 0;
     const now = Math.floor(Date.now() / 1000);
     return Math.max(0, exp - now);
+  }
+
+  /**
+   * refresh 重用偵測後撤銷該使用者所有 session：tokenVersion +1 並清 context 快取，
+   * 使既有 access / refresh（帶舊版本）全部失效。token 無法解析（識別不出使用者）就略過。
+   */
+  private async revokeAllSessions(
+    token: string,
+    secret: string,
+  ): Promise<void> {
+    try {
+      const payload = this.jwtService.verify<JwtPayload>(token, { secret });
+      if (payload?.type === 'refresh') {
+        await this.saveMember.incrementTokenVersion(payload.sub);
+        await this.clearMemberContext.clearMemberContext(payload.sub);
+      }
+    } catch {
+      // 無法解析 → 略過撤銷，仍拒絕本次請求
+    }
   }
 
   /**

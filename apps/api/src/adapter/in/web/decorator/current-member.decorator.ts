@@ -13,6 +13,8 @@ export interface MemberContext {
   permissions: string[];
   /** 帳號啟用狀態（false 時 Guard 會拒絕請求） */
   status: boolean;
+  /** token 版本（refresh 重用連坐撤銷用） */
+  tokenVersion?: number;
   lastPasswordChange?: string | null;
 }
 
@@ -24,6 +26,7 @@ export const MemberContextSchema = z.object({
   roleCode: z.string(),
   permissions: z.array(z.string()),
   status: z.boolean(),
+  tokenVersion: z.number().optional(),
   lastPasswordChange: z.string().nullable().optional(),
 });
 

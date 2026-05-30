@@ -3,6 +3,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './JwtAuthGuard';
 import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
@@ -28,6 +29,8 @@ const makeContext = (authHeader?: string): ExecutionContext => {
   };
   return {
     switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
   } as unknown as ExecutionContext;
 };
 
@@ -55,12 +58,17 @@ const mockFeatureFlags = {
   onModuleInit: jest.fn(),
 };
 
+const mockReflector = {
+  getAllAndOverride: jest.fn().mockReturnValue(undefined),
+} as unknown as Reflector;
+
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
 
   beforeEach(() => {
     jest.clearAllMocks();
     guard = new JwtAuthGuard(
+      mockReflector,
       mockJwt,
       mockTokenBlacklist,
       mockMemberContextCache,
