@@ -1,4 +1,5 @@
 import { Module, RequestMethod } from '@nestjs/common';
+import type { Request } from 'express';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
@@ -124,6 +125,13 @@ import { getEnv } from './infrastructure/validate-env';
             },
           ],
           storage: new RedisThrottlerStorage(redis),
+          // metrics 端點供 Prometheus 定期輪詢，與 health 探針（@SkipThrottle）一樣不應受速率限制
+          skipIf: (context) => {
+            const request = context.switchToHttp().getRequest<Request>();
+            return (request.originalUrl ?? request.url ?? '').startsWith(
+              '/api/metrics',
+            );
+          },
         };
       },
     }),
@@ -148,7 +156,6 @@ import { getEnv } from './infrastructure/validate-env';
       ? [PrometheusModule.register({ defaultMetrics: { enabled: true } })]
       : []),
   ],
-  controllers: [],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: IpBlacklistGuard },

@@ -16,6 +16,11 @@ export type FeatureFlagName =
 /**
  * 功能開關服務：從環境變數讀取功能啟用狀態。
  * 各 Guard / Service 透過 isEnabled() 判斷功能是否啟用。
+ *
+ * 注意：此服務只管「runtime flag」（onModuleInit 後才備妥）。
+ * Sentry / Prometheus 屬「bootstrap-time flag」——須在 module 裝飾器求值與
+ * instrument.ts（app 建立前）就決定，時序上無法走本服務，故直接讀 getEnv()，
+ * 不在此 union 內，這是刻意分離而非遺漏。
  */
 @Injectable()
 export class FeatureFlagService implements OnModuleInit {
