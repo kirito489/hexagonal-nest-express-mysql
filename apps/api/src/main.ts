@@ -1,3 +1,5 @@
+// 必須是第一個 import：在任何模組載入前完成 Sentry.init
+import './instrument';
 import * as dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 

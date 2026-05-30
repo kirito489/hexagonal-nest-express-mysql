@@ -127,6 +127,19 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
+  // ─── 可觀測性（Observability，皆預設關閉） ───
+  APPLICATION_SENTRY_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  SENTRY_DSN: z.string().optional(),
+  // 0 = 不採樣 trace；production 視流量調至 0.1 等小數
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+  APPLICATION_METRICS_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+
   // ─── 密碼策略 ───
   APPLICATION_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(1).default(8),
   APPLICATION_PASSWORD_MAX_LENGTH: z.coerce.number().int().min(1).default(32),

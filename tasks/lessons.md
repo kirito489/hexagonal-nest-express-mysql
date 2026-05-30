@@ -154,3 +154,9 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 - **pnpm 11 預設不執行套件的 build scripts，需在 `pnpm-workspace.yaml` 的 `allowBuilds` 段明確核准**：Prisma、bcrypt、@nestjs/core、@firebase/util、protobufjs 等有 postinstall/install script 的套件首次 `pnpm install` 會被擋下並警告 `[ERR_PNPM_IGNORED_BUILDS]`。解法：把每個套件設成 `true`（信任）或 `false`（明確拒絕，如 telemetry-only 的 `@scarf/scarf`）。新加套件遇到此警告時更新 `allowBuilds` 即可。
 
 - **Monorepo 下 Prisma client 落在 pnpm 虛擬 store**：執行 `pnpm db:generate` 後，client 會被生成在 `node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client`（不是傳統的 `node_modules/@prisma/client`）。`apps/api/package.json` 的 `postinstall` symlink 步驟仍有效，TypeScript 也能解析。重點：搬完 monorepo 後**必須先跑一次 `pnpm db:generate`** 再 typecheck，否則所有 Prisma model 型別找不到，會誤導以為 strict mode 的 catch-unknown 才是元兇。
+
+## 可觀測性 / Sentry & metrics
+
+- **`instrument.ts`（Sentry init）必須自行呼叫 `dotenv.config()`**：ES module 的 import 會提升（hoist）到所有語句之前，所以即使在 `main.ts` 把 `import './instrument'` 放第一行、`dotenv.config()` 放第二行，instrument 內的 `Sentry.init` 仍會早於 main 的 dotenv 執行而讀不到 env。解法：instrument 在自己檔案最上方先 `dotenv.config({ quiet: true })` 再 `Sentry.init`。**Why:** 2026-05-30 接入 Sentry（add 可觀測性）時，instrument 必須最早載入才能正確 instrument，但又依賴 env。**How to apply:** `instrument.ts` 結構固定為「dotenv.config() → getEnv() → Sentry.init()」；`main.ts` 第一行 import 它（main 的 dotenv.config 重複呼叫無害）。
+
+- **可觀測性套件用 feature flag 包起來、預設關閉，兩種不同包法**：Sentry 由 `Sentry.init({ enabled: flag && !!DSN })` 控制——停用時 `Sentry.captureException` 是 no-op，所以呼叫端（如 GlobalExceptionFilter 的 fallback 500 分支）可無條件呼叫，不必自己判旗標。Prometheus 則用 `...(getEnv().APPLICATION_METRICS_ENABLED ? [PrometheusModule.register()] : [])` 在 AppModule imports 條件式掛載，關閉時完全不註冊 `/api/metrics`。**Why:** 2026-05-30 兩者皆要 flag 預設關閉、wiring 就緒。**How to apply:** 「SDK 自帶 enabled 開關」的（Sentry）走 init 旗標 + 呼叫端無條件呼叫；「會掛 controller / endpoint」的（Prometheus）走 imports 陣列條件 spread，避免關閉時還曝露端點。

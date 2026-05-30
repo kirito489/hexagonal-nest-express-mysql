@@ -25,6 +25,8 @@ import { IpBlacklistGuard } from './adapter/in/web/guard/IpBlacklistGuard';
 import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
 import { HealthModule } from './modules/health.module';
+import { SentryModule } from '@sentry/nestjs/setup';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { getEnv } from './infrastructure/validate-env';
 
 @Module({
@@ -139,6 +141,12 @@ import { getEnv } from './infrastructure/validate-env';
     MemberModule,
     AuthModule,
     HealthModule,
+    // Sentry NestJS 整合（事件實際送出與否由 instrument.ts 的 enabled 控制）
+    SentryModule.forRoot(),
+    // Prometheus metrics：flag 開啟才掛載，曝露 GET /api/metrics（含 Node/process 預設指標）
+    ...(getEnv().APPLICATION_METRICS_ENABLED
+      ? [PrometheusModule.register({ defaultMetrics: { enabled: true } })]
+      : []),
   ],
   controllers: [],
   providers: [

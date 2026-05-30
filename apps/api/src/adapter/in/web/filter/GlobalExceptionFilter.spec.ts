@@ -11,11 +11,14 @@ import { SaveSystemLogPort } from '../../../../application/port/out/shared/SaveS
 import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
 import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+import * as Sentry from '@sentry/nestjs';
 
 // buildSystemLogData uses getEnv() internally
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({ REDIS_KEY_PREFIX: 'test:', SERVICE_NAME: 'test' }),
 }));
+
+jest.mock('@sentry/nestjs', () => ({ captureException: jest.fn() }));
 
 const makeJson = () => jest.fn();
 const makeStatus = (json: jest.Mock) => jest.fn().mockReturnValue({ json });
@@ -104,6 +107,22 @@ describe('GlobalExceptionFilter', () => {
     const body = (json.mock.calls[0] as [{ code: string; message: string }])[0];
     expect(body.code).toBe('INTERNAL_SERVER_ERROR');
     expect(body.message).toBe('Internal server error');
+  });
+
+  describe('Sentry 上報', () => {
+    it('未預期的 fallback 500 應上報', () => {
+      const { host } = makeHost();
+      filter.catch(new Error('unexpected'), host);
+
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('可預期的 domain exception 不應上報', () => {
+      const { host } = makeHost();
+      filter.catch(new EmailNotFoundException(), host);
+
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    });
   });
 
   describe('Domain exception 對映', () => {

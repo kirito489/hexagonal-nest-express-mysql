@@ -8,6 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 import {
   SAVE_SYSTEM_LOG_PORT,
   SaveSystemLogPort,
@@ -149,6 +150,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message,
       exception instanceof Error ? exception.stack : String(exception),
     );
+
+    // 僅上報未預期的 fallback 500；domain exception 與 HttpException 為可預期錯誤，不上報以免噪音。
+    // Sentry 未啟用時 captureException 為 no-op。
+    if (code === 'INTERNAL_SERVER_ERROR') {
+      Sentry.captureException(exception);
+    }
 
     void this.saveSystemLog
       .saveSystemLog(
