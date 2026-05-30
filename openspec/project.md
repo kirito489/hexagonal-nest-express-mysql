@@ -52,6 +52,9 @@ hexagonal-nest-express-mysql/
 | Auth            | JWT（`@nestjs/jwt`）+ Redis token blacklist + Redis member-context cache        |
 | Logging         | Pino + `pino-roll`（檔案輪替）+ DB via `SaveSystemLogPort`                      |
 | Rate limit      | `@nestjs/throttler`                                                             |
+| Security header | `helmet`（CSP 關閉以相容 Swagger UI，其餘標頭預設啟用）                         |
+| Health check    | `@nestjs/terminus`（liveness + readiness，探 DB / Redis）                       |
+| Observability   | Sentry（`@sentry/nestjs`）+ Prometheus（`@willsoto/nestjs-prometheus`），皆 flag 預設關閉 |
 | Mail            | Nodemailer                                                                      |
 | Files           | AWS S3（`@aws-sdk/client-s3`、presigned URL）                                   |
 | Push            | Firebase Admin SDK                                                              |
@@ -185,6 +188,7 @@ apps/web/src/
 - 前端：若需要走 Vite 環境變數，鍵名以 `VITE_` 開頭，放 `apps/web/.env`。目前無前端環境變數需求。
 - **CORS_ORIGIN**：支援逗號分隔多 origin，預設 `http://localhost:3000,http://localhost:5173`。
 - **`*` 在生產環境會擋下**：validate-env 強制要求明確指定 origin。
+- **可觀測性（皆預設關閉）**：`APPLICATION_SENTRY_ENABLED` + `SENTRY_DSN`（+ `SENTRY_TRACES_SAMPLE_RATE`）開啟 Sentry 錯誤上報；`APPLICATION_METRICS_ENABLED` 掛載 Prometheus `/api/metrics`。此兩開關由 `getEnv()` 直讀（非 `FeatureFlagService`）：Sentry 在 `instrument.ts` 的 `Sentry.init({ enabled })` 控制、未啟用時 `captureException` 為 no-op；Metrics 在 `app.module.ts` imports 條件式掛載、關閉時完全不註冊端點。
 
 ---
 
@@ -201,7 +205,8 @@ apps/web/src/
 | Members  | `GET/POST/PATCH/DELETE /api/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
 | Roles    | `GET/POST/PATCH/DELETE /api/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
 | Security | `/api/security/ip-{whitelist,blacklist}*`、`/api/security/unlock-account` | JWT + ADMIN 角色 |
-| Health   | `GET /api/health`                   | 公開（不計入速率限制）                   |
+| Health   | `GET /api/health`（liveness）、`GET /api/health/ready`（readiness，探 DB + Redis） | 公開（不計入速率限制） |
+| Metrics  | `GET /api/metrics`（Prometheus，flag 開啟才掛載） | 公開（不計入速率限制；需網路層保護）     |
 
 ### RBAC 權限系統
 

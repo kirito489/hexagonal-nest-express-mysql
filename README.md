@@ -50,6 +50,7 @@ pnpm dev
 
 - 後端 API：`http://localhost:3000/api`
 - 後端 Swagger UI：`http://localhost:3000/api/docs`
+- 健康檢查：`http://localhost:3000/api/health`（liveness）、`/api/health/ready`（readiness，探 DB + Redis）
 - 前端 admin：`http://localhost:5173`（dev proxy `/api` → 後端）
 
 ## 常用指令
