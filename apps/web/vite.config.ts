@@ -27,5 +27,25 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      // 覆蓋率聚焦可獨立單元測試的純邏輯（lib 工具函式、共用元件）。
+      // 排除需 React Router / API client context 的組合層（guard component、
+      // 與 /me、URL state 整合的 hooks），這些由 e2e 與手動驗證涵蓋。
+      include: [
+        'src/lib/format-relative-time.ts',
+        'src/lib/status-filter.ts',
+        'src/lib/storage.ts',
+        'src/lib/use-debounced-value.ts',
+        'src/lib/use-has-permission.ts',
+        'src/components/DeleteConfirmDialog.tsx',
+      ],
+      thresholds: {
+        statements: 75,
+        branches: 75,
+        functions: 60,
+        lines: 75,
+      },
+    },
   },
 })

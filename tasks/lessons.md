@@ -61,6 +61,12 @@ _Patterns, rules, and validated decisions accumulated over time. Updated after c
 
 ## 測試
 
+- **寫 spec 前一定先 Read 受測檔的真實簽章，不要憑模式猜**：批次補測試時最容易踩——以為 `execute({ id })` 結果是 `execute(id: string)`；以為 repo 回 `{ list, meta }` 結果是 `{ data, total }`（轉換在 service）；以為建構子是 `(port, flags)` 結果是 `(flags, port)`；以為元件叫 `ConfirmDialog` 結果只有 `DeleteConfirmDialog`；以為 helper 是 `getClientIp` 結果根本不存在。**Why:** 2026-05-30 補 coverage 時連續多輪「猜簽章→測試紅→重寫」，浪費大量往返。**How to apply:** 每個 spec 動筆前先讀「受測 class/function 本體 + 它呼叫的 port interface + in-port Command 型別」三者；service 委派型的還要確認回傳是原樣轉發還是有 map 轉換。一次讀齊再寫，比寫完被 jest 打回快得多。
+
+- **`jest.clearAllMocks()` 不清 mock implementation，throw 會洩漏到後續測試**：用 `mockImplementation(() => { throw ... })` 設一次性錯誤後，`clearAllMocks` 只重置呼叫紀錄、不還原 implementation，後面的 test 會繼續 throw。**Why:** 2026-05-30 ResetPasswordService spec「密碼策略不合」用 `mockImplementation` throw，污染了後兩個 test。**How to apply:** 一次性行為一律用 `mockImplementationOnce` / `mockResolvedValueOnce`；或在 `beforeEach` 用 `mockReset()`（會清 implementation）而非 `clearAllMocks()`。
+
+- **coverage 門檻聚焦邏輯層，用 `coveragePathIgnorePatterns` 排除 wiring/DTO**：`*.module.ts`、`main.ts`、`*Controller.ts`、`*Request.ts`、`*Query.ts`、`port/`、`facade/`、`adapter/out/`、`validate-env.ts` 這些屬 wiring / 宣告 / 已由 e2e 涵蓋的層，納入 coverage 只會稀釋數字、逼著為 DI 配線寫無意義的測試。**Why:** 2026-05-30 建 coverage gate，全量計算時 service 補到 ~99% 但整體仍被一堆 0% 的 controller/adapter 拉到 40%。**How to apply:** 後端 `package.json` jest 設 `coveragePathIgnorePatterns` 排除上述，再設 `coverageThreshold`（本專案 70/60/70/70）。前端 vitest 的 coverage `include` 只列「可獨立單測的純函式 + 共用元件」，排除需 Router / api-client context 的組合層（pages、與 /me 整合的 hooks），門檻才有意義。
+
 - **Guard 邏輯變更後，spec mock payload 必須同步更新**：mock `jwtService.verify` 回傳值若缺少 `type: 'access'`，測試直接失敗且錯誤訊息會誤導排查。
 
 - **Zod v4 的 `z.string().uuid()` 嚴格 RFC 4122**：測試 UUID 不能用 `00000000-0000-0000-0000-000000000010`（版本/變體皆 0），要改成合法 v4 形式如 `00000000-0000-4000-8000-000000000001`。

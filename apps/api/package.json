@@ -119,8 +119,33 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts"
     ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "\\.module\\.ts$",
+      "/main\\.ts$",
+      "/instrument\\.ts$",
+      "/types/",
+      "/application/port/",
+      "/application/facade/",
+      "Controller\\.ts$",
+      "Request\\.ts$",
+      "Query\\.ts$",
+      "\\.decorator\\.ts$",
+      "/adapter/out/",
+      "/infrastructure/validate-env\\.ts$",
+      "ip-schema\\.ts$"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 70,
+        "branches": 60,
+        "functions": 70,
+        "lines": 70
+      }
+    },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
