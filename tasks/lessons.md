@@ -10,6 +10,8 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **DB 時間一律 UTC**：`timezone: 'Z'` 已在 `prisma.service.ts` 設定；JS `Date` 寫入/讀回都當作 UTC，跨時區部署不會位移。
 
+- **MySQL 9 本機開發要設 `allowPublicKeyRetrieval: true`**：MySQL 9 預設 `caching_sha2_password`，非 TLS 連線冷快取下首次認證需向 server 取 RSA 公鑰；localhost dev 未啟用 TLS、不允許取回公鑰時會 `ER_CANNOT_RETRIEVE_RSA_KEY` 連不上。作法：`prisma.service.ts` 的 `PrismaMariaDb({ ... })` 加 `allowPublicKeyRetrieval: true`。生產走 TLS 時此選項無作用，安全上僅在無 TLS 的 MITM 情境有理論風險（dev/localhost 可接受）。
+
 - **Prisma P2002 `unique constraint violation` 應在 Repository 層轉為 domain exception**：`findByEmail + create` 存在競態，Repository 的 `create` 外層 try/catch，`err.code === 'P2002'` 時 throw domain exception；Service 層不需感知 Prisma 錯誤。
 
 - **軟刪除 model 的所有 read path 都要加 `deletedAt: null`**：Prisma `findUnique` 只接受 unique 欄位，要過濾軟刪需改用 `findFirst({ where: { id, deletedAt: null } })`。`count` 用於「是否還有相關紀錄」判斷時（如 DeleteRoleService 阻擋有成員的角色）也要排除軟刪，否則永遠刪不掉。例外是「恢復」場景才用 `loadIncludingDeleted` 顯式 opt-in。
@@ -181,3 +183,17 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 - **`instrument.ts`（Sentry init）必須自行呼叫 `dotenv.config()`**：ES module import 會 hoist 到所有語句前，即使 `main.ts` 第一行 import instrument、第二行才 `dotenv.config()`，instrument 內的 `Sentry.init` 仍早於 main 的 dotenv 執行而讀不到 env。作法：`instrument.ts` 固定「`dotenv.config({ quiet: true })` → `getEnv()` → `Sentry.init()`」；`main.ts` 第一行 import 它（main 的 dotenv 重複呼叫無害）。
 
 - **可觀測性套件用 feature flag 包、預設關閉，兩種包法**：Sentry 由 `Sentry.init({ enabled: flag && !!DSN })` 控制，停用時 `captureException` 是 no-op，呼叫端可無條件呼叫；Prometheus 會掛 endpoint，要用 `...(flag ? [PrometheusModule.register()] : [])` 在 imports 條件 spread，關閉時完全不註冊 `/api/metrics`。作法：SDK 自帶 enabled 開關的走 init 旗標 + 呼叫端無條件呼叫；會掛 controller / endpoint 的走 imports 條件 spread。
+
+## 單一埠部署 / ServeStaticModule
+
+- **單一埠：由 api 服務前端 `dist`，用 `forRootAsync` + 執行期偵測，不要在 `@Module` 載入時判斷**：`ServeStaticModule.forRootAsync({ useFactory })` 在 `app.init()` 時才偵測 `index.html`（前端未 build / 純 API 部署時回 `[]` 等同不掛載，dev 走 Vite 不受影響）。`@Module` 的 imports 陣列在 import 時就 evaluate，那時 e2e fixture 還沒建。靜態根目錄預設相對 api 編譯輸出找 `apps/web/dist`，可用 env `WEB_STATIC_ROOT` 覆寫（見 `app.module.ts` 的 `resolveWebStaticRoot`）。
+
+- **`exclude` pattern 要用 Express 5 / path-to-regexp v8 的 named wildcard `'/api/{*path}'`**：舊式 `/api*`、`/api/*` 都不對；`'/api/*path'` 會漏掉裸 `/api`。`'/api/{*path}'` 能涵蓋 `/api`、`/api/health`、`/api/docs`、`/api/metrics` 且不誤殺 `/`、`/assets/*`。漏設 exclude 會讓 API 的 404 回 `index.html`（HTML）而非 JSON，前端會壞。
+
+- **e2e 測 serve-static 要把 `AbstractLoader` override 成 `ExpressLoader`**：`@nestjs/serve-static` 的 loader factory 依 `httpAdapter` 是否存在挑 loader；測試用 `Test...compile()` 在 `createNestApplication(ExpressAdapter)` 之前就實例化 loader → 拿到 **NoopLoader**（靜態檔全 404）。作法：測試 `.overrideProvider(AbstractLoader).useClass(ExpressLoader)`（`test-app.ts` 的 `forceServeStatic` 旗標）對齊生產；fixture 目錄由 `WEB_STATIC_ROOT`（setup-env 指向 `os.tmpdir()`）指定，spec 的 `beforeAll` 先寫 `index.html`。
+
+## 排程 / @nestjs/schedule
+
+- **`@Cron('expr')` decorator 的表達式在「模組載入時」就求值，讀不到 `.env`**：import 會 hoist 到檔案最上方，`AppModule`（含排程器）在 `main.ts` 的 `dotenv.config()` 之前就被 require，decorator 內 `process.env.X` 拿到 undefined；在 decorator 內呼叫 `getEnv()` 更會在 env 未載入時觸發驗證而 `process.exit(1)`。作法：改在 `onModuleInit()`（dotenv 已載入）用 `SchedulerRegistry.addCronJob(name, CronJob.from({ cronTime, onTick, timeZone }))` 動態註冊（範式見 `ExampleScheduler`）；env gate（`SCHEDULE_ENABLED`）預設關，測試環境保持關閉避免背景 cron 與開檔 handle。
+
+- **`@nestjs/schedule` 沒有 re-export `CronJob`，要顯式安裝 `cron`**：動態註冊用的 `CronJob.from(...)` 來自 `cron` 套件，且版本要與 `@nestjs/schedule` 內部相依一致（本專案 `cron@4.4.0`）以免 `addCronJob` 型別不相容。

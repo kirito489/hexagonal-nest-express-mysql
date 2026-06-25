@@ -19,6 +19,16 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
 
 ## 完成項目
 
+### 2026-06-25
+
+- [x] **從衍生專案 `ppt-shift-html-demo` 回補共用基建** — typecheck / lint / test(211) / e2e(116) 全綠：
+  - 單一埠部署：加 `@nestjs/serve-static`，`app.module` 以 `ServeStaticModule.forRootAsync` 服務 `apps/web/dist`（`exclude: ['/api/{*path}']`、執行期偵測 `index.html`），env `WEB_STATIC_ROOT`；含 `forceServeStatic` e2e（override `AbstractLoader`→`ExpressLoader`）+ `serve-static.e2e-spec.ts`。
+  - 排程骨架：加 `@nestjs/schedule` + `cron@4.4.0`，`ScheduleModule.forRoot()` + `SchedulerModule` + 通用 `ExampleScheduler`（`onModuleInit` 動態註冊、`SCHEDULE_ENABLED` 預設關）+ spec。
+  - DB：`prisma.service.ts` 加 `allowPublicKeyRetrieval: true`（MySQL 9 本機 dev）。
+  - CI：新增 `.gitlab-ci.yml` 共用骨架（install / build / cleanup / pr_agent，專屬值佔位化；部署 job 註解保留為參考範本）。
+  - 未搬：TipTap 富文本（偏功能非基建）、PPT 專屬套件（fast-xml-parser / jszip / multer）。
+  - 待補：`apps/api/.env.example` 因 `.env*` 受權限保護無法自動寫入，需手動補 `WEB_STATIC_ROOT` / `SCHEDULE_ENABLED` / `SCHEDULE_EXAMPLE_CRON`。
+
 ### 2026-05-30
 
 - [x] **專案審查問題修補** — `/review-project` 發現的 15 項安全 / 健壯性問題，typecheck / lint / test / e2e(111) 全綠：

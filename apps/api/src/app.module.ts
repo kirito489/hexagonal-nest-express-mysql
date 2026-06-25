@@ -3,7 +3,11 @@ import type { Request } from 'express';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { randomUUID } from 'crypto';
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
 import { RedisThrottlerStorage } from './infrastructure/redis/redis-throttler.storage';
 import { RedisService } from './infrastructure/redis/redis.service';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
@@ -28,9 +32,26 @@ import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
 import { JwtAuthGuard } from './adapter/in/web/guard/JwtAuthGuard';
 import { HealthModule } from './modules/health.module';
+import { SchedulerModule } from './modules/scheduler.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { getEnv } from './infrastructure/validate-env';
+
+/**
+ * 解析前端打包產物（apps/web/dist）的根目錄。
+ *
+ * 預設相對 api 編譯輸出往上找 apps/web/dist；可用環境變數 WEB_STATIC_ROOT 覆寫部署路徑。
+ * 找不到 index.html（dev 尚未 build 前端、或純 API 部署）時回 null，呼叫端據此略過掛載。
+ *
+ * @returns 含 index.html 的靜態根目錄絕對路徑，或 null
+ */
+const resolveWebStaticRoot = (): string | null => {
+  const { WEB_STATIC_ROOT } = getEnv();
+  const root = WEB_STATIC_ROOT
+    ? resolve(WEB_STATIC_ROOT)
+    : join(__dirname, '..', '..', 'web', 'dist');
+  return existsSync(join(root, 'index.html')) ? root : null;
+};
 
 @Module({
   imports: [
@@ -153,6 +174,18 @@ import { getEnv } from './infrastructure/validate-env';
     // 全域 JwtAuthGuard（APP_GUARD）需在 AppModule 直接取得 JwtService
     JwtModule,
     HealthModule,
+    // 排程：ScheduleModule.forRoot() 全域註冊 SchedulerRegistry；SchedulerModule 宣告各排程器
+    ScheduleModule.forRoot(),
+    SchedulerModule,
+    // 單一埠部署：由 api 一併服務前端打包產物（apps/web/dist）。
+    // exclude 排除 /api，讓 API 與 Swagger 走原本路由、SPA 深層路由 fallback 回 index.html；
+    // useFactory 在 init 時才偵測 dist，前端未 build 時回空陣列等同不掛載（dev 走 Vite 不受影響）。
+    ServeStaticModule.forRootAsync({
+      useFactory: () => {
+        const rootPath = resolveWebStaticRoot();
+        return rootPath ? [{ rootPath, exclude: ['/api/{*path}'] }] : [];
+      },
+    }),
     // Sentry NestJS 整合（事件實際送出與否由 instrument.ts 的 enabled 控制）
     SentryModule.forRoot(),
     // Prometheus metrics：flag 開啟才掛載，曝露 GET /api/metrics（含 Node/process 預設指標）

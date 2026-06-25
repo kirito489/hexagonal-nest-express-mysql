@@ -74,6 +74,16 @@ pnpm --filter @app/api-client generate
 
 **完整指令參考**（含 db、shadcn、build 等）：`openspec/project.md` → 「完整指令參考」。
 
+## 單一埠部署（選用）
+
+預設 dev 前後端分開（Vite 5173 proxy `/api` → 後端 3000）。正式環境可由後端**一個埠**同時服務前端與 API：
+
+1. `pnpm build`（產出 `apps/api/dist` 與 `apps/web/dist`）
+2. 設 `WEB_STATIC_ROOT` 指向前端 `dist`（未設則由 api 相對自身編譯輸出找 `apps/web/dist`）
+3. `pnpm --filter @app/api start:prod` → 同一 origin 提供 SPA + `/api`（深層 SPA 路由 fallback 回 `index.html`，`/api/*` 不被攔截）
+
+未 build 前端（或純 API 部署）時自動略過靜態掛載，不影響 API。
+
 ## 必填環境變數
 
 `apps/api/.env` 啟動時若缺以下任一會立即 exit(1)：

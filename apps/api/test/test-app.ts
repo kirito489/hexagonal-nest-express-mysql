@@ -4,6 +4,8 @@ import {
   ExpressAdapter,
   NestExpressApplication,
 } from '@nestjs/platform-express';
+import { AbstractLoader } from '@nestjs/serve-static/dist/loaders/abstract.loader';
+import { ExpressLoader } from '@nestjs/serve-static/dist/loaders/express.loader';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { RedisService } from '../src/infrastructure/redis/redis.service';
@@ -13,6 +15,13 @@ export interface TestAppOverrides {
   prisma?: Record<string, unknown>;
   redis?: ReturnType<typeof createMockRedis>;
   saveSystemLog?: Record<string, unknown>;
+  /**
+   * 強制 ServeStaticModule 使用 ExpressLoader。
+   *
+   * 測試以 compile() 後才 createNestApplication 的兩段式建立 app，loader factory 在尚無
+   * httpAdapter 時會選到 NoopLoader（不服務靜態檔）；驗證單一埠靜態服務時設 true 對齊生產。
+   */
+  forceServeStatic?: boolean;
 }
 
 /**
@@ -58,7 +67,7 @@ export async function createE2EApp(overrides: TestAppOverrides = {}): Promise<{
   const mockRedis = overrides.redis ?? createMockRedis();
   const mockLog = overrides.saveSystemLog ?? createMockSaveSystemLog();
 
-  const moduleRef = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     imports: [AppModule],
   } as ModuleMetadata)
     .overrideProvider(PrismaService)
@@ -66,8 +75,13 @@ export async function createE2EApp(overrides: TestAppOverrides = {}): Promise<{
     .overrideProvider(RedisService)
     .useValue(mockRedis)
     .overrideProvider(SAVE_SYSTEM_LOG_PORT)
-    .useValue(mockLog)
-    .compile();
+    .useValue(mockLog);
+
+  if (overrides.forceServeStatic) {
+    builder.overrideProvider(AbstractLoader).useClass(ExpressLoader);
+  }
+
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>(
     new ExpressAdapter(),

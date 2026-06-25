@@ -10,6 +10,9 @@ const envSchema = z.object({
   SERVICE_NAME: z.string().default('hexagonal-nest-express'),
   API_BASE_URL: z.string().optional(),
 
+  // 單一埠部署：前端打包產物根目錄；未設則相對 api 編譯輸出往上找 apps/web/dist
+  WEB_STATIC_ROOT: z.string().optional(),
+
   // Database（必填）
   DB_HOST: z.string(),
   DB_PORT: z.coerce.number().default(3306),
@@ -231,6 +234,15 @@ const envSchema = z.object({
   //任務 alarm 排程 ───
   NOTIFICATION_ALARM_HOUR: z.coerce.number().int().min(0).max(23).default(8),
   NOTIFICATION_ALARM_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
+
+  // ─── 排程（@nestjs/schedule，範例排程預設關閉） ───
+  /** 範例排程是否啟用；正式排程依需求改寫 ExampleScheduler，測試環境保持關閉 */
+  SCHEDULE_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** 範例排程 cron（@nestjs/schedule 6 欄位含秒），預設每分鐘第 0 秒 */
+  SCHEDULE_EXAMPLE_CRON: z.string().default('0 * * * * *'),
 });
 
 export type Env = z.infer<typeof envSchema>;

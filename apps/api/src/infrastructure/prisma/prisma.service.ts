@@ -26,6 +26,9 @@ export class PrismaService
       password: env.DB_PASSWORD,
       database: env.DB_DATABASE,
       timezone: 'Z',
+      // MySQL 9 預設 caching_sha2_password，非 TLS 連線冷快取首次認證需向 server 取 RSA 公鑰；
+      // 本機 localhost 開發未啟用 TLS、不允許取回公鑰時會 ER_CANNOT_RETRIEVE_RSA_KEY 連不上
+      allowPublicKeyRetrieval: true,
     });
     super({ adapter });
   }

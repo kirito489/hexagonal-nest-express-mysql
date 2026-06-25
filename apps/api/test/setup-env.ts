@@ -2,6 +2,9 @@
  * E2E 測試前設定最低限度的環境變數，
  * 確保 getEnv() singleton 在 Jest 啟動時能通過驗證。
  */
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 process.env.NODE_ENV = 'test';
 process.env.ACCESS_SECRET = 'e2e-test-access-secret-min-32-chars!!'; // min(32)
 process.env.REFRESH_SECRET = 'e2e-test-refresh-secret-min-32-chars!'; // min(32)
@@ -22,3 +25,5 @@ process.env.APP_TIMEZONE = 'Asia/Taipei';
 process.env.NOTIFICATION_ALARM_HOUR = '8';
 process.env.NOTIFICATION_ALARM_MINUTE = '0';
 process.env.AWS_MEDIA_LIBRARY_ROOT = 'local';
+// 單一埠 serve-static e2e 的前端 dist fixture 目錄（spec 自行建立 index.html）
+process.env.WEB_STATIC_ROOT = join(tmpdir(), 'hexagonal-web-dist-e2e');

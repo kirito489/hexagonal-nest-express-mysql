@@ -55,6 +55,8 @@ hexagonal-nest-express-mysql/
 | Security header | `helmet`（CSP 關閉以相容 Swagger UI，其餘標頭預設啟用）                         |
 | Health check    | `@nestjs/terminus`（liveness + readiness，探 DB / Redis）                       |
 | Observability   | Sentry（`@sentry/nestjs`）+ Prometheus（`@willsoto/nestjs-prometheus`），皆 flag 預設關閉 |
+| 排程            | `@nestjs/schedule` + `cron`（`onModuleInit` 動態註冊，env gate 預設關）         |
+| 靜態 / 單一埠   | `@nestjs/serve-static`（`forRootAsync` 服務 `apps/web/dist`，exclude `/api`）   |
 | Mail            | Nodemailer                                                                      |
 | Files           | AWS S3（`@aws-sdk/client-s3`、presigned URL）                                   |
 | Push            | Firebase Admin SDK                                                              |
@@ -189,6 +191,8 @@ apps/web/src/
 - **CORS_ORIGIN**：支援逗號分隔多 origin，預設 `http://localhost:3000,http://localhost:5173`。
 - **`*` 在生產環境會擋下**：validate-env 強制要求明確指定 origin。
 - **可觀測性（皆預設關閉）**：`APPLICATION_SENTRY_ENABLED` + `SENTRY_DSN`（+ `SENTRY_TRACES_SAMPLE_RATE`）開啟 Sentry 錯誤上報；`APPLICATION_METRICS_ENABLED` 掛載 Prometheus `/api/metrics`。此兩開關由 `getEnv()` 直讀（非 `FeatureFlagService`）：Sentry 在 `instrument.ts` 的 `Sentry.init({ enabled })` 控制、未啟用時 `captureException` 為 no-op；Metrics 在 `app.module.ts` imports 條件式掛載、關閉時完全不註冊端點。
+- **單一埠部署**：`WEB_STATIC_ROOT` 指定前端打包根目錄（未設則由 api 相對自身編譯輸出找 `apps/web/dist`）。設定後 `node dist/main` 同一個埠同時服務前端 SPA + API：`ServeStaticModule.forRootAsync` 在 init 時偵測 `index.html`（無則略過掛載），`exclude: ['/api/{*path}']` 確保 `/api` 不被 SPA fallback 攔截；dev 仍走 Vite proxy 不受影響。
+- **排程（@nestjs/schedule，預設關閉）**：`SCHEDULE_ENABLED` 開關範例排程、`SCHEDULE_EXAMPLE_CRON`（6 欄位含秒）設 cron。排程器以 `onModuleInit` 動態註冊（`@Cron` decorator 在模組載入時求值、早於 dotenv 讀不到 `.env`），範式見 `apps/api/src/adapter/in/scheduler/ExampleScheduler.ts`；時區用 `APP_TIMEZONE`。
 
 ---
 
@@ -414,7 +418,8 @@ apps/api/test/
 ├── auth.e2e-spec.ts
 ├── member.e2e-spec.ts
 ├── role.e2e-spec.ts
-└── security.e2e-spec.ts
+├── security.e2e-spec.ts
+└── serve-static.e2e-spec.ts   # 單一埠：服務前端 dist + SPA fallback + /api 不被攔截（forceServeStatic）
 ```
 
 E2E 範例：
