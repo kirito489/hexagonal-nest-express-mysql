@@ -146,7 +146,7 @@ const bootstrap = async (): Promise<void> => {
       next();
     },
     swaggerUi.serve,
-    swaggerUi.setup(swaggerDocument as Parameters<typeof swaggerUi.setup>[0], {
+    swaggerUi.setup(swaggerDocument, {
       swaggerOptions: {
         persistAuthorization: true,
         displayRequestDuration: true,
@@ -168,4 +168,8 @@ const bootstrap = async (): Promise<void> => {
   app.get(Logger).log(`應用程式啟動：${await app.getUrl()}`, 'Bootstrap');
 };
 
-bootstrap();
+bootstrap().catch((err) => {
+  // 啟動失敗必須讓程序以非零碼退出,否則容器 / orchestrator 會誤判為健康
+  console.error('應用程式啟動失敗', err);
+  process.exit(1);
+});

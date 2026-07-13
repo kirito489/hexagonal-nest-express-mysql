@@ -32,7 +32,7 @@ export function buildSystemLogData(
         'x-request-id': request.headers['x-request-id'],
         'x-forwarded-for': request.headers['x-forwarded-for'],
       },
-      body: request.body,
+      body: request.body as unknown,
       query: request.query,
     }),
     response: sanitize(responsePayload),

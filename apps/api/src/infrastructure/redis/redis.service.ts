@@ -40,34 +40,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const PING_INTERVAL_MS = 30000;
 
     // 優先使用 REDIS_URL（適用 Redis Cloud、Heroku Redis 等雲端服務）
-    this.client = (
-      env.REDIS_URL
-        ? createClient({
-            url: env.REDIS_URL,
-            socket: { reconnectStrategy, connectTimeout: CONNECT_TIMEOUT_MS },
-            pingInterval: PING_INTERVAL_MS,
-          })
-        : createClient({
-            socket: {
-              host: env.REDIS_HOST,
-              port: env.REDIS_PORT,
-              reconnectStrategy,
-              connectTimeout: CONNECT_TIMEOUT_MS,
-            },
-            password: env.REDIS_PASSWORD,
-            database: env.REDIS_DB,
-            pingInterval: PING_INTERVAL_MS,
-          })
-    ) as RedisClientType;
+    this.client = env.REDIS_URL
+      ? createClient({
+          url: env.REDIS_URL,
+          socket: { reconnectStrategy, connectTimeout: CONNECT_TIMEOUT_MS },
+          pingInterval: PING_INTERVAL_MS,
+        })
+      : createClient({
+          socket: {
+            host: env.REDIS_HOST,
+            port: env.REDIS_PORT,
+            reconnectStrategy,
+            connectTimeout: CONNECT_TIMEOUT_MS,
+          },
+          password: env.REDIS_PASSWORD,
+          database: env.REDIS_DB,
+          pingInterval: PING_INTERVAL_MS,
+        });
 
     this.client.on('connect', () => this.logger.log('Redis 連線成功'));
     this.client.on('error', (err) =>
-      this.logger.error('Redis 錯誤', err.message),
+      this.logger.error(
+        'Redis 錯誤',
+        err instanceof Error ? err.message : String(err),
+      ),
     );
     this.client.on('end', () => this.logger.warn('Redis 連線已結束'));
 
     await this.client.connect().catch((err) => {
-      this.logger.error('Redis 初始連線失敗', err.message);
+      this.logger.error(
+        'Redis 初始連線失敗',
+        err instanceof Error ? err.message : String(err),
+      );
       this.logger.warn('應用程式將在無 Redis 的情況下運行');
     });
   }

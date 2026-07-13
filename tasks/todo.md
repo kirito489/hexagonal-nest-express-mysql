@@ -15,9 +15,23 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
 
 - [ ] **帳號鎖定管理 CRUD（add-account-lock-management）** — `add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/security/locks`、`DELETE /api/security/locks/:id`（list 已鎖帳號 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。
 
+### 工程設置（kgie-nest-backend 借鏡，未完成批次）
+
+- [ ] **六角模組產生器 `gen:module` + `module-template/`** — 一行 `pnpm gen:module <name>` 產出 port/service/facade/controller/dto/repo 骨架 + 自動註冊 `app.module`。kgie 是單 package 佈局，需改寫成 `apps/api` + `packages/api-client` 三 workspace 路徑（搬概念、重寫模板）。價值高、工多，獨立排期。
+- [ ] **`init-project.sh` 模板初始化腳本** — 若要把本專案當「衍生專案母體」才值得（重設 package.json name / git 歷史 / reinstall）。
+
 ---
 
 ## 完成項目
+
+### 2026-07-14
+
+- [x] **借鏡 kgie-nest-backend 的工程設置（第一批 DX + ESLint 升級）** — typecheck / lint / test（api 211 + web 27）全綠：
+  - `.vscode/extensions.json`：推薦擴充（prettier / eslint / prisma / tailwind）。
+  - **ESLint 抽共用基底 `packages/eslint-config`**：api / web 皆 extends；基底只放 `ignores` + `js.recommended` + 家規（`houseRules` named export），tseslint 預設由各 workspace 自帶「一組」（避免 Cannot redefine plugin）。
+  - **api 從 legacy `.eslintrc.js` 升級 flat config + type-checked（`recommendedTypeChecked`）**：對 `persistence` / `seeds` / `spec` 分區關 `no-unsafe-*`，核心層維持嚴格；加 `prelint: db:generate` 修生成依賴（未生成 client → 假陽性）。
+  - type-checked 抓到並修掉 **9 個真發現**：`main.ts` bootstrap 未 catch 的 floating-promise（旗艦發現）、多處多餘 `as`、redis 錯誤未 narrow（`err.message` on any）、PasswordPolicy 冗餘型別（`RoleCode | string`）。
+  - 未搬（刻意）：根 prettier「審全部」——本 repo 前後端刻意兩套風格（後端有分號 / 前端無分號），不統一。詳見 lessons.md「ESLint / 工具鏈」。
 
 ### 2026-06-25
 

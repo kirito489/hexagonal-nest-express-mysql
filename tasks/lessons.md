@@ -178,6 +178,16 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **Monorepo 下 Prisma client 落在 pnpm 虛擬 store**：執行 `pnpm db:generate` 後 client 生成在 `node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client`（不是傳統的 `node_modules/@prisma/client`）。`apps/api/package.json` 的 `postinstall` symlink 仍有效，TypeScript 也能解析。重點：搬完 monorepo 後**必須先跑一次 `pnpm db:generate`** 再 typecheck，否則所有 Prisma model 型別找不到，會誤導以為是 strict mode 的問題。
 
+## ESLint / 工具鏈
+
+- **Monorepo 共用 ESLint 基底放 `packages/eslint-config`,基底「不含」任何 typescript-eslint 預設集**：api 走 `recommendedTypeChecked`、web 走 `recommended`,兩者都會註冊 `@typescript-eslint` 外掛;若共用基底也帶一組 tseslint 預設,和 workspace 自帶的那組併存會觸發 `ConfigError: Cannot redefine plugin "@typescript-eslint"`。作法:基底只放 `ignores` + `js.configs.recommended` + 家規(以 named export `houseRules` 交由各 workspace「在自己的 tseslint 預設之後」最後套用,否則 `no-explicit-any` 等會被 recommended 蓋回 error);tseslint 預設由各 workspace 自帶且僅一組。
+
+- **api 的 `lint` 必須先 `db:generate`,否則 type-aware 規則對 Prisma 回傳大量假陽性**：client 未生成時 `this.prisma.x.count()` 回 `any`,`recommendedTypeChecked` 會誤報 `no-unsafe-call`(型別解析不到)與 `require-await`(回傳不被視為 Promise)。作法:`apps/api/package.json` 加 `"prelint": "pnpm db:generate"`(對齊既有的 `predev`/`prebuild`/`pretypecheck`)。注意 lint-staged 直接呼叫 `eslint --fix` 不走 pre 腳本,靠 dev 環境 client 已生成。
+
+- **type-checked lint 對「ORM 邊界 / jest mock / seed 腳本」的 `no-unsafe-*` 是雜訊,分區關掉、核心層維持嚴格**：Prisma 查詢結果、mapper、jest mock 回傳天生 `any`,全開 `no-unsafe-*` 會爆數百個假訊號淹沒真發現(本專案 524→9)。作法:`eslint.config.mjs` 對 `src/adapter/out/persistence/**`、`seeds/**`+`scripts/**`、`**/*.spec.ts`(另加 `unbound-method`)關掉 no-unsafe-* 家族;application/domain/infrastructure 維持全嚴格,真發現(floating-promise 等)才浮得出來。
+
+- **本 monorepo 刻意跑兩套格式風格,不要在根目錄用一份 prettier 統一**：後端 `apps/api` 用 prettier + 有分號(NestJS 慣例);前端 `apps/web` + `packages/api-client` 用 eslint flat + 無分號(Vite 慣例)、且不裝 prettier。根 prettier 預設 `semi:true` 會把前端分號全加回去、與前端 eslint 打架。作法:格式各 workspace 自理,共用的是 ESLint 邏輯規則基底而非 prettier。
+
 ## 可觀測性 / Sentry & metrics
 
 - **`instrument.ts`（Sentry init）必須自行呼叫 `dotenv.config()`**：ES module import 會 hoist 到所有語句前，即使 `main.ts` 第一行 import instrument、第二行才 `dotenv.config()`，instrument 內的 `Sentry.init` 仍早於 main 的 dotenv 執行而讀不到 env。作法：`instrument.ts` 固定「`dotenv.config({ quiet: true })` → `getEnv()` → `Sentry.init()`」；`main.ts` 第一行 import 它（main 的 dotenv 重複呼叫無害）。

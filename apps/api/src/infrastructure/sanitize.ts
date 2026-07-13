@@ -28,7 +28,7 @@ const SENSITIVE_QUERY_PARAMS = new Set([
 
 export const sanitize = (obj: unknown): string => {
   try {
-    return JSON.stringify(obj, (key, value) => {
+    return JSON.stringify(obj, (key: string, value: unknown) => {
       if (typeof value === 'string' && value.startsWith('data:image')) {
         return '[BASE64_IMAGE_REMOVED]';
       }

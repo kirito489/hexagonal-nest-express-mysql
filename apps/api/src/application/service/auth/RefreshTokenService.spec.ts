@@ -4,7 +4,6 @@ import { TokenBlacklistPort } from '../../port/out/auth/TokenBlacklistPort';
 import { LoadMemberContextPort } from '../../port/out/member/LoadMemberContextPort';
 import { SaveAuthLogPort } from '../../port/out/auth/SaveAuthLogPort';
 import { SaveMemberPort } from '../../port/out/member/SaveMemberPort';
-import { ClearMemberContextPort } from '../../port/out/member/ClearMemberContextPort';
 import { FeatureFlagService } from '../shared/FeatureFlagService';
 import { InvalidRefreshTokenException } from '../../../domain/exception/InvalidRefreshTokenException';
 import { AccountDisabledException } from '../../../domain/exception/AccountDisabledException';
@@ -63,7 +62,7 @@ describe('RefreshTokenService', () => {
       saveAuthLog,
       featureFlags as unknown as FeatureFlagService,
       saveMember as unknown as SaveMemberPort,
-      clearMemberContext as unknown as ClearMemberContextPort,
+      clearMemberContext,
     );
   });
 

@@ -44,7 +44,7 @@ export class PasswordPolicyService implements OnModuleInit {
    * @param password - 待驗證密碼
    * @param roleCode - 省略時走一般策略
    */
-  validateOrThrow(password: string, roleCode?: RoleCode | string | null): void {
+  validateOrThrow(password: string, roleCode?: string | null): void {
     const policy =
       roleCode && HIGH_COMPLEXITY_ROLE_CODES.has(roleCode)
         ? this.systemAdminPolicy
