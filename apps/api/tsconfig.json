@@ -3,12 +3,18 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
+    // node10 於 TS 7.0 移除；真解 nodenext 會與 NestJS 裝飾器 metadata 衝突（124 個 TS1272），
+    // 待生態支援前用 TS 官方機制消音（見 tasks/todo.md 技術債）
+    "ignoreDeprecations": "6.0",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "sourceMap": true,
     "outDir": "./dist",
+    // TS 6 起要求明示 rootDir（涵蓋 src/scripts/seeds/test/prisma.config.ts 的共同根）；
+    // 實際 build 走 tsconfig.build.json 的 rootDir: src，此處僅供 typecheck / ts-jest
+    "rootDir": ".",
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "preserveWatchOutput": true,

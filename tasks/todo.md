@@ -17,7 +17,7 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
 
 ### 技術債（外部相依卡住，延後）
 
-- [ ] **api `moduleResolution: node`（node10）遷移 `nodenext`** — TS 7.0 會移除 node10；但 api 現用 TS 5.9 build 正常，警告只在編輯器 TS6 language service 出現。實測改 nodenext 爆 124 個 `TS1272`（NestJS 裝飾器 metadata：`@Body()` DTO + constructor 注入的 service 要求 `import type`，而注入 service 不能 `import type` 否則 DI 壞）。**條件**：等 NestJS 改善 nodenext 支援，或 api 升 TS 7 時一併做為獨立遷移（含 ts-jest / ts-node 相容驗證）。現階段不動、不加 `ignoreDeprecations`（api 5.9 可能拒絕該值）。
+- [ ] **api `moduleResolution: node`（node10）遷移 `nodenext`** — TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已從 TS 5.9 對齊到 **TS 6.0.2**（與 web / 編輯器同版，消除混版）；`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音（TS 官方機制，須 TS≥6 才吃）+ `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**（NestJS 裝飾器 metadata：`@Body()` DTO + constructor 注入 service 要求 `import type`，注入 service 不能改否則 DI 壞）——與 TS 版本無關，卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時此消音失效、屆時強制處理（可能需關 `isolatedModules` 或大改 import 為 `import type`）。
 
 ---
 
