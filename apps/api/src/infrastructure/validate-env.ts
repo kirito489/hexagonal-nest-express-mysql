@@ -19,6 +19,8 @@ const envSchema = z.object({
   DB_USERNAME: z.string(),
   DB_PASSWORD: z.string().default(''),
   DB_DATABASE: z.string(),
+  // e2e 專用測試庫名稱（僅 e2e 需要，dev / prod 可不設）；名稱須含 "test" 以防誤連 dev
+  DB_TEST_DATABASE: z.string().optional(),
 
   // JWT（必填）
   ACCESS_SECRET: z.string().min(32),

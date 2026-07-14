@@ -1,4 +1,3 @@
-import { ModuleMetadata } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   ExpressAdapter,
@@ -7,11 +6,11 @@ import {
 import { AbstractLoader } from '@nestjs/serve-static/dist/loaders/abstract.loader';
 import { ExpressLoader } from '@nestjs/serve-static/dist/loaders/express.loader';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { RedisService } from '../src/infrastructure/redis/redis.service';
 import { SAVE_SYSTEM_LOG_PORT } from '../src/application/port/out/shared/SaveSystemLogPort';
 
 export interface TestAppOverrides {
+  /** @deprecated e2e 已改走真 test DB，Prisma 不再 mock；待 4 支 CRUD spec 轉完移除此欄位 */
   prisma?: Record<string, unknown>;
   redis?: ReturnType<typeof createMockRedis>;
   saveSystemLog?: Record<string, unknown>;
@@ -63,15 +62,13 @@ export async function createE2EApp(overrides: TestAppOverrides = {}): Promise<{
   app: NestExpressApplication;
   moduleRef: TestingModule;
 }> {
-  const mockPrisma = overrides.prisma ?? {};
   const mockRedis = overrides.redis ?? createMockRedis();
   const mockLog = overrides.saveSystemLog ?? createMockSaveSystemLog();
 
+  // PrismaService 不 override → 用真 PrismaService，連到 setup-env.e2e 指定的 *_test 庫
   const builder = Test.createTestingModule({
     imports: [AppModule],
-  } as ModuleMetadata)
-    .overrideProvider(PrismaService)
-    .useValue(mockPrisma)
+  })
     .overrideProvider(RedisService)
     .useValue(mockRedis)
     .overrideProvider(SAVE_SYSTEM_LOG_PORT)

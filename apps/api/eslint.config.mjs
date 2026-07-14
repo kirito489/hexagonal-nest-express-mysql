@@ -42,9 +42,9 @@ export default defineConfig([
     files: ['seeds/**/*.ts', 'scripts/**/*.ts'],
     rules: { ...noUnsafeOff },
   },
-  // 單元測試:jest mock 回傳 any、unbound method 取用皆為慣例
+  // 測試碼:jest mock 回傳 any、supertest res.body 為 any、unbound method 取用皆為慣例
   {
-    files: ['**/*.spec.ts'],
+    files: ['**/*.spec.ts', 'test/**/*.ts'],
     rules: {
       ...noUnsafeOff,
       '@typescript-eslint/unbound-method': 'off',

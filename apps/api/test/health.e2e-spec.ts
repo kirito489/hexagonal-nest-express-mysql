@@ -2,24 +2,13 @@ import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { createE2EApp, createMockRedis } from './test-app';
 
-// ──────────────────────────────────────────────
-// Mock：health 只依賴 PrismaService.$queryRaw 與 RedisService.ping
-// ──────────────────────────────────────────────
-const createMockPrisma = () => ({
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  $queryRaw: jest.fn().mockResolvedValue([{ '1': 1 }]),
-});
-
+// 走真 test DB：DbHealthIndicator 的 `SELECT 1` 打真連線；Redis 仍 mock。
 describe('Health (e2e)', () => {
   describe('GET /api/health（liveness）', () => {
     let app: NestExpressApplication;
 
     beforeAll(async () => {
-      ({ app } = await createE2EApp({
-        prisma: createMockPrisma(),
-        redis: createMockRedis(),
-      }));
+      ({ app } = await createE2EApp({ redis: createMockRedis() }));
     });
 
     afterAll(async () => {
@@ -37,11 +26,8 @@ describe('Health (e2e)', () => {
   });
 
   describe('GET /api/health/ready（readiness）', () => {
-    it('DB 與 Redis 皆正常時回 200，details 標記 up', async () => {
-      const { app } = await createE2EApp({
-        prisma: createMockPrisma(),
-        redis: createMockRedis(),
-      });
+    it('DB（真連線）與 Redis 皆正常時回 200，details 標記 up', async () => {
+      const { app } = await createE2EApp({ redis: createMockRedis() });
 
       const res = await request(app.getHttpServer()).get('/api/health/ready');
 
@@ -58,10 +44,7 @@ describe('Health (e2e)', () => {
       const redis = createMockRedis();
       redis.ping.mockResolvedValue(false);
 
-      const { app } = await createE2EApp({
-        prisma: createMockPrisma(),
-        redis,
-      });
+      const { app } = await createE2EApp({ redis });
 
       const res = await request(app.getHttpServer()).get('/api/health/ready');
 
@@ -72,22 +55,7 @@ describe('Health (e2e)', () => {
       await app.close();
     });
 
-    it('DB 查詢失敗時回 503', async () => {
-      const prisma = createMockPrisma();
-      prisma.$queryRaw.mockRejectedValue(new Error('DB down'));
-
-      const { app } = await createE2EApp({
-        prisma,
-        redis: createMockRedis(),
-      });
-
-      const res = await request(app.getHttpServer()).get('/api/health/ready');
-
-      expect(res.status).toBe(503);
-      expect(res.body.success).toBe(false);
-      expect(res.body.code).toBe('SERVICE_UNAVAILABLE');
-
-      await app.close();
-    });
+    // 「DB 查詢失敗 → 503」由 DbHealthIndicator.spec.ts（unit）涵蓋；
+    // 真 DB e2e 無法模擬 DB 故障，故此案例不在 e2e 重複。
   });
 });
