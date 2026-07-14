@@ -65,7 +65,7 @@ pnpm --filter @app/web dev                    # 只啟動前端
 pnpm typecheck                                # 三個 workspace 全部 tsc --noEmit
 pnpm lint
 pnpm test
-pnpm --filter @app/api test:e2e               # 改 controller / 路由時加跑（需 MySQL + Redis）
+pnpm --filter @app/api test:e2e               # 改 controller / 路由時加跑（走真 test DB：需本機 MySQL 的 *_test 庫；Redis 仍 mock）
 
 # 改後端 controller / Swagger 後同步前端型別
 pnpm --filter @app/api swagger:bundle

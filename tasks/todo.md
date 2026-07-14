@@ -6,7 +6,7 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 
 ## 進行中
 
-_（目前無）_
+- [ ] **e2e 改走真 test DB（取代 mock Prisma）** — 依 `openspec/project.md`「測試結構」的 spec 實作：`setup-env` 覆寫 `DB_DATABASE=*_test` + 關限流、`global-setup`（守門 *_test → migrate deploy → seed baseline）、`global-teardown`、`helpers/db.ts`（reset/seed）、`createE2EApp` 改注入真 `PrismaService`（Redis 仍 mock）、`test:e2e` 保持 `--runInBand`。5 支現有 e2e spec 從 mock 斷言改寫成「真 DB seed + 查詢斷言」。納入 KGIE 坑：ThrottlerGuard 429（env 關掉）、`.overrideGuard` 對 APP_GUARD 全域 guard 無效、script 用 `pnpm exec` 非 `npx`。
 
 ## 待處理
 

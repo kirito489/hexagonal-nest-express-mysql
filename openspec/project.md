@@ -438,8 +438,11 @@ apps/api/src/
 └── adapter/in/web/{guard,filter,interceptor}/*.spec.ts
 
 apps/api/test/
-├── test-app.ts            # createE2EApp()、createMockRedis() 工廠
-├── setup-env.ts           # 測試用環境變數
+├── test-app.ts            # createE2EApp()（注入真 PrismaService）、createMockRedis() 工廠
+├── setup-env.ts           # e2e 環境變數：DB_DATABASE=*_test、關限流（超大 rate limit）
+├── helpers/db.ts          # 測試庫 reset / seed helper（跨 spec 共用）
+├── global-setup.ts        # 守門（僅 *_test 庫）→ 建庫 + migrate deploy + seed baseline
+├── global-teardown.ts     # 收尾（disconnect）
 ├── auth.e2e-spec.ts
 ├── member.e2e-spec.ts
 ├── role.e2e-spec.ts
@@ -447,21 +450,16 @@ apps/api/test/
 └── serve-static.e2e-spec.ts   # 單一埠：服務前端 dist + SPA fallback + /api 不被攔截（forceServeStatic）
 ```
 
-E2E 範例：
+E2E 走**真正的 test 資料庫**（非 mock Prisma），只 mock Redis：
 
-```typescript
-import { createE2EApp, createMockRedis } from './test-app';
+- **專用測試庫**：`test/setup-env.ts` 把 `DB_DATABASE` 覆寫成 `*_test`（本專案 Prisma 走 object-config `PrismaMariaDb`、非 `DATABASE_URL`，故以資料庫「名稱」隔離）；`createE2EApp` 用**真 `PrismaService`** 連該庫。
+- **globalSetup 守門**：目標 DB 名稱不是 `*_test` 就中止（絕不誤 migrate / 清空 dev / prod 庫）；通過才建庫 + `prisma migrate deploy` + seed baseline。腳本內跑 prisma 一律 `pnpm exec`（不用 `npx`，否則噴 pnpm `Unknown env config` warn）。
+- **序列執行**：`test:e2e` 用 `--runInBand`（等同 `maxWorkers:1`）——所有 spec 共用同一測試庫，平行會互相 `deleteMany` race（`AUTH_UNAUTHENTICATED` / `P2025` 間歇失敗）。
+- **關限流**：`setup-env.ts` 設超大 rate limit env 關掉全域 `APP_GUARD ThrottlerGuard`——序列連跑會跨 spec 累計觸發 429；且 `.overrideGuard(ThrottlerGuard)` 對「經 `APP_GUARD` 註冊的全域 guard」**無效**（NestJS 已知坑），只能走 env。
+- **每 spec 自理狀態**：`beforeEach` 用 `helpers/db.ts` reset（`deleteMany` 相關表）+ seed 該 spec 需要的資料。
+- Redis 仍以 `createMockRedis()` 注入（本次只把 persistence 拉成真 DB）。
 
-const mockRedis = createMockRedis();
-const mockPrisma = {
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  memberRecord: { findUnique: jest.fn(), findFirst: jest.fn() },
-  role: { findFirstOrThrow: jest.fn() },
-};
-
-const { app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis });
-```
+> 為何走真 DB：provider 建構子副作用（如 `S3FileStorage` 於建構子建 client）、env 空字串、adapter 即時計算的欄位等，**只有接真 DI + 真 DB 的 e2e 抓得到**，mock 版看不到。
 
 ### System Log
 

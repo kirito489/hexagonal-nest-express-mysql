@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository. **Architecture, tech stack, and module conventions live in `openspec/project.md`** — do not duplicate them here. This file only governs Claude behavior, workflow, and commands.
+Behavior rules for Claude Code in this repo. **Architecture, tech stack, project structure, module conventions, `gen:module`, seed, and the full command reference all live in `openspec/project.md`** — do not duplicate them here. This file only governs Claude's behavior, workflow, Hard Rules, and common commands. If the architecture isn't clear before you start, read `openspec/project.md` first.
 
 ---
 
@@ -8,31 +8,47 @@ Guidance for Claude Code when working in this repository. **Architecture, tech s
 
 At the start of every new session:
 
-1. Ensure `tasks/lessons.md` and `tasks/todo.md` exist. If missing, create each with the title line and a one-line subtitle.
-2. Read `tasks/lessons.md` — known pitfalls from past corrections.
+1. Ensure `tasks/lessons.md` and `tasks/todo.md` exist. If missing, create each with a title line + a one-line subtitle.
+2. Read `tasks/lessons.md` — known pitfalls accumulated from past corrections.
 3. Read `tasks/todo.md` — pending cross-change items and deferred features.
-4. Read `openspec/project.md` — project context, structure, tech stack, and conventions.
-5. If working on a feature: check `openspec/changes/` for active (non-archived) changes and read their `tasks.md`.
+4. Read `openspec/project.md` — project context, structure, tech stack, conventions.
+5. If working on a feature: check `openspec/changes/` for any active (non-archived) change and read its `tasks.md`.
 
 ---
 
 ## Critical Rules
 
-- **Never execute `git commit` or `git push`** unless explicitly asked. Provide the commands for the user to run manually.
-- **Do not over-engineer**: implement exactly what is asked — no extra endpoints, migration scripts, debug APIs, or entity files. When in doubt, do less.
-- **Output data directly**: when asked for data or JSON, print it to stdout. Do not provide placeholder values, setup instructions, or scripts unless explicitly requested.
-- **Verify schema before modifying queries**: always check `apps/api/prisma/schema.prisma` before assuming a field exists on a model.
-- **Reuse before creating**: search `apps/api/src/` (backend), `apps/web/src/` (frontend), and `packages/api-client/src/` (shared) for existing helpers / facades / ports / adapters / hooks before writing new ones.
-- **New env var → add it to `validate-env`**: any new environment variable must also be added to the Zod schema in `apps/api/src/infrastructure/validate-env.ts` (and `.env.example`), or it fails silently as `undefined` at runtime.
+- **Never run `git commit` / `git push` on your own** unless explicitly asked. Provide the commands for the user to run manually.
+- **Do not over-engineer**: implement only what's asked — no extra endpoints, migration scripts, debug APIs, or entity files. When in doubt, do less.
+- **Output data directly**: when asked for data / JSON, print it straight to stdout. Do not give placeholder values, setup steps, or scripts unless explicitly asked.
+- **Verify schema before modifying queries**: before assuming a field exists, check `apps/api/prisma/schema.prisma`.
+- **Reuse before creating**: before writing anything new, search `apps/api/src/` (backend), `apps/web/src/` (frontend), and `packages/api-client/src/` (shared) for an existing helper / facade / port / adapter / hook.
+
+---
+
+## Hard Rules
+
+> Scannable red-line list; complements the Critical Rules above.
+
+- 🚫 **Never let a controller touch Prisma / a repository directly** — always go through `Facade → UseCase / Service → Port` (hexagonal layering).
+- 🚫 **Never `throw new Error('...')`** — use a domain exception (a named subclass extending `Error`) or a NestJS `HttpException`, and add the mapping in `GlobalExceptionFilter` (status + SCREAMING_SNAKE code).
+- 🚫 **Never hand-write a DTO class** — request / response types are always inferred from a Zod schema via `z.infer`, validated with `ZodValidationPipe`.
+- 🚫 **Never set `"type": "module"` on the root or `apps/api` `package.json`** — stay on the NestJS CommonJS baseline; switching to ESM cascades into breaking nest CLI / ts-jest / decorator metadata (`apps/web` is the exception — it's Vite ESM by design).
+- 🚫 **Never skip env validation** — any new env var must be added to the `envSchema` in `apps/api/src/infrastructure/validate-env.ts` (production-mandatory ones also into `productionErrors`), or it fails silently as `undefined` at runtime.
+- 🚫 **Never let an Exception message leak sensitive info** — SQL / stack traces must not reach the client; unexpected errors always return 500 + a generic message (domain exceptions return only a safe message).
+- 🚫 **Never mock the database in e2e / integration tests** — run against a dedicated test database (`test/setup-env.ts` overrides `DB_DATABASE` to a `*_test` DB — object-config Prisma, no `DATABASE_URL`). `globalSetup` must verify the target DB name ends in `_test` before migrating/resetting; run serially (`--runInBand`) since all specs share one test DB.
+- 🚫 **Never run `pnpm dev` on your own** (including per-`--filter`) — the dev server is started by the user for verification.
+- 🚫 **Never modify `.env`** — that's the user's DB / secret config; only edit `.env.example`.
 
 ---
 
 ## Communication Style
 
-- Default language is **Traditional Chinese (繁體中文)** for chat replies. Switch to English only when the user does.
-- When the user says "不用" or interrupts, stop immediately and keep replies brief.
-- Before changes that touch 3+ files, outline the plan (which files, what changes) and wait for confirmation.
-- Match response length to question complexity. Simple question → direct answer, no headers.
+- Default reply language is **Traditional Chinese**; switch to English only when the user does.
+- When the user says 「不用」 or interrupts, stop immediately and keep replies brief.
+- Before a change touching 3+ files, outline the plan (which files, what changes) and wait for confirmation.
+- When a requirement is ambiguous, ask one key question rather than guessing the implementation.
+- Match reply length to question complexity. Simple question → direct answer, no headers.
 
 ---
 
@@ -40,24 +56,24 @@ At the start of every new session:
 
 This project has explicit per-file language rules:
 
-| File / location              | Language                          |
-| ---------------------------- | --------------------------------- |
-| `CLAUDE.md` (this file)      | **English**                       |
-| `README.md`                  | Traditional Chinese               |
-| `openspec/project.md`        | Traditional Chinese               |
-| `openspec/changes/**/*.md`   | Traditional Chinese               |
-| `tasks/lessons.md`, `todo.md`| Traditional Chinese               |
-| Code comments (all files)    | Traditional Chinese only          |
-| Frontend UI strings          | Traditional Chinese only          |
+| File / location               | Language                 |
+| ----------------------------- | ------------------------ |
+| `CLAUDE.md` (this file)       | **English**              |
+| `README.md`                   | Traditional Chinese      |
+| `openspec/project.md`         | Traditional Chinese      |
+| `openspec/changes/**/*.md`    | Traditional Chinese      |
+| `tasks/lessons.md`, `todo.md` | Traditional Chinese      |
+| Code comments (all files)     | Traditional Chinese only |
+| Frontend UI strings           | Traditional Chinese only |
 
-- **Never use Japanese** in any artifact in this repo (overrides any bilingual default in global CLAUDE.md).
-- **Never write code comments in English or bilingual format** — Traditional Chinese only.
+- **Never use Japanese** in any artifact (overrides the bilingual default in the global CLAUDE.md).
+- **Never write code comments in English or bilingual** — Traditional Chinese only.
 
 ---
 
 ## Code Style
 
-- Every non-trivial function gets a TSDoc comment in Traditional Chinese only:
+- Every non-trivial function gets a Traditional-Chinese TSDoc comment:
   ```typescript
   /**
    * 依 ID 查詢使用者
@@ -66,7 +82,7 @@ This project has explicit per-file language rules:
    */
   ```
 - Comments are **moderate**: explain _why_ (non-obvious logic, domain terms, workarounds), not _what_. No comments on self-explanatory code.
-- Prefer arrow functions over `function` declarations unless a named function is strictly required (hoisting, recursion).
+- Prefer arrow functions unless a named function is strictly required (hoisting, recursion).
 - TypeScript: full `strict: true` from the shared `tsconfig.base.json`. Don't relax strictness in a sub-workspace without justification.
 
 ---
@@ -76,49 +92,55 @@ This project has explicit per-file language rules:
 Three layers work together:
 
 | Layer       | Tool                                 | Purpose                                                       |
-| ----------- | ------------------------------------ | ------------------------------------------------------------- |
-| **Memory**  | `tasks/todo.md` + `tasks/lessons.md` | Cross-session deferred items and lessons                      |
-| **Spec**    | `openspec/changes/<name>/`           | Proposal, design, specs, tasks per change                     |
+| ----------- | ------------------------------------ | ------------------------------------------------------------ |
+| **Memory**  | `tasks/todo.md` + `tasks/lessons.md` | Cross-session deferred items and lessons                     |
+| **Spec**    | `openspec/changes/<name>/`           | Per-change proposal / design / specs / tasks                 |
 | **Process** | openspec + selected superpowers      | Change management + TDD / verification / debugging discipline |
 
 ### Phase 1 — Explore & Design (new feature)
 
-- Gather design context from available sources — design files via MCP (Pencil, Figma, etc.), PNG / screenshot assets in `openspec/assets/`, or referenced docs.
-- Invoke `openspec-explore` as a thinking partner to clarify requirements.
-- Write approved design → `openspec/changes/<name>/design.md`.
+- Gather design context from available sources — MCP design files (Pencil, Figma, etc.), PNGs / screenshots in `openspec/assets/`, or referenced docs.
+- Use `openspec-explore` (or `superpowers:brainstorming` — one question at a time, decisions via `AskUserQuestion`) as a thinking partner to clarify requirements.
+- Write the approved design to `openspec/changes/<name>/design.md`.
 
 ### Phase 2 — Specify
 
-- Invoke `openspec-propose` → generates `proposal.md`, `specs/`, `tasks.md` in the change folder.
-- API changes must define request body and response schema in the change's `specs/` folder before any controller code is written.
-- `tasks.md` phases follow this order for backend changes: Schema/Migration → Domain/Port → Exceptions/Filter → Services (TDD) → Out Adapter → Controller/DTO → Facade + Module → Swagger → Unit Tests → E2E Tests → Verification → Wrap-up.
-- User reviews and approves before any code is written.
+- Use `openspec-propose` → generates `proposal.md`, `specs/`, `tasks.md` in the change folder.
+- API changes must define request / response specs (the unified wrapper / code / status for success + each failure response) in the change's `specs/` before any controller code.
+- For backend changes, `tasks.md` phases follow this order: Schema/Migration → Domain/Port → Exceptions/Filter → Services (TDD) → Out Adapter → Controller/DTO → Facade + Module → Swagger → Unit tests → E2E tests → Verification → Wrap-up.
+- The user reviews and approves before any code is written.
 
 ### Phase 3 — Implement
 
-- Invoke `openspec-apply` to work through `tasks.md` task by task.
-- For service / use case implementation, invoke `superpowers:test-driven-development` — write spec first, then implementation.
-- Before marking a task done, invoke `superpowers:verification-before-completion` — never claim "done" without running the verification command.
-- Run **Pre-Change Checklist** (below) before suggesting a commit.
-- Create `smoke-test.md` in the change folder with curl commands for manual verification of new endpoints.
+- Use `openspec-apply` to work task by task.
+- For service / use case implementation use `superpowers:test-driven-development` — spec first, then implementation; write unit tests per block (mock ports at the service layer).
+- **Work in blocks**: split the change into blocks that each build / verify independently (mind chained dependencies — e.g. dropping a column hits service / seed, so bind them into the same block; never leave a non-compiling intermediate state). Each block: run the Pre-Change Checklist green → give one bulleted commit command (the user runs it) → move to the next block.
+- Before marking a task done, use `superpowers:verification-before-completion` — never claim "done" without running the verification command.
+- Create `smoke-test.md` in the change folder with curl commands for manually verifying new endpoints.
 
 ### Phase 4 — Complete
 
-- Invoke `openspec-archive-change` to close the change — automatically merges the change's `specs/` into `openspec/specs/` (master specs) and moves the change folder into `openspec/changes/archive/<YYYY-MM-DD>-<name>/`.
-- Move any deferred items to `tasks/todo.md`.
-- Append new lessons to `tasks/lessons.md`.
-- For debugging during any phase, invoke `superpowers:systematic-debugging`.
+- Use `openspec-archive-change` to close the change — it merges the change's `specs/` into `openspec/specs/` (master specs) and moves the change folder to `openspec/changes/archive/<YYYY-MM-DD>-<name>/`.
+- Move deferred items to `tasks/todo.md`; append new lessons to `tasks/lessons.md`.
+- **Review follow-up**: from the branch review report, open a fix change (same propose → apply → archive), split by severity (🔴 blockers first → same-topic 🟡 → the rest 🟡 / 🟢 in a separate cleanup change).
+- Debug at any phase with `superpowers:systematic-debugging` (find the root cause before fixing).
+
+### Working Habits
+
+- **Subagent strategy**: offload research, broad searches, or cross-file comparison to an Explore subagent to protect the main context.
+- **Demand elegance**: before acting, ask "is there a more elegant / smaller way?"
+- **Lessons format**: record immediately when corrected or after hitting a non-obvious pitfall; each entry covers Symptom / Why / How to apply (see the "撰寫格式" section at the top of `tasks/lessons.md`).
 
 ### Memory rules
 
 **`tasks/todo.md`** — update in these four situations:
 
-1. **Before implementation**: record the change name and goal being started (e.g. `[ ] implement add-role-management`).
+1. **Before implementation**: record the change name and goal you're starting (e.g. `[ ] implement add-role-management`).
 2. **After implementation**: review todo.md, confirm all goals are met, move completed items to the "done" section.
-3. **Cross-change side effect discovered**: write it immediately, do not wait until end of session.
+3. **Cross-change side effect discovered**: write it immediately, don't wait until session end.
 4. **Feature deferred due to external dependency**: record the reason and condition.
 
-**`tasks/lessons.md`** — append after corrections OR after the user confirms a non-obvious approach worked; never delete entries.
+**`tasks/lessons.md`** — append after corrections OR after the user confirms a non-obvious approach worked; never delete existing entries.
 
 **Design docs** always live in `openspec/changes/<name>/design.md`.
 
@@ -128,13 +150,13 @@ Three layers work together:
 
 After making changes, before suggesting a commit:
 
-1. `pnpm typecheck` — fix all type errors across all three workspaces. If api typecheck fails with "Property X does not exist on PrismaService", run `pnpm --filter @app/api db:generate` first.
+1. `pnpm typecheck` — fix all type errors across the three workspaces. If api typecheck reports "Property X does not exist on PrismaService", run `pnpm --filter @app/api db:generate` first.
 2. `pnpm lint` — fix all lint warnings / errors.
-3. `pnpm test` — ensure no regressions. Run `pnpm --filter @app/api test:e2e` if controllers or routes changed (requires MySQL + Redis running locally).
-4. `pnpm build` — when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
-5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` and `pnpm --filter @app/api-client generate` to keep frontend types in sync.
+3. `pnpm test` — ensure no regressions. If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked).
+4. `pnpm build` — run when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
+5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` + `pnpm --filter @app/api-client generate` to keep frontend types in sync.
 
-Once all checks pass, suggest a commit message (Traditional Chinese, conventional commits format). Do not execute `git commit`.
+Once all pass, suggest a commit message (Traditional Chinese, conventional commits; body as bullets, one change per bullet). Do not run `git commit` yourself.
 
 ---
 
@@ -144,9 +166,9 @@ Package manager: **pnpm 11+**. Run from repo root.
 
 ```bash
 pnpm install                                  # install all workspace deps
-pnpm dev                                      # start apps/api + apps/web concurrently
+pnpm dev                                      # start apps/api + apps/web in parallel (user runs this; don't run it yourself)
 pnpm typecheck && pnpm lint && pnpm test      # the pre-commit triad
-pnpm --filter @app/api db:generate            # rerun this after any pnpm install before typecheck
+pnpm --filter @app/api db:generate            # run after every pnpm install, before typecheck
 pnpm --filter @app/api swagger:bundle && pnpm --filter @app/api-client generate   # after Swagger changes
 ```
 
@@ -158,10 +180,10 @@ pnpm --filter @app/api swagger:bundle && pnpm --filter @app/api-client generate 
 
 See **`openspec/project.md`** for:
 
-- Backend hexagonal layout (`adapter` / `application` / `domain` / `infrastructure`) and module naming.
+- Backend hexagonal layout (`adapter` / `application` / `domain` / `infrastructure`), module naming, and the `gen:module` generator.
 - Frontend directory layout, path aliases, shadcn integration, form / API conventions.
 - Swagger yaml inline-data convention (never `$ref: SuccessResponse`).
-- Auth flow, token storage, CORS, environment variables.
+- Auth flow, token storage, CORS, environment variables, time-handling convention, naming conventions.
 - API client design (source-first, auto-unwrap of `{ success, data, timestamp }`).
 
-Do not duplicate any of that here. When in doubt, read `openspec/project.md` first.
+Don't duplicate any of that here. When in doubt, read `openspec/project.md` first.
