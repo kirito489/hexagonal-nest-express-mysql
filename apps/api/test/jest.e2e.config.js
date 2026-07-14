@@ -10,10 +10,6 @@ module.exports = {
   globalSetup: '<rootDir>/test/global-setup.ts',
   // 所有 spec 共用同一測試庫，序列執行避免互相 deleteMany race
   maxWorkers: 1,
-  // Block B 待轉真 DB：這幾支仍餵 mockPrisma、斷言 mock 行為，暫時排除
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '(member|role|security)\\.e2e-spec\\.ts$',
-  ],
+  testPathIgnorePatterns: ['/node_modules/'],
   forceExit: true,
 };

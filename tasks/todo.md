@@ -6,7 +6,7 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 
 ## 進行中
 
-- [ ] **e2e 改走真 test DB（取代 mock Prisma）** — 依 `openspec/project.md`「測試結構」的 spec 實作：`setup-env` 覆寫 `DB_DATABASE=*_test` + 關限流、`global-setup`（守門 *_test → migrate deploy → seed baseline）、`global-teardown`、`helpers/db.ts`（reset/seed）、`createE2EApp` 改注入真 `PrismaService`（Redis 仍 mock）、`test:e2e` 保持 `--runInBand`。5 支現有 e2e spec 從 mock 斷言改寫成「真 DB seed + 查詢斷言」。納入 KGIE 坑：ThrottlerGuard 429（env 關掉）、`.overrideGuard` 對 APP_GUARD 全域 guard 無效、script 用 `pnpm exec` 非 `npx`。
+_(目前無)_
 
 ## 待處理
 
@@ -29,6 +29,10 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 
 ### 2026-07-14
 
+- [x] **e2e 全面改走真 test DB（取代 mock Prisma）** — 6 支 e2e spec（health / serve-static / auth / role / member / security）全轉真庫，**114 tests 全綠** + typecheck 0 + lint pass：
+  - 基建（前批 commit `d16cc8e` / `50027d2`）：`helpers/e2e-env.ts`（載真 `.env` 帳密 + 守門測試庫名須含 `test`）、`setup-env.e2e.ts`（覆寫 `DB_DATABASE=*_test` + 補測試 secrets）、`global-setup.ts`（`CREATE DATABASE IF NOT EXISTS` + `pnpm exec prisma migrate deploy`）、`helpers/db.ts`（`resetDb` 依 FK 序清表 / `ensurePermissions` / `seedMember` / `seedRole`）、`test-app.ts` 注入真 `PrismaService`（Redis 仍 mock）。
+  - 本批：role / member / security 從「mock 斷言」改「真 DB seed + 查庫斷言」；`seedMember` / `seedRole` 加 `roleCode`（security 走 `@Roles(SUPERADMIN)`、flag 預設開，admin 需 `roleCode:'SUPERADMIN'`，值由 JwtAuthGuard 每次查 DB 補進 `request.member`）；`jest.e2e.config.js` 移除 security 的 `testPathIgnorePatterns`。
+  - KGIE 坑的實際處置：限流 429 因 Redis 仍 mock（`throttleIncrement→1`）而無影響、無需 `.overrideGuard` 全域 guard、script 用 `pnpm exec` 非 `npx`。詳見 lessons.md「測試 / 真 DB e2e」。
 - [x] **借鏡 kgie-nest-backend 的工程設置（第一批 DX + ESLint 升級）** — typecheck / lint / test（api 211 + web 27）全綠：
   - `.vscode/extensions.json`：推薦擴充（prettier / eslint / prisma / tailwind）。
   - **ESLint 抽共用基底 `packages/eslint-config`**：api / web 皆 extends；基底只放 `ignores` + `js.recommended` + 家規（`houseRules` named export），tseslint 預設由各 workspace 自帶「一組」（避免 Cannot redefine plugin）。

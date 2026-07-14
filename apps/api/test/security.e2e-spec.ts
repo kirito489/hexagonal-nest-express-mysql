@@ -1,177 +1,105 @@
-import bcrypt from 'bcrypt';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { Prisma } from '@prisma/client';
+import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
+import { resetDb, seedMember } from './helpers/db';
 
-// ──────────────────────────────────────────────
-// Mock 資料
-// ──────────────────────────────────────────────
-const TEST_PASSWORD = 'TestPass123!';
-const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);
-const ADMIN_UUID = '00000000-0000-4000-8000-000000000001';
-const ROLE_UUID = '00000000-0000-4000-8000-000000000010';
+// 走真 test DB:beforeEach seed 一個 roleCode=SUPERADMIN 的 admin 並登入取 token
+//（security 走 RolesGuard + @Roles(SUPERADMIN)，flag 預設開啟,roleCode 由 JwtAuthGuard 每次查 DB 補上）。
+// IP 名單直接落庫 / 查庫斷言;unlock 以真鎖定紀錄驗證;forgot/reset-password 為 @Public 免 token。
+const ADMIN_EMAIL = 'admin@test.com';
+const PASSWORD = 'TestPass123!';
+const MISSING_ID = '00000000-0000-4000-8000-0000000000ff';
 
-const ADMIN_RECORD = {
-  id: ADMIN_UUID,
-  email: 'admin@test.com',
-  member: 'Admin',
-  password: TEST_HASH,
-  roleId: ROLE_UUID,
-  status: true,
-  isDefault: false,
-  lockedAt: null,
-  failedLoginCount: 0,
-  lastPasswordChange: null,
-  createdAt: new Date('2024-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-  lastLoginAt: null,
-  role: {
-    name: '管理者',
-    roleCode: 'SUPERADMIN',
-    permissions: [
-      {
-        permission: {
-          permissionCode: 'BACKEND:ACCOUNT:VIEW',
-          status: true,
-        },
-      },
-    ],
-  },
-};
-
-const mockPrisma = {
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  // list endpoints 改用 $transaction([findMany, count])；陣列 form 直接 Promise.all
-  $transaction: jest.fn().mockImplementation((arg: unknown) => {
-    if (typeof arg === 'function')
-      return (arg as (tx: unknown) => unknown)(mockPrisma);
-    return Promise.all(arg as Promise<unknown>[]);
-  }),
-  memberRecord: {
-    findUnique: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    upsert: jest.fn().mockResolvedValue({}),
-    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-    update: jest.fn().mockResolvedValue({}),
-  },
-  role: {
-    findFirstOrThrow: jest.fn().mockResolvedValue({
-      id: ROLE_UUID,
-      name: 'ADMIN',
-      isDefault: false,
-      status: true,
-    }),
-  },
-  ipWhitelistRecord: {
-    findUnique: jest.fn().mockResolvedValue(null),
-    findMany: jest.fn().mockResolvedValue([]),
-    count: jest.fn().mockResolvedValue(0),
-    upsert: jest.fn().mockResolvedValue({ id: 'wl-new-uuid' }),
-    update: jest.fn().mockResolvedValue({}),
-    delete: jest.fn().mockResolvedValue({}),
-  },
-  ipBlacklistRecord: {
-    findUnique: jest.fn().mockResolvedValue(null),
-    findMany: jest.fn().mockResolvedValue([]),
-    count: jest.fn().mockResolvedValue(0),
-    upsert: jest.fn().mockResolvedValue({ id: 'bl-new-uuid' }),
-    update: jest.fn().mockResolvedValue({}),
-    delete: jest.fn().mockResolvedValue({}),
-  },
-  authLogRecord: {
-    create: jest.fn().mockResolvedValue({}),
-  },
-  passwordResetTokenRecord: {
-    create: jest.fn().mockResolvedValue({}),
-    findUnique: jest.fn().mockResolvedValue(null),
-    update: jest.fn().mockResolvedValue({}),
-  },
-};
-
-const mockRedis = createMockRedis();
-
-// ──────────────────────────────────────────────
-// Helper：取得 JWT token
-// ──────────────────────────────────────────────
-const getAdminToken = async (app: NestExpressApplication): Promise<string> => {
-  mockPrisma.memberRecord.findUnique.mockResolvedValue(ADMIN_RECORD);
-
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email: 'admin@test.com', password: TEST_PASSWORD });
-
-  return (res.body as { data: { accessToken: string } }).data.accessToken;
-};
-
-// ──────────────────────────────────────────────
-// E2E Test Suite
-// ──────────────────────────────────────────────
 describe('Security E2E', () => {
   let app: NestExpressApplication;
+  let prisma: PrismaService;
   let token: string;
+  let adminRoleId: string;
+  const mockRedis = createMockRedis();
+
+  const get = (url: string) =>
+    request(app.getHttpServer())
+      .get(url)
+      .set('Authorization', `Bearer ${token}`);
+  const post = (url: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer())
+      .post(url)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  const patch = (url: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer())
+      .patch(url)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  const del = (url: string) =>
+    request(app.getHttpServer())
+      .delete(url)
+      .set('Authorization', `Bearer ${token}`);
 
   beforeAll(async () => {
-    ({ app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis }));
-    token = await getAdminToken(app);
+    ({ app } = await createE2EApp({ redis: mockRedis }));
+    prisma = app.get(PrismaService);
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.isTokenBlacklisted.mockResolvedValue(false);
     mockRedis.throttleIncrement.mockResolvedValue(1);
-    mockPrisma.memberRecord.findUnique.mockResolvedValue(ADMIN_RECORD);
-    mockPrisma.memberRecord.findFirst.mockResolvedValue(ADMIN_RECORD);
+    await resetDb(prisma);
+    ({ roleId: adminRoleId } = await seedMember(prisma, {
+      email: ADMIN_EMAIL,
+      password: PASSWORD,
+      roleName: '管理者',
+      roleCode: 'SUPERADMIN',
+    }));
+    const res = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: ADMIN_EMAIL, password: PASSWORD });
+    token = (res.body as { data: { accessToken: string } }).data.accessToken;
   });
 
   // ── IP 白名單 ──────────────────────────────
 
   describe('GET /api/security/ip-whitelist', () => {
     it('Admin JWT → 200 + { list, meta }', async () => {
-      mockPrisma.ipWhitelistRecord.findMany.mockResolvedValue([
-        {
-          id: '1',
-          ipAddress: '1.2.3.4',
-          description: 'test',
-          createdAt: new Date(),
-        },
-      ]);
-      mockPrisma.ipWhitelistRecord.count.mockResolvedValue(1);
+      await prisma.ipWhitelistRecord.create({
+        data: { ipAddress: '1.2.3.4', description: 'test' },
+      });
 
-      const res = await request(app.getHttpServer())
-        .get('/api/security/ip-whitelist')
-        .set('authorization', `Bearer ${token}`);
+      const res = await get('/api/security/ip-whitelist');
 
       expect(res.status).toBe(200);
       const body = res.body as {
         data: {
-          list: Array<{ id: string }>;
+          list: Array<{ id: string; ipAddress: string }>;
           meta: { page: number; total: number };
         };
       };
       expect(body.data.list).toHaveLength(1);
+      expect(body.data.list[0].ipAddress).toBe('1.2.3.4');
       expect(body.data.meta.page).toBe(1);
       expect(body.data.meta.total).toBe(1);
     });
 
-    it('search → where.ipAddress.contains 帶上', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/api/security/ip-whitelist?search=192.168')
-        .set('authorization', `Bearer ${token}`);
+    it('search → 依 ipAddress 模糊過濾', async () => {
+      await prisma.ipWhitelistRecord.createMany({
+        data: [{ ipAddress: '192.168.1.1' }, { ipAddress: '10.0.0.1' }],
+      });
+
+      const res = await get('/api/security/ip-whitelist?search=192.168');
 
       expect(res.status).toBe(200);
-      expect(mockPrisma.ipWhitelistRecord.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { ipAddress: { contains: '192.168' } },
-        }),
-      );
+      const body = res.body as {
+        data: { list: Array<{ ipAddress: string }> };
+      };
+      expect(body.data.list).toHaveLength(1);
+      expect(body.data.list[0].ipAddress).toBe('192.168.1.1');
     });
 
     it('無 JWT → 401', async () => {
@@ -184,55 +112,44 @@ describe('Security E2E', () => {
   });
 
   describe('POST /api/security/ip-whitelist', () => {
-    it('Admin 新增白名單 → 201 + { id }', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/security/ip-whitelist')
-        .set('authorization', `Bearer ${token}`)
-        .send({ ip: '10.0.0.1', description: '辦公室' });
+    it('Admin 新增白名單 → 201 + { id } 且落庫', async () => {
+      const res = await post('/api/security/ip-whitelist', {
+        ip: '10.0.0.1',
+        description: '辦公室',
+      });
 
       expect(res.status).toBe(201);
-      expect(mockPrisma.ipWhitelistRecord.upsert).toHaveBeenCalled();
-      const body = res.body as { data: { id: string } };
-      expect(body.data.id).toBe('wl-new-uuid');
+      const id = (res.body as { data: { id: string } }).data.id;
+      expect(typeof id).toBe('string');
+      const row = await prisma.ipWhitelistRecord.findUnique({
+        where: { ipAddress: '10.0.0.1' },
+      });
+      expect(row?.description).toBe('辦公室');
     });
 
     it('缺少 ip → 400', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/security/ip-whitelist')
-        .set('authorization', `Bearer ${token}`)
-        .send({});
+      const res = await post('/api/security/ip-whitelist', {});
 
       expect(res.status).toBe(400);
     });
   });
 
   describe('GET /api/security/ip-whitelist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000aa01';
-
     it('Admin 取單筆 → 200', async () => {
-      mockPrisma.ipWhitelistRecord.findUnique.mockResolvedValue({
-        id: TEST_UUID,
-        ipAddress: '10.0.0.1',
-        description: 'office',
-        createdBy: null,
-        createdAt: new Date(),
+      const { id } = await prisma.ipWhitelistRecord.create({
+        data: { ipAddress: '10.0.0.1', description: 'office' },
       });
 
-      const res = await request(app.getHttpServer())
-        .get(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await get(`/api/security/ip-whitelist/${id}`);
 
       expect(res.status).toBe(200);
       const body = res.body as { data: { id: string; ipAddress: string } };
-      expect(body.data.id).toBe(TEST_UUID);
+      expect(body.data.id).toBe(id);
+      expect(body.data.ipAddress).toBe('10.0.0.1');
     });
 
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
-      mockPrisma.ipWhitelistRecord.findUnique.mockResolvedValue(null);
-
-      const res = await request(app.getHttpServer())
-        .get(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await get(`/api/security/ip-whitelist/${MISSING_ID}`);
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
@@ -240,35 +157,24 @@ describe('Security E2E', () => {
   });
 
   describe('PATCH /api/security/ip-whitelist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000aa02';
+    it('Admin 更新成功 → 204 且落庫', async () => {
+      const { id } = await prisma.ipWhitelistRecord.create({
+        data: { ipAddress: '10.0.0.1', description: '舊備註' },
+      });
 
-    it('Admin 更新成功 → 204', async () => {
-      mockPrisma.ipWhitelistRecord.update.mockResolvedValueOnce({});
-
-      const res = await request(app.getHttpServer())
-        .patch(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`)
-        .send({ description: '新備註' });
+      const res = await patch(`/api/security/ip-whitelist/${id}`, {
+        description: '新備註',
+      });
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.ipWhitelistRecord.update).toHaveBeenCalledWith({
-        where: { id: TEST_UUID },
-        data: { description: '新備註' },
-      });
+      const row = await prisma.ipWhitelistRecord.findUnique({ where: { id } });
+      expect(row?.description).toBe('新備註');
     });
 
     it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
-      const err = Object.assign(new Error('P2025'), { code: 'P2025' });
-      Object.setPrototypeOf(
-        err,
-        Prisma.PrismaClientKnownRequestError.prototype,
-      );
-      mockPrisma.ipWhitelistRecord.update.mockRejectedValueOnce(err);
-
-      const res = await request(app.getHttpServer())
-        .patch(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`)
-        .send({ description: 'x' });
+      const res = await patch(`/api/security/ip-whitelist/${MISSING_ID}`, {
+        description: 'x',
+      });
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
@@ -276,35 +182,26 @@ describe('Security E2E', () => {
   });
 
   describe('DELETE /api/security/ip-whitelist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000aa03';
+    it('Admin 移除 → 204 且落庫刪除', async () => {
+      const { id } = await prisma.ipWhitelistRecord.create({
+        data: { ipAddress: '10.0.0.1' },
+      });
 
-    it('Admin 移除 → 204', async () => {
-      const res = await request(app.getHttpServer())
-        .delete(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await del(`/api/security/ip-whitelist/${id}`);
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.ipWhitelistRecord.delete).toHaveBeenCalledWith({
-        where: { id: TEST_UUID },
-      });
+      const row = await prisma.ipWhitelistRecord.findUnique({ where: { id } });
+      expect(row).toBeNull();
     });
 
     it('紀錄不存在仍 → 204（靜默通過，硬刪）', async () => {
-      mockPrisma.ipWhitelistRecord.delete.mockRejectedValueOnce(
-        new Error('P2025'),
-      );
-
-      const res = await request(app.getHttpServer())
-        .delete(`/api/security/ip-whitelist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await del(`/api/security/ip-whitelist/${MISSING_ID}`);
 
       expect(res.status).toBe(204);
     });
 
     it('非 uuid path param → 400', async () => {
-      const res = await request(app.getHttpServer())
-        .delete('/api/security/ip-whitelist/not-a-uuid')
-        .set('authorization', `Bearer ${token}`);
+      const res = await del('/api/security/ip-whitelist/not-a-uuid');
 
       expect(res.status).toBe(400);
     });
@@ -314,61 +211,48 @@ describe('Security E2E', () => {
 
   describe('GET /api/security/ip-blacklist', () => {
     it('Admin JWT → 200', async () => {
-      mockPrisma.ipBlacklistRecord.findMany.mockResolvedValue([]);
-
-      const res = await request(app.getHttpServer())
-        .get('/api/security/ip-blacklist')
-        .set('authorization', `Bearer ${token}`);
+      const res = await get('/api/security/ip-blacklist');
 
       expect(res.status).toBe(200);
     });
   });
 
   describe('POST /api/security/ip-blacklist', () => {
-    it('Admin 新增黑名單 → 201 + { id }', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/security/ip-blacklist')
-        .set('authorization', `Bearer ${token}`)
-        .send({ ip: '192.168.1.100', reason: '惡意攻擊' });
+    it('Admin 新增黑名單 → 201 + { id }，isAutoBlock 預設 false', async () => {
+      const res = await post('/api/security/ip-blacklist', {
+        ip: '192.168.1.100',
+        reason: '惡意攻擊',
+      });
 
       expect(res.status).toBe(201);
-      expect(mockPrisma.ipBlacklistRecord.upsert).toHaveBeenCalled();
-      const body = res.body as { data: { id: string } };
-      expect(body.data.id).toBe('bl-new-uuid');
+      const id = (res.body as { data: { id: string } }).data.id;
+      expect(typeof id).toBe('string');
+      const row = await prisma.ipBlacklistRecord.findUnique({
+        where: { ipAddress: '192.168.1.100' },
+      });
+      expect(row?.reason).toBe('惡意攻擊');
+      expect(row?.isAutoBlock).toBe(false);
     });
   });
 
   describe('GET /api/security/ip-blacklist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000bb01';
-
     it('Admin 取單筆 → 200', async () => {
-      mockPrisma.ipBlacklistRecord.findUnique.mockResolvedValue({
-        id: TEST_UUID,
-        ipAddress: '1.2.3.4',
-        reason: 'brute force',
-        isAutoBlock: false,
-        createdBy: null,
-        createdAt: new Date(),
+      const { id } = await prisma.ipBlacklistRecord.create({
+        data: { ipAddress: '1.2.3.4', reason: 'brute force' },
       });
 
-      const res = await request(app.getHttpServer())
-        .get(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await get(`/api/security/ip-blacklist/${id}`);
 
       expect(res.status).toBe(200);
       const body = res.body as {
         data: { id: string; ipAddress: string; isAutoBlock: boolean };
       };
-      expect(body.data.id).toBe(TEST_UUID);
+      expect(body.data.id).toBe(id);
       expect(body.data.isAutoBlock).toBe(false);
     });
 
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
-      mockPrisma.ipBlacklistRecord.findUnique.mockResolvedValue(null);
-
-      const res = await request(app.getHttpServer())
-        .get(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await get(`/api/security/ip-blacklist/${MISSING_ID}`);
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
@@ -376,35 +260,24 @@ describe('Security E2E', () => {
   });
 
   describe('PATCH /api/security/ip-blacklist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000bb02';
+    it('Admin 更新成功 → 204 且落庫', async () => {
+      const { id } = await prisma.ipBlacklistRecord.create({
+        data: { ipAddress: '1.2.3.4', reason: '舊理由' },
+      });
 
-    it('Admin 更新成功 → 204', async () => {
-      mockPrisma.ipBlacklistRecord.update.mockResolvedValueOnce({});
-
-      const res = await request(app.getHttpServer())
-        .patch(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`)
-        .send({ reason: '新理由' });
+      const res = await patch(`/api/security/ip-blacklist/${id}`, {
+        reason: '新理由',
+      });
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.ipBlacklistRecord.update).toHaveBeenCalledWith({
-        where: { id: TEST_UUID },
-        data: { reason: '新理由' },
-      });
+      const row = await prisma.ipBlacklistRecord.findUnique({ where: { id } });
+      expect(row?.reason).toBe('新理由');
     });
 
     it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
-      const err = Object.assign(new Error('P2025'), { code: 'P2025' });
-      Object.setPrototypeOf(
-        err,
-        Prisma.PrismaClientKnownRequestError.prototype,
-      );
-      mockPrisma.ipBlacklistRecord.update.mockRejectedValueOnce(err);
-
-      const res = await request(app.getHttpServer())
-        .patch(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`)
-        .send({ reason: 'x' });
+      const res = await patch(`/api/security/ip-blacklist/${MISSING_ID}`, {
+        reason: 'x',
+      });
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
@@ -412,27 +285,20 @@ describe('Security E2E', () => {
   });
 
   describe('DELETE /api/security/ip-blacklist/:id', () => {
-    const TEST_UUID = '00000000-0000-4000-8000-00000000bb03';
+    it('Admin 移除 → 204 且落庫刪除', async () => {
+      const { id } = await prisma.ipBlacklistRecord.create({
+        data: { ipAddress: '1.2.3.4' },
+      });
 
-    it('Admin 移除 → 204', async () => {
-      const res = await request(app.getHttpServer())
-        .delete(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await del(`/api/security/ip-blacklist/${id}`);
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.ipBlacklistRecord.delete).toHaveBeenCalledWith({
-        where: { id: TEST_UUID },
-      });
+      const row = await prisma.ipBlacklistRecord.findUnique({ where: { id } });
+      expect(row).toBeNull();
     });
 
     it('紀錄不存在仍 → 204', async () => {
-      mockPrisma.ipBlacklistRecord.delete.mockRejectedValueOnce(
-        new Error('P2025'),
-      );
-
-      const res = await request(app.getHttpServer())
-        .delete(`/api/security/ip-blacklist/${TEST_UUID}`)
-        .set('authorization', `Bearer ${token}`);
+      const res = await del(`/api/security/ip-blacklist/${MISSING_ID}`);
 
       expect(res.status).toBe(204);
     });
@@ -441,77 +307,61 @@ describe('Security E2E', () => {
   // ── 帳號解鎖 ───────────────────────────────
 
   describe('POST /api/security/unlock-account', () => {
-    it('Admin 解鎖鎖定帳號 → 204', async () => {
-      // loadMemberByEmail（findUnique）：找到 member
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
-        ...ADMIN_RECORD,
-        email: 'locked@test.com',
-        lockedAt: new Date(),
-      });
-      // isLocked 改用 findFirst（軟刪過濾）：回傳已鎖定狀態（guard 與 isLocked 共用）
-      mockPrisma.memberRecord.findFirst.mockResolvedValue({
-        ...ADMIN_RECORD,
-        email: 'locked@test.com',
-        lockedAt: new Date(),
+    it('Admin 解鎖鎖定帳號 → 204 且落庫清鎖', async () => {
+      await prisma.memberRecord.create({
+        data: {
+          member: 'Locked',
+          email: 'locked@test.com',
+          password: 'x',
+          roleId: adminRoleId,
+          status: true,
+          isDefault: false,
+          lockedAt: new Date(),
+          failedLoginCount: 5,
+        },
       });
 
-      const res = await request(app.getHttpServer())
-        .post('/api/security/unlock-account')
-        .set('authorization', `Bearer ${token}`)
-        .send({ email: 'locked@test.com' });
+      const res = await post('/api/security/unlock-account', {
+        email: 'locked@test.com',
+      });
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.memberRecord.updateMany).toHaveBeenCalledWith({
-        where: { email: 'locked@test.com', deletedAt: null },
-        data: { failedLoginCount: 0, lockedAt: null },
+      const row = await prisma.memberRecord.findUnique({
+        where: { email: 'locked@test.com' },
       });
+      expect(row?.lockedAt).toBeNull();
+      expect(row?.failedLoginCount).toBe(0);
     });
 
     it('email 不存在 → 404 EMAIL_NOT_FOUND', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(null);
-
-      const res = await request(app.getHttpServer())
-        .post('/api/security/unlock-account')
-        .set('authorization', `Bearer ${token}`)
-        .send({ email: 'unknown@test.com' });
+      const res = await post('/api/security/unlock-account', {
+        email: 'unknown@test.com',
+      });
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('EMAIL_NOT_FOUND');
     });
 
     it('帳號未鎖 → 409 ACCOUNT_NOT_LOCKED', async () => {
-      // loadMemberByEmail（findUnique）：找到
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce({
-        ...ADMIN_RECORD,
-        email: 'normal@test.com',
-        lockedAt: null,
+      // admin 帳號本身未鎖定
+      const res = await post('/api/security/unlock-account', {
+        email: ADMIN_EMAIL,
       });
-      // isLocked 改用 findFirst：beforeEach 預設 ADMIN_RECORD（lockedAt: null）→ 視為未鎖
-
-      const res = await request(app.getHttpServer())
-        .post('/api/security/unlock-account')
-        .set('authorization', `Bearer ${token}`)
-        .send({ email: 'normal@test.com' });
 
       expect(res.status).toBe(409);
       expect((res.body as { code: string }).code).toBe('ACCOUNT_NOT_LOCKED');
-      expect(mockPrisma.memberRecord.updateMany).not.toHaveBeenCalled();
     });
 
     it('缺少 email → 400', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/security/unlock-account')
-        .set('authorization', `Bearer ${token}`)
-        .send({});
+      const res = await post('/api/security/unlock-account', {});
 
       expect(res.status).toBe(400);
     });
 
     it('無效 email 格式 → 400', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/security/unlock-account')
-        .set('authorization', `Bearer ${token}`)
-        .send({ email: 'not-email' });
+      const res = await post('/api/security/unlock-account', {
+        email: 'not-email',
+      });
 
       expect(res.status).toBe(400);
     });
@@ -520,20 +370,17 @@ describe('Security E2E', () => {
   // ── Auth: forgot-password / reset-password ─
 
   describe('POST /api/auth/forgot-password', () => {
-    it('已註冊 email → 204（不洩漏帳號是否存在）', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(ADMIN_RECORD);
-
+    it('已註冊 email → 204 且落庫產生 reset token', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/auth/forgot-password')
-        .send({ email: 'admin@test.com' });
+        .send({ email: ADMIN_EMAIL });
 
       expect(res.status).toBe(204);
-      expect(mockPrisma.passwordResetTokenRecord.create).toHaveBeenCalled();
+      const count = await prisma.passwordResetTokenRecord.count();
+      expect(count).toBeGreaterThanOrEqual(1);
     });
 
     it('不存在 email → 204（同樣回傳成功，防列舉）', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValueOnce(null);
-
       const res = await request(app.getHttpServer())
         .post('/api/auth/forgot-password')
         .send({ email: 'nobody@test.com' });
@@ -552,12 +399,6 @@ describe('Security E2E', () => {
 
   describe('POST /api/auth/reset-password', () => {
     it('無效 token → 400', async () => {
-      // 新的 atomic claim：找不到符合條件的 token 時 Prisma 丟 P2025
-      const p2025 = Object.assign(new Error('Record not found'), {
-        code: 'P2025',
-      });
-      mockPrisma.passwordResetTokenRecord.update.mockRejectedValueOnce(p2025);
-
       const res = await request(app.getHttpServer())
         .post('/api/auth/reset-password')
         .send({ token: 'invalid-token', newPassword: 'NewPass123!' });

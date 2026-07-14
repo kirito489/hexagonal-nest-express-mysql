@@ -18,13 +18,31 @@ export const resetDb = async (prisma: PrismaService): Promise<void> => {
   await prisma.permission.deleteMany();
 };
 
+/** 依 permissionCode 確保 Permission 存在（upsert），回傳其 id 陣列 */
+export const ensurePermissions = async (
+  prisma: PrismaService,
+  codes: string[],
+): Promise<string[]> => {
+  const ids: string[] = [];
+  for (const code of codes) {
+    const [platform, module, action] = code.split(':');
+    const perm = await prisma.permission.upsert({
+      where: { permissionCode: code },
+      create: { permissionCode: code, name: code, platform, module, action },
+      update: {},
+    });
+    ids.push(perm.id);
+  }
+  return ids;
+};
+
 export interface SeededMember {
   memberId: string;
   roleId: string;
 }
 
 /**
- * 建立一個可登入的後台會員:一個 Permission + 一個 Role（綁該權限）+ 一個 Member（bcrypt 密碼）。
+ * 建立一個可登入的後台會員:權限（upsert）+ Role（綁權限）+ Member（bcrypt 密碼）。
  * @returns 新建的 memberId / roleId
  */
 export const seedMember = async (
@@ -34,20 +52,21 @@ export const seedMember = async (
     password: string;
     status?: boolean;
     roleName?: string;
-    permissionCode?: string;
+    roleCode?: string;
+    permissionCodes?: string[];
   },
 ): Promise<SeededMember> => {
-  const permissionCode = opts.permissionCode ?? 'BACKEND:ACCOUNT:VIEW';
-  const [platform, module, action] = permissionCode.split(':');
-  const permission = await prisma.permission.create({
-    data: { permissionCode, name: permissionCode, platform, module, action },
-  });
+  const permIds = await ensurePermissions(
+    prisma,
+    opts.permissionCodes ?? ['BACKEND:ACCOUNT:VIEW'],
+  );
   const role = await prisma.role.create({
     data: {
       name: opts.roleName ?? 'member',
+      roleCode: opts.roleCode,
       status: true,
       isDefault: false,
-      permissions: { create: [{ permissionId: permission.id }] },
+      permissions: { create: permIds.map((id) => ({ permissionId: id })) },
     },
   });
   const member = await prisma.memberRecord.create({
@@ -61,4 +80,30 @@ export const seedMember = async (
     },
   });
   return { memberId: member.id, roleId: role.id };
+};
+
+/**
+ * 建立一個 Role（可帶權限），回傳 roleId。
+ */
+export const seedRole = async (
+  prisma: PrismaService,
+  opts: {
+    name: string;
+    isDefault?: boolean;
+    status?: boolean;
+    roleCode?: string;
+    permissionCodes?: string[];
+  },
+): Promise<string> => {
+  const permIds = await ensurePermissions(prisma, opts.permissionCodes ?? []);
+  const role = await prisma.role.create({
+    data: {
+      name: opts.name,
+      roleCode: opts.roleCode,
+      isDefault: opts.isDefault ?? false,
+      status: opts.status ?? true,
+      permissions: { create: permIds.map((id) => ({ permissionId: id })) },
+    },
+  });
+  return role.id;
 };

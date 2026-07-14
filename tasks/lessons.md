@@ -95,6 +95,16 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **新增 Port 方法會讓既有 mock spec 報 TypeScript 錯誤**：擴充 port interface 時要同步在所有相關 spec 的 mock 物件補上 `jest.fn()`，否則 compile fail。
 
+### 真 DB e2e（object-config Prisma）
+
+- **物件組態 Prisma（無 `DATABASE_URL`）跑真 DB e2e：env 層覆寫 `DB_DATABASE` 到 `*_test` 庫、守門庫名含 `test`、`global-setup` 才組 `DATABASE_URL` 給 migrate CLI**：runtime 用 `PrismaMariaDb({ host, user, password, database })` 物件組態，但 `prisma migrate deploy` CLI 只吃 `DATABASE_URL`。作法：`helpers/e2e-env.ts` 從真 `.env` 載 DB 帳密（`config({ path: '../../.env' })`）→ 斷言 `DB_TEST_DATABASE` 名稱含 `test`（不含就 throw，防打到正式庫）→ `process.env.DB_DATABASE = 測試庫`；`global-setup.ts` 用 mysql2 `CREATE DATABASE IF NOT EXISTS` 後 `execSync('pnpm exec prisma migrate deploy', { env: { ...process.env, DATABASE_URL: 'mysql://user:pw@host:port/testdb' } })`（**`pnpm exec` 非 `npx`**，monorepo 下 npx 抓不到 workspace bin）。`.env*` 受權限保護不可改，帳密只在 runtime 從 `.env` 讀，絕不寫進任何檔案 / commit。
+
+- **mock 斷言 spec 轉真 DB：`toHaveBeenCalledWith` → 真 seed + 查庫斷言；P2025 模擬 → 真的打不存在的 id**：原本 `expect(mockPrisma.x.update).toHaveBeenCalledWith(...)` 改成先 `prisma.x.create` seed、呼叫 API、再 `prisma.x.findUnique` 驗證落庫值；原本手動 `Object.setPrototypeOf(err, Prisma.PrismaClientKnownRequestError.prototype)` 模擬「更新不存在 → P2025 → 404」的 case，真庫直接 PATCH 一個不存在的 UUID 即可（repo 的 `update` 自然丟 P2025 → 映射 404），程式更短更真。每個 spec `beforeEach` 先 `resetDb`（依 FK 序 deleteMany）再 seed，序列執行（`maxWorkers:1`）避免互相 race。
+
+- **真 DB e2e 過 `@Roles(SUPERADMIN)` gate：JWT payload 不含 roleCode，靠 seed 的 role.roleCode + JwtAuthGuard 每次查 DB 補上**：`JwtPayload` 輕量只存 `sub`，`request.member.roleCode` 是 `JwtAuthGuard` 每個 request 呼叫 `loadMemberContext(sub)` 從 DB 撈的。所以 SecurityController 這種 `@Roles(SUPERADMIN)` 端點，seed admin 時必須把 role 的 `roleCode` 設成 `'SUPERADMIN'`（`APPLICATION_ADMIN_ROLE_ENABLED` 預設 `'true'`，e2e 未覆寫故 RolesGuard 生效）。作法：`seedMember` / `seedRole` 開 `roleCode?` 參數傳進 `prisma.role.create`；roleName（顯示名「管理者」）與 roleCode（權限碼 `SUPERADMIN`）是兩回事，gate 比對的是後者。
+
+- **Redis 仍 mock 時，限流 429 與黑名單在真 DB e2e 中不會誤觸**：throttle 計數走 `redis.throttleIncrement`（mock 回 `1`）、token 黑名單走 `redis.isTokenBlacklisted`（mock 回 `false`），故轉真 DB 後 KGIE 那條「ThrottlerGuard 429 要關 env」的坑在本專案自動迴避，唯一要主動測 429 的 case 才 `mockResolvedValue(1_000_000)`。也因全域 guard（APP_GUARD）此路徑不需 `.overrideGuard`。
+
 ## NestJS build
 
 - **tsconfig 設 `preserveWatchOutput: true`，否則 `tsc --watch` 會吃掉終端 scrollback**：tsc 預設用 alternate screen buffer，watch 每次重建會整個替換畫面，先前輸出（如 `[web]` 的 Vite ready URL）消失且無法往上 scroll。作法：monorepo 內任何用 `tsc --watch` 的 workspace（含 `nest start --watch`）都設 `"preserveWatchOutput": true`。

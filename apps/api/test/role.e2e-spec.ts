@@ -1,517 +1,340 @@
-import bcrypt from 'bcrypt';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
+import { resetDb, seedMember, seedRole } from './helpers/db';
 
-// ──────────────────────────────────────────────
-// Mock 資料
-// ──────────────────────────────────────────────
-const TEST_PASSWORD = 'TestPass123!';
-const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);
-const AUTH_UUID = '00000000-0000-4000-8000-000000000001';
-const ROLE_UUID = '00000000-0000-4000-8000-000000000002';
-const TARGET_ROLE_UUID = '00000000-0000-4000-8000-000000000003';
-const PERM_UUID = '00000000-0000-4000-8000-000000000004';
+// 走真 test DB:beforeEach seed 一個帶 BACKEND:ROLE:VIEW/EDIT 的 admin 並登入取 token；
+// 目標角色以 seedRole 建，斷言查真 DB。列表含 admin 自身的角色，故用「包含」語意。
+const ADMIN_EMAIL = 'auth@example.com';
+const PASSWORD = 'TestPass123!';
+const ROLE_PERMS = ['BACKEND:ROLE:VIEW', 'BACKEND:ROLE:EDIT'];
+const MISSING_ID = '00000000-0000-4000-8000-000000000099';
 
-/** 擁有 ROLE VIEW + EDIT 權限的測試管理員 */
-const AUTH_MEMBER = {
-  id: AUTH_UUID,
-  email: 'auth@example.com',
-  member: 'Auth User',
-  password: TEST_HASH,
-  roleId: ROLE_UUID,
-  status: true,
-  isDefault: false,
-  failedLoginCount: 0,
-  lockedAt: null,
-  lastPasswordChange: null,
-  createdAt: new Date('2024-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-  lastLoginAt: null,
-  role: {
-    name: 'admin',
-    permissions: [
-      { permission: { permissionCode: 'BACKEND:ROLE:VIEW', status: true } },
-      { permission: { permissionCode: 'BACKEND:ROLE:EDIT', status: true } },
-    ],
-  },
-};
+describe('Role E2E', () => {
+  let app: NestExpressApplication;
+  let prisma: PrismaService;
+  let token: string;
+  const mockRedis = createMockRedis();
 
-const TARGET_ROLE = {
-  id: TARGET_ROLE_UUID,
-  name: '管理者',
-  status: true,
-  isDefault: false,
-  roleCode: null,
-  deletedAt: null,
-  createdAt: new Date('2024-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-};
-
-const TARGET_PERMISSION = {
-  id: PERM_UUID,
-  permissionCode: 'BACKEND:ROLE:VIEW',
-  name: '後台-角色與權限管理-檢視',
-  platform: 'BACKEND',
-  module: 'ROLE',
-  subModule: null,
-  action: 'VIEW',
-  status: true,
-};
-
-const mockPrisma = {
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  $transaction: jest.fn(),
-  memberRecord: {
-    findUnique: jest.fn().mockResolvedValue(AUTH_MEMBER),
-    findFirst: jest.fn().mockResolvedValue(AUTH_MEMBER),
-    count: jest.fn().mockResolvedValue(0),
-  },
-  role: {
-    findFirstOrThrow: jest.fn().mockResolvedValue({
-      id: ROLE_UUID,
-      name: 'admin',
-      isDefault: true,
-      status: true,
-    }),
-    findMany: jest.fn().mockResolvedValue([TARGET_ROLE]),
-    findFirst: jest.fn(),
-    findUnique: jest.fn().mockResolvedValue(TARGET_ROLE),
-    count: jest.fn().mockResolvedValue(1),
-    create: jest.fn().mockResolvedValue(TARGET_ROLE),
-    update: jest.fn().mockResolvedValue(TARGET_ROLE),
-  },
-  permission: {
-    findMany: jest.fn().mockResolvedValue([TARGET_PERMISSION]),
-    findFirst: jest.fn().mockResolvedValue(TARGET_PERMISSION),
-  },
-  rolePermission: {
-    findMany: jest.fn().mockResolvedValue([]),
-    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-    createMany: jest.fn().mockResolvedValue({ count: 0 }),
-  },
-};
-
-const mockRedis = createMockRedis();
-
-let app: NestExpressApplication;
-
-beforeAll(async () => {
-  ({ app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis }));
-});
-
-afterAll(async () => {
-  await app.close();
-});
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  mockRedis.get.mockResolvedValue(null);
-  mockRedis.isTokenBlacklisted.mockResolvedValue(false);
-  mockRedis.throttleIncrement.mockResolvedValue(1);
-  mockPrisma.memberRecord.findUnique.mockResolvedValue(AUTH_MEMBER);
-  mockPrisma.memberRecord.findFirst.mockResolvedValue(AUTH_MEMBER);
-  mockPrisma.role.findUnique.mockResolvedValue(TARGET_ROLE);
-  mockPrisma.role.update.mockResolvedValue(TARGET_ROLE);
-  // $transaction 同時支援陣列形式與 callback 形式
-  mockPrisma.$transaction.mockImplementation(
-    async (arg: unknown[] | ((tx: unknown) => Promise<unknown>)) => {
-      if (typeof arg === 'function') return arg(mockPrisma);
-      return Promise.all(arg as Promise<unknown>[]);
-    },
-  );
-});
-
-// ──────────────────────────────────────────────
-// Helper：取得 access token
-// ──────────────────────────────────────────────
-const getToken = async (): Promise<string> => {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email: 'auth@example.com', password: TEST_PASSWORD });
-  return (res.body as { data: { accessToken: string } }).data.accessToken;
-};
-
-// ──────────────────────────────────────────────
-// GET /api/roles
-// ──────────────────────────────────────────────
-describe('GET /api/roles', () => {
-  it('回傳角色列表 → 200', async () => {
-    const token = await getToken();
-    mockPrisma.$transaction.mockResolvedValueOnce([[TARGET_ROLE], 1]);
-
-    const res = await request(app.getHttpServer())
-      .get('/api/roles')
+  const get = (url: string) =>
+    request(app.getHttpServer())
+      .get(url)
+      .set('Authorization', `Bearer ${token}`);
+  const post = (url: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer())
+      .post(url)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  const patch = (url: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer())
+      .patch(url)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  const del = (url: string) =>
+    request(app.getHttpServer())
+      .delete(url)
       .set('Authorization', `Bearer ${token}`);
 
-    expect(res.status).toBe(200);
-    const body = res.body as {
-      data: { list: Array<{ name: string }>; meta: { total: number } };
-    };
-    expect(body.data.list).toHaveLength(1);
-    expect(body.data.list[0].name).toBe('管理者');
-    expect(body.data.meta.total).toBe(1);
-  });
-
-  it('無 token → 401', async () => {
-    const res = await request(app.getHttpServer()).get('/api/roles');
-    expect(res.status).toBe(401);
-  });
-
-  it('status=true → 200 且 prisma.findMany where 含 status: true', async () => {
-    const token = await getToken();
-
-    const res = await request(app.getHttpServer())
-      .get('/api/roles?status=true')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: true }),
-      }),
+  const roleNames = (body: unknown): string[] =>
+    (body as { data: { list: Array<{ name: string }> } }).data.list.map(
+      (r) => r.name,
     );
+
+  beforeAll(async () => {
+    ({ app } = await createE2EApp({ redis: mockRedis }));
+    prisma = app.get(PrismaService);
   });
 
-  it('status=false → 200 且 prisma.findMany where 含 status: false', async () => {
-    const token = await getToken();
+  afterAll(async () => {
+    await app.close();
+  });
 
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.isTokenBlacklisted.mockResolvedValue(false);
+    mockRedis.throttleIncrement.mockResolvedValue(1);
+    await resetDb(prisma);
+    await seedMember(prisma, {
+      email: ADMIN_EMAIL,
+      password: PASSWORD,
+      roleName: 'admin',
+      permissionCodes: ROLE_PERMS,
+    });
     const res = await request(app.getHttpServer())
-      .get('/api/roles?status=false')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(mockPrisma.role.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: false }),
-      }),
-    );
+      .post('/api/auth/login')
+      .send({ email: ADMIN_EMAIL, password: PASSWORD });
+    token = (res.body as { data: { accessToken: string } }).data.accessToken;
   });
 
-  it('未帶 status → where 不含 status key', async () => {
-    const token = await getToken();
+  describe('GET /api/roles', () => {
+    it('回傳角色列表 → 200（含目標角色）', async () => {
+      await seedRole(prisma, { name: '管理者' });
 
-    await request(app.getHttpServer())
-      .get('/api/roles')
-      .set('Authorization', `Bearer ${token}`);
+      const res = await get('/api/roles');
 
-    const call = mockPrisma.role.findMany.mock.calls[0]?.[0] as {
-      where: Record<string, unknown>;
-    };
-    expect('status' in call.where).toBe(false);
-  });
-
-  it('status=foo (非合法 enum) → 400', async () => {
-    const token = await getToken();
-
-    const res = await request(app.getHttpServer())
-      .get('/api/roles?status=foo')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(400);
-  });
-});
-
-// ──────────────────────────────────────────────
-// GET /api/roles/permissions
-// ──────────────────────────────────────────────
-describe('GET /api/roles/permissions', () => {
-  it('回傳可用 permission 清單 → 200', async () => {
-    const token = await getToken();
-    mockPrisma.permission.findMany.mockResolvedValue([TARGET_PERMISSION]);
-
-    const res = await request(app.getHttpServer())
-      .get('/api/roles/permissions')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    const body = res.body as {
-      data: Array<{ permissionCode: string }>;
-    };
-    expect(body.data).toHaveLength(1);
-    expect(body.data[0].permissionCode).toBe('BACKEND:ROLE:VIEW');
-  });
-});
-
-// ──────────────────────────────────────────────
-// POST /api/roles
-// ──────────────────────────────────────────────
-describe('POST /api/roles', () => {
-  it('建立成功 → 201', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(null); // 名稱無衝突
-    mockPrisma.permission.findMany.mockResolvedValue([]);
-    mockPrisma.role.create.mockResolvedValue(TARGET_ROLE);
-
-    const res = await request(app.getHttpServer())
-      .post('/api/roles')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '管理者', permissionCodes: [] });
-
-    expect(res.status).toBe(201);
-    const body = res.body as { data: { id: string } };
-    expect(body.data.id).toBe(TARGET_ROLE_UUID);
-  });
-
-  it('名稱衝突 → 409 DUPLICATE_ROLE_NAME', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE); // 名稱已存在
-
-    const res = await request(app.getHttpServer())
-      .post('/api/roles')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '管理者', permissionCodes: [] });
-
-    expect(res.status).toBe(409);
-    expect((res.body as { code: string }).code).toBe('DUPLICATE_ROLE_NAME');
-  });
-
-  it('EDIT 缺少對應 VIEW → 400 INVALID_PERMISSION_COMBINATION', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(null);
-    mockPrisma.permission.findMany.mockResolvedValue([
-      {
-        ...TARGET_PERMISSION,
-        permissionCode: 'BACKEND:ROLE:EDIT',
-        action: 'EDIT',
-      },
-    ]);
-
-    const res = await request(app.getHttpServer())
-      .post('/api/roles')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '新角色', permissionCodes: ['BACKEND:ROLE:EDIT'] });
-
-    expect(res.status).toBe(400);
-    expect((res.body as { code: string }).code).toBe(
-      'INVALID_PERMISSION_COMBINATION',
-    );
-  });
-});
-
-// ──────────────────────────────────────────────
-// GET /api/roles/:id
-// ──────────────────────────────────────────────
-describe('GET /api/roles/:id', () => {
-  it('回傳角色詳情 → 200', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-    mockPrisma.rolePermission.findMany.mockResolvedValue([
-      { permission: { permissionCode: 'BACKEND:ROLE:VIEW' } },
-    ]);
-
-    const res = await request(app.getHttpServer())
-      .get(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    const body = res.body as {
-      data: { id: string; name: string; permissionCodes: string[] };
-    };
-    expect(body.data.id).toBe(TARGET_ROLE_UUID);
-    expect(body.data.name).toBe('管理者');
-    expect(body.data.permissionCodes).toContain('BACKEND:ROLE:VIEW');
-  });
-
-  it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(null);
-
-    const res = await request(app.getHttpServer())
-      .get(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(404);
-    expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
-  });
-});
-
-// ──────────────────────────────────────────────
-// PATCH /api/roles/:id
-// ──────────────────────────────────────────────
-describe('PATCH /api/roles/:id', () => {
-  it('更新成功 → 204', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst
-      .mockResolvedValueOnce(TARGET_ROLE) // findById
-      .mockResolvedValueOnce(null); // findByName（無衝突）
-    mockPrisma.permission.findMany.mockResolvedValue([]);
-
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '新名稱', permissionCodes: [] });
-
-    expect(res.status).toBe(204);
-  });
-
-  it('預設角色不可編輯 → 400 DEFAULT_ROLE_NOT_EDITABLE', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue({
-      ...TARGET_ROLE,
-      isDefault: true,
+      expect(res.status).toBe(200);
+      expect(roleNames(res.body)).toContain('管理者');
+      expect(
+        (res.body as { data: { meta: { total: number } } }).data.meta.total,
+      ).toBeGreaterThanOrEqual(2);
     });
 
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '新名稱', permissionCodes: [] });
-
-    expect(res.status).toBe(400);
-    expect((res.body as { code: string }).code).toBe(
-      'DEFAULT_ROLE_NOT_EDITABLE',
-    );
-  });
-
-  it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(null);
-
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '新名稱', permissionCodes: [] });
-
-    expect(res.status).toBe(404);
-    expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
-  });
-
-  it('僅送 status → 204 且 role.update 收到 { status }', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ status: false });
-
-    expect(res.status).toBe(204);
-    expect(mockPrisma.role.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: TARGET_ROLE_UUID },
-        data: { status: false },
-      }),
-    );
-    // 沒送 permissionCodes 時不應動到 rolePermission
-    expect(mockPrisma.rolePermission.deleteMany).not.toHaveBeenCalled();
-  });
-
-  it('name + status 同送 → 204 且 role.update data 同時含 name 與 status', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst
-      .mockResolvedValueOnce(TARGET_ROLE) // findById
-      .mockResolvedValueOnce(null); // findByName（無衝突）
-
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: '審核人員', status: false });
-
-    expect(res.status).toBe(204);
-    expect(mockPrisma.role.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: TARGET_ROLE_UUID },
-        data: { name: '審核人員', status: false },
-      }),
-    );
-  });
-
-  it('status 型別錯誤（非 boolean）→ 400', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ status: 'off' });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('預設角色僅切 status → 400 DEFAULT_ROLE_NOT_EDITABLE', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue({
-      ...TARGET_ROLE,
-      isDefault: true,
+    it('無 token → 401', async () => {
+      const res = await request(app.getHttpServer()).get('/api/roles');
+      expect(res.status).toBe(401);
     });
 
-    const res = await request(app.getHttpServer())
-      .patch(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ status: false });
+    it('status=true → 只回啟用角色', async () => {
+      await seedRole(prisma, { name: '啟用角色', status: true });
+      await seedRole(prisma, { name: '停用角色', status: false });
 
-    expect(res.status).toBe(400);
-    expect((res.body as { code: string }).code).toBe(
-      'DEFAULT_ROLE_NOT_EDITABLE',
-    );
-  });
-});
+      const res = await get('/api/roles?status=true');
 
-// ──────────────────────────────────────────────
-// DELETE /api/roles/:id
-// ──────────────────────────────────────────────
-describe('DELETE /api/roles/:id', () => {
-  it('軟刪除成功 → 204', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-    mockPrisma.memberRecord.count.mockResolvedValue(0);
-
-    const res = await request(app.getHttpServer())
-      .delete(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(204);
-  });
-
-  it('軟刪除時對 name 加 suffix 釋放 unique 約束', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-    mockPrisma.memberRecord.count.mockResolvedValue(0);
-
-    await request(app.getHttpServer())
-      .delete(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
-
-    // softDelete 用「原 name + ts + 4-byte random hex」格式 mangle，釋放 name @unique
-    expect(mockPrisma.role.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: TARGET_ROLE_UUID },
-        data: expect.objectContaining({
-          name: expect.stringMatching(/^管理者_\d+_[a-f0-9]{8}$/) as string,
-          deletedAt: expect.any(Date) as Date,
-        }),
-      }),
-    );
-  });
-
-  it('預設角色不可刪除 → 400 DEFAULT_ROLE_NOT_DELETABLE', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue({
-      ...TARGET_ROLE,
-      isDefault: true,
+      expect(res.status).toBe(200);
+      const names = roleNames(res.body);
+      expect(names).toContain('啟用角色');
+      expect(names).not.toContain('停用角色');
     });
 
-    const res = await request(app.getHttpServer())
-      .delete(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
+    it('status=false → 只回停用角色', async () => {
+      await seedRole(prisma, { name: '啟用角色', status: true });
+      await seedRole(prisma, { name: '停用角色', status: false });
 
-    expect(res.status).toBe(400);
-    expect((res.body as { code: string }).code).toBe(
-      'DEFAULT_ROLE_NOT_DELETABLE',
-    );
+      const res = await get('/api/roles?status=false');
+
+      expect(res.status).toBe(200);
+      const names = roleNames(res.body);
+      expect(names).toContain('停用角色');
+      expect(names).not.toContain('啟用角色');
+      expect(names).not.toContain('admin');
+    });
+
+    it('未帶 status → 啟用停用都回', async () => {
+      await seedRole(prisma, { name: '啟用角色', status: true });
+      await seedRole(prisma, { name: '停用角色', status: false });
+
+      const res = await get('/api/roles');
+
+      const names = roleNames(res.body);
+      expect(names).toContain('啟用角色');
+      expect(names).toContain('停用角色');
+    });
+
+    it('status=foo（非合法 enum）→ 400', async () => {
+      const res = await get('/api/roles?status=foo');
+      expect(res.status).toBe(400);
+    });
   });
 
-  it('角色仍有成員 → 409 ROLE_HAS_MEMBERS', async () => {
-    const token = await getToken();
-    mockPrisma.role.findFirst.mockResolvedValue(TARGET_ROLE);
-    mockPrisma.memberRecord.count.mockResolvedValue(2);
+  describe('GET /api/roles/permissions', () => {
+    it('回傳可用 permission 清單 → 200', async () => {
+      const res = await get('/api/roles/permissions');
 
-    const res = await request(app.getHttpServer())
-      .delete(`/api/roles/${TARGET_ROLE_UUID}`)
-      .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      const codes = (
+        res.body as { data: Array<{ permissionCode: string }> }
+      ).data.map((p) => p.permissionCode);
+      expect(codes).toContain('BACKEND:ROLE:VIEW');
+    });
+  });
 
-    expect(res.status).toBe(409);
-    expect((res.body as { code: string }).code).toBe('ROLE_HAS_MEMBERS');
+  describe('POST /api/roles', () => {
+    it('建立成功 → 201 且落庫', async () => {
+      const res = await post('/api/roles', {
+        name: '審核角色',
+        permissionCodes: [],
+      });
+
+      expect(res.status).toBe(201);
+      const id = (res.body as { data: { id: string } }).data.id;
+      const role = await prisma.role.findUnique({ where: { id } });
+      expect(role?.name).toBe('審核角色');
+    });
+
+    it('名稱衝突 → 409 DUPLICATE_ROLE_NAME', async () => {
+      await seedRole(prisma, { name: '管理者' });
+
+      const res = await post('/api/roles', {
+        name: '管理者',
+        permissionCodes: [],
+      });
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('DUPLICATE_ROLE_NAME');
+    });
+
+    it('EDIT 缺少對應 VIEW → 400 INVALID_PERMISSION_COMBINATION', async () => {
+      const res = await post('/api/roles', {
+        name: '新角色',
+        permissionCodes: ['BACKEND:ROLE:EDIT'],
+      });
+
+      expect(res.status).toBe(400);
+      expect((res.body as { code: string }).code).toBe(
+        'INVALID_PERMISSION_COMBINATION',
+      );
+    });
+  });
+
+  describe('GET /api/roles/:id', () => {
+    it('回傳角色詳情 → 200', async () => {
+      const id = await seedRole(prisma, {
+        name: '管理者',
+        permissionCodes: ['BACKEND:ROLE:VIEW'],
+      });
+
+      const res = await get(`/api/roles/${id}`);
+
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        data: { id: string; name: string; permissionCodes: string[] };
+      };
+      expect(body.data.id).toBe(id);
+      expect(body.data.name).toBe('管理者');
+      expect(body.data.permissionCodes).toContain('BACKEND:ROLE:VIEW');
+    });
+
+    it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
+      const res = await get(`/api/roles/${MISSING_ID}`);
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+    });
+  });
+
+  describe('PATCH /api/roles/:id', () => {
+    it('更新成功 → 204 且落庫', async () => {
+      const id = await seedRole(prisma, { name: '原名稱' });
+
+      const res = await patch(`/api/roles/${id}`, {
+        name: '新名稱',
+        permissionCodes: [],
+      });
+
+      expect(res.status).toBe(204);
+      const role = await prisma.role.findUnique({ where: { id } });
+      expect(role?.name).toBe('新名稱');
+    });
+
+    it('預設角色不可編輯 → 400 DEFAULT_ROLE_NOT_EDITABLE', async () => {
+      const id = await seedRole(prisma, { name: '預設角色', isDefault: true });
+
+      const res = await patch(`/api/roles/${id}`, {
+        name: '新名稱',
+        permissionCodes: [],
+      });
+
+      expect(res.status).toBe(400);
+      expect((res.body as { code: string }).code).toBe(
+        'DEFAULT_ROLE_NOT_EDITABLE',
+      );
+    });
+
+    it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
+      const res = await patch(`/api/roles/${MISSING_ID}`, {
+        name: '新名稱',
+        permissionCodes: [],
+      });
+
+      expect(res.status).toBe(404);
+      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+    });
+
+    it('僅送 status → 204 且僅 status 落庫', async () => {
+      const id = await seedRole(prisma, { name: '角色A', status: true });
+
+      const res = await patch(`/api/roles/${id}`, { status: false });
+
+      expect(res.status).toBe(204);
+      const role = await prisma.role.findUnique({ where: { id } });
+      expect(role?.status).toBe(false);
+      expect(role?.name).toBe('角色A');
+    });
+
+    it('name + status 同送 → 204 且皆落庫', async () => {
+      const id = await seedRole(prisma, { name: '角色B', status: true });
+
+      const res = await patch(`/api/roles/${id}`, {
+        name: '審核人員',
+        status: false,
+      });
+
+      expect(res.status).toBe(204);
+      const role = await prisma.role.findUnique({ where: { id } });
+      expect(role?.name).toBe('審核人員');
+      expect(role?.status).toBe(false);
+    });
+
+    it('status 型別錯誤（非 boolean）→ 400', async () => {
+      const id = await seedRole(prisma, { name: '角色C' });
+
+      const res = await patch(`/api/roles/${id}`, { status: 'off' });
+      expect(res.status).toBe(400);
+    });
+
+    it('預設角色僅切 status → 400 DEFAULT_ROLE_NOT_EDITABLE', async () => {
+      const id = await seedRole(prisma, { name: '預設角色', isDefault: true });
+
+      const res = await patch(`/api/roles/${id}`, { status: false });
+
+      expect(res.status).toBe(400);
+      expect((res.body as { code: string }).code).toBe(
+        'DEFAULT_ROLE_NOT_EDITABLE',
+      );
+    });
+  });
+
+  describe('DELETE /api/roles/:id', () => {
+    it('軟刪除成功 → 204', async () => {
+      const id = await seedRole(prisma, { name: '待刪角色' });
+
+      const res = await del(`/api/roles/${id}`);
+
+      expect(res.status).toBe(204);
+      const role = await prisma.role.findUnique({ where: { id } });
+      expect(role?.deletedAt).not.toBeNull();
+    });
+
+    it('軟刪除時對 name 加 suffix 釋放 unique 約束', async () => {
+      const id = await seedRole(prisma, { name: '管理者' });
+
+      await del(`/api/roles/${id}`);
+
+      const role = await prisma.role.findUnique({ where: { id } });
+      // softDelete 用「原 name + ts + 4-byte random hex」格式 mangle，釋放 name @unique
+      expect(role?.name).toMatch(/^管理者_\d+_[a-f0-9]{8}$/);
+      expect(role?.deletedAt).not.toBeNull();
+    });
+
+    it('預設角色不可刪除 → 400 DEFAULT_ROLE_NOT_DELETABLE', async () => {
+      const id = await seedRole(prisma, { name: '預設角色', isDefault: true });
+
+      const res = await del(`/api/roles/${id}`);
+
+      expect(res.status).toBe(400);
+      expect((res.body as { code: string }).code).toBe(
+        'DEFAULT_ROLE_NOT_DELETABLE',
+      );
+    });
+
+    it('角色仍有成員 → 409 ROLE_HAS_MEMBERS', async () => {
+      const roleId = await seedRole(prisma, { name: '有成員角色' });
+      await prisma.memberRecord.create({
+        data: {
+          member: '成員',
+          email: 'member-of-role@example.com',
+          password: 'x',
+          roleId,
+          status: true,
+          isDefault: false,
+        },
+      });
+
+      const res = await del(`/api/roles/${roleId}`);
+
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('ROLE_HAS_MEMBERS');
+    });
   });
 });
