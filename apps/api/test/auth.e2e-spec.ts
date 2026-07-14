@@ -14,7 +14,7 @@ const login = (
   password = TEST_PASSWORD,
 ) =>
   request(app.getHttpServer())
-    .post('/api/auth/login')
+    .post('/api/admin/auth/login')
     .send({ email, password });
 
 describe('Auth E2E', () => {
@@ -39,7 +39,7 @@ describe('Auth E2E', () => {
     await resetDb(prisma);
   });
 
-  describe('POST /api/auth/login', () => {
+  describe('POST /api/admin/auth/login', () => {
     it('正確憑證 → 200 + 雙 token + roleName', async () => {
       await seedMember(prisma, {
         email: TEST_EMAIL,
@@ -84,7 +84,7 @@ describe('Auth E2E', () => {
 
     it('無效 email 格式 → 400 Zod 驗證錯誤', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/login')
+        .post('/api/admin/auth/login')
         .send({ email: 'not-an-email', password: 'any' });
       expect(res.status).toBe(400);
     });
@@ -112,18 +112,20 @@ describe('Auth E2E', () => {
     });
   });
 
-  describe('GET /api/members', () => {
+  describe('GET /api/admin/members', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get(
-        '/api/members?email=test@example.com',
+        '/api/admin/members?email=test@example.com',
       );
       expect(res.status).toBe(401);
     });
   });
 
-  describe('POST /api/auth/logout', () => {
+  describe('POST /api/admin/auth/logout', () => {
     it('無 JWT → 401', async () => {
-      const res = await request(app.getHttpServer()).post('/api/auth/logout');
+      const res = await request(app.getHttpServer()).post(
+        '/api/admin/auth/logout',
+      );
       expect(res.status).toBe(401);
     });
 
@@ -136,7 +138,7 @@ describe('Auth E2E', () => {
       ).data;
 
       const logoutRes = await request(app.getHttpServer())
-        .post('/api/auth/logout')
+        .post('/api/admin/auth/logout')
         .set('authorization', `Bearer ${accessToken}`)
         .send({ refreshToken });
 
@@ -152,7 +154,7 @@ describe('Auth E2E', () => {
     });
   });
 
-  describe('POST /api/auth/refresh', () => {
+  describe('POST /api/admin/auth/refresh', () => {
     it('有效 refresh token → 200 + 新 access token', async () => {
       await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
       const loginRes = await login(app);
@@ -161,7 +163,7 @@ describe('Auth E2E', () => {
       ).data;
 
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({ refreshToken });
 
       expect(res.status).toBe(200);
@@ -174,14 +176,14 @@ describe('Auth E2E', () => {
 
     it('缺少 refreshToken → 400', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({});
       expect(res.status).toBe(400);
     });
 
     it('無效 refresh token → 401 INVALID_REFRESH_TOKEN', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({ refreshToken: 'not-a-valid-jwt' });
       expect(res.status).toBe(401);
       expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
@@ -195,7 +197,7 @@ describe('Auth E2E', () => {
       ).data;
 
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({ refreshToken: accessToken });
       expect(res.status).toBe(401);
       expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
@@ -211,7 +213,7 @@ describe('Auth E2E', () => {
       mockRedis.isTokenBlacklisted.mockResolvedValue(true);
 
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({ refreshToken });
       expect(res.status).toBe(401);
       expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
@@ -234,7 +236,7 @@ describe('Auth E2E', () => {
       });
 
       const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
+        .post('/api/admin/auth/refresh')
         .send({ refreshToken });
       expect(res.status).toBe(403);
       expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');

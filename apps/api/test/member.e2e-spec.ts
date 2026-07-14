@@ -21,7 +21,7 @@ describe('Member E2E', () => {
 
   const login = async (email: string): Promise<string> => {
     const res = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/admin/auth/login')
       .send({ email, password: PASSWORD });
     return (res.body as { data: { accessToken: string } }).data.accessToken;
   };
@@ -100,15 +100,15 @@ describe('Member E2E', () => {
     adminToken = await login(AUTH_EMAIL);
   });
 
-  describe('GET /api/members', () => {
+  describe('GET /api/admin/members', () => {
     it('無 JWT → 401', async () => {
-      const res = await request(app.getHttpServer()).get('/api/members');
+      const res = await request(app.getHttpServer()).get('/api/admin/members');
       expect(res.status).toBe(401);
     });
 
     it('有 JWT + VIEW → 200 + 列表含目標', async () => {
       await createTargetMember();
-      const res = await get('/api/members');
+      const res = await get('/api/admin/members');
       expect(res.status).toBe(200);
       const emails = (
         res.body as { data: { list: Array<{ email: string }> } }
@@ -118,7 +118,7 @@ describe('Member E2E', () => {
 
     it('無 ACCOUNT:VIEW 權限 → 403', async () => {
       const token = await loginNoPerm();
-      const res = await get('/api/members', () => token);
+      const res = await get('/api/admin/members', () => token);
       expect(res.status).toBe(403);
     });
 
@@ -128,7 +128,7 @@ describe('Member E2E', () => {
         email: 'inactive@example.com',
         status: false,
       });
-      const res = await get('/api/members?status=true');
+      const res = await get('/api/admin/members?status=true');
       expect(res.status).toBe(200);
       const emails = (
         res.body as { data: { list: Array<{ email: string }> } }
@@ -143,7 +143,7 @@ describe('Member E2E', () => {
         email: 'inactive@example.com',
         status: false,
       });
-      const res = await get('/api/members?status=false');
+      const res = await get('/api/admin/members?status=false');
       expect(res.status).toBe(200);
       const emails = (
         res.body as { data: { list: Array<{ email: string }> } }
@@ -153,21 +153,21 @@ describe('Member E2E', () => {
     });
 
     it('status=foo（非合法 enum）→ 400', async () => {
-      const res = await get('/api/members?status=foo');
+      const res = await get('/api/admin/members?status=foo');
       expect(res.status).toBe(400);
     });
   });
 
-  describe('GET /api/members/role/options', () => {
+  describe('GET /api/admin/members/role/options', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get(
-        '/api/members/role/options',
+        '/api/admin/members/role/options',
       );
       expect(res.status).toBe(401);
     });
 
     it('預設分頁 → 200 + { list, meta }', async () => {
-      const res = await get('/api/members/role/options');
+      const res = await get('/api/admin/members/role/options');
       expect(res.status).toBe(200);
       const body = res.body as {
         data: {
@@ -186,7 +186,7 @@ describe('Member E2E', () => {
         where: { name: '超級管理員' },
         data: { roleCode: 'SUPERADMIN' },
       });
-      const res = await get('/api/members/role/options');
+      const res = await get('/api/admin/members/role/options');
       expect(res.status).toBe(200);
       const superRole = (
         res.body as {
@@ -197,7 +197,7 @@ describe('Member E2E', () => {
     });
 
     it('指定 page / limit → meta 反映', async () => {
-      const res = await get('/api/members/role/options?page=2&limit=10');
+      const res = await get('/api/admin/members/role/options?page=2&limit=10');
       expect(res.status).toBe(200);
       const meta = (
         res.body as { data: { meta: { page: number; limit: number } } }
@@ -209,7 +209,9 @@ describe('Member E2E', () => {
     it('search 命中 → 只回名稱含關鍵字的角色', async () => {
       await seedRole(prisma, { name: 'searchable-admin', permissionCodes: [] });
       await seedRole(prisma, { name: 'other-role', permissionCodes: [] });
-      const res = await get('/api/members/role/options?search=searchable');
+      const res = await get(
+        '/api/admin/members/role/options?search=searchable',
+      );
       expect(res.status).toBe(200);
       const names = (
         res.body as { data: { list: Array<{ name: string }> } }
@@ -220,21 +222,21 @@ describe('Member E2E', () => {
 
     it('無 VIEW 權限 → 403', async () => {
       const token = await loginNoPerm();
-      const res = await get('/api/members/role/options', () => token);
+      const res = await get('/api/admin/members/role/options', () => token);
       expect(res.status).toBe(403);
     });
   });
 
-  describe('GET /api/members/role/options/:id', () => {
+  describe('GET /api/admin/members/role/options/:id', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get(
-        `/api/members/role/options/${roleId}`,
+        `/api/admin/members/role/options/${roleId}`,
       );
       expect(res.status).toBe(401);
     });
 
     it('找到啟用角色 → 200 + { id, name, isAssignable }', async () => {
-      const res = await get(`/api/members/role/options/${roleId}`);
+      const res = await get(`/api/admin/members/role/options/${roleId}`);
       expect(res.status).toBe(200);
       const body = res.body as {
         data: { id: string; name: string; isAssignable: boolean };
@@ -245,31 +247,36 @@ describe('Member E2E', () => {
     });
 
     it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
-      const res = await get(`/api/members/role/options/${MISSING_ID}`);
+      const res = await get(`/api/admin/members/role/options/${MISSING_ID}`);
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
     });
 
     it('無 VIEW 權限 → 403', async () => {
       const token = await loginNoPerm();
-      const res = await get(`/api/members/role/options/${roleId}`, () => token);
+      const res = await get(
+        `/api/admin/members/role/options/${roleId}`,
+        () => token,
+      );
       expect(res.status).toBe(403);
     });
   });
 
-  describe('POST /api/members', () => {
+  describe('POST /api/admin/members', () => {
     it('無 JWT → 401', async () => {
-      const res = await request(app.getHttpServer()).post('/api/members').send({
-        email: 'new@example.com',
-        member: 'New',
-        password: 'StrongPass123!',
-        roleId,
-      });
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/members')
+        .send({
+          email: 'new@example.com',
+          member: 'New',
+          password: 'StrongPass123!',
+          roleId,
+        });
       expect(res.status).toBe(401);
     });
 
     it('有 JWT + EDIT，有效資料 → 201 且落庫', async () => {
-      const res = await post('/api/members', {
+      const res = await post('/api/admin/members', {
         email: 'new@example.com',
         member: 'New User',
         password: 'StrongPass123!',
@@ -284,7 +291,7 @@ describe('Member E2E', () => {
 
     it('email 已存在 → 409', async () => {
       await createTargetMember({ email: 'existing@example.com' });
-      const res = await post('/api/members', {
+      const res = await post('/api/admin/members', {
         email: 'existing@example.com',
         member: 'Dup',
         password: 'StrongPass123!',
@@ -294,7 +301,7 @@ describe('Member E2E', () => {
     });
 
     it('無效 email → 400', async () => {
-      const res = await post('/api/members', {
+      const res = await post('/api/admin/members', {
         email: 'bad-email',
         member: 'X',
         password: 'StrongPass123!',
@@ -306,7 +313,7 @@ describe('Member E2E', () => {
     it('無 ACCOUNT:EDIT 權限 → 403', async () => {
       const token = await loginNoPerm();
       const res = await post(
-        '/api/members',
+        '/api/admin/members',
         {
           email: 'new2@example.com',
           member: 'X',
@@ -319,17 +326,17 @@ describe('Member E2E', () => {
     });
   });
 
-  describe('GET /api/members/:id', () => {
+  describe('GET /api/admin/members/:id', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get(
-        `/api/members/${MISSING_ID}`,
+        `/api/admin/members/${MISSING_ID}`,
       );
       expect(res.status).toBe(401);
     });
 
     it('member 存在 → 200', async () => {
       const target = await createTargetMember();
-      const res = await get(`/api/members/${target.id}`);
+      const res = await get(`/api/admin/members/${target.id}`);
       expect(res.status).toBe(200);
       expect((res.body as { data: { email: string } }).data.email).toBe(
         'target@example.com',
@@ -337,22 +344,22 @@ describe('Member E2E', () => {
     });
 
     it('member 不存在 → 404', async () => {
-      const res = await get(`/api/members/${MISSING_ID}`);
+      const res = await get(`/api/admin/members/${MISSING_ID}`);
       expect(res.status).toBe(404);
     });
   });
 
-  describe('PATCH /api/members/:id', () => {
+  describe('PATCH /api/admin/members/:id', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/api/members/${MISSING_ID}`)
+        .patch(`/api/admin/members/${MISSING_ID}`)
         .send({ status: true });
       expect(res.status).toBe(401);
     });
 
     it('有 JWT + EDIT，有效資料 → 204 且落庫', async () => {
       const target = await createTargetMember();
-      const res = await patch(`/api/members/${target.id}`, {
+      const res = await patch(`/api/admin/members/${target.id}`, {
         email: 'target@example.com',
         member: 'Updated Name',
         roleId,
@@ -366,7 +373,7 @@ describe('Member E2E', () => {
     });
 
     it('member 不存在 → 404', async () => {
-      const res = await patch(`/api/members/${MISSING_ID}`, {
+      const res = await patch(`/api/admin/members/${MISSING_ID}`, {
         email: 'x@example.com',
         member: 'X',
         roleId,
@@ -377,7 +384,7 @@ describe('Member E2E', () => {
 
     it('預設帳號不可編輯 → 409 DEFAULT_MEMBER_NOT_EDITABLE', async () => {
       const target = await createTargetMember({ isDefault: true });
-      const res = await patch(`/api/members/${target.id}`, {
+      const res = await patch(`/api/admin/members/${target.id}`, {
         email: 'target@example.com',
         member: 'Updated',
         roleId,
@@ -392,7 +399,7 @@ describe('Member E2E', () => {
     it('成功後清除 MemberContext 快取', async () => {
       const target = await createTargetMember();
       mockRedis.del.mockClear();
-      const res = await patch(`/api/members/${target.id}`, {
+      const res = await patch(`/api/admin/members/${target.id}`, {
         email: 'target@example.com',
         member: 'Role Changed',
         roleId,
@@ -404,7 +411,7 @@ describe('Member E2E', () => {
     });
 
     it('將自己停用 → 409 CANNOT_DISABLE_SELF', async () => {
-      const res = await patch(`/api/members/${adminId}`, {
+      const res = await patch(`/api/admin/members/${adminId}`, {
         email: AUTH_EMAIL,
         member: 'Auth',
         roleId,
@@ -416,7 +423,9 @@ describe('Member E2E', () => {
 
     it('partial body 只送 { status } → 204 且落庫', async () => {
       const target = await createTargetMember();
-      const res = await patch(`/api/members/${target.id}`, { status: false });
+      const res = await patch(`/api/admin/members/${target.id}`, {
+        status: false,
+      });
       expect(res.status).toBe(204);
       const updated = await prisma.memberRecord.findUnique({
         where: { id: target.id },
@@ -426,7 +435,7 @@ describe('Member E2E', () => {
 
     it('partial body 只送 { member } → 204', async () => {
       const target = await createTargetMember();
-      const res = await patch(`/api/members/${target.id}`, {
+      const res = await patch(`/api/admin/members/${target.id}`, {
         member: 'Only Name Changed',
       });
       expect(res.status).toBe(204);
@@ -439,23 +448,23 @@ describe('Member E2E', () => {
         where: { id: adminId },
         data: { status: false },
       });
-      const res = await get('/api/members');
+      const res = await get('/api/admin/members');
       expect(res.status).toBe(403);
       expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
     });
   });
 
-  describe('DELETE /api/members/:id', () => {
+  describe('DELETE /api/admin/members/:id', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).delete(
-        `/api/members/${MISSING_ID}`,
+        `/api/admin/members/${MISSING_ID}`,
       );
       expect(res.status).toBe(401);
     });
 
     it('有 JWT + EDIT → 204 且軟刪', async () => {
       const target = await createTargetMember();
-      const res = await del(`/api/members/${target.id}`);
+      const res = await del(`/api/admin/members/${target.id}`);
       expect(res.status).toBe(204);
       const deleted = await prisma.memberRecord.findUnique({
         where: { id: target.id },
@@ -464,14 +473,14 @@ describe('Member E2E', () => {
     });
 
     it('刪除自己 → 409 CANNOT_DELETE_SELF', async () => {
-      const res = await del(`/api/members/${adminId}`);
+      const res = await del(`/api/admin/members/${adminId}`);
       expect(res.status).toBe(409);
       expect((res.body as { code: string }).code).toBe('CANNOT_DELETE_SELF');
     });
 
     it('預設帳號不可刪除 → 409 DEFAULT_MEMBER_NOT_DELETABLE', async () => {
       const target = await createTargetMember({ isDefault: true });
-      const res = await del(`/api/members/${target.id}`);
+      const res = await del(`/api/admin/members/${target.id}`);
       expect(res.status).toBe(409);
       expect((res.body as { code: string }).code).toBe(
         'DEFAULT_MEMBER_NOT_DELETABLE',

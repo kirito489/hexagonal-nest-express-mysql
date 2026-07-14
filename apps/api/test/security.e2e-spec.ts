@@ -59,20 +59,20 @@ describe('Security E2E', () => {
       roleCode: 'SUPERADMIN',
     }));
     const res = await request(app.getHttpServer())
-      .post('/api/auth/login')
+      .post('/api/admin/auth/login')
       .send({ email: ADMIN_EMAIL, password: PASSWORD });
     token = (res.body as { data: { accessToken: string } }).data.accessToken;
   });
 
   // ── IP 白名單 ──────────────────────────────
 
-  describe('GET /api/security/ip-whitelist', () => {
+  describe('GET /api/admin/security/ip-whitelist', () => {
     it('Admin JWT → 200 + { list, meta }', async () => {
       await prisma.ipWhitelistRecord.create({
         data: { ipAddress: '1.2.3.4', description: 'test' },
       });
 
-      const res = await get('/api/security/ip-whitelist');
+      const res = await get('/api/admin/security/ip-whitelist');
 
       expect(res.status).toBe(200);
       const body = res.body as {
@@ -92,7 +92,7 @@ describe('Security E2E', () => {
         data: [{ ipAddress: '192.168.1.1' }, { ipAddress: '10.0.0.1' }],
       });
 
-      const res = await get('/api/security/ip-whitelist?search=192.168');
+      const res = await get('/api/admin/security/ip-whitelist?search=192.168');
 
       expect(res.status).toBe(200);
       const body = res.body as {
@@ -104,16 +104,16 @@ describe('Security E2E', () => {
 
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get(
-        '/api/security/ip-whitelist',
+        '/api/admin/security/ip-whitelist',
       );
 
       expect(res.status).toBe(401);
     });
   });
 
-  describe('POST /api/security/ip-whitelist', () => {
+  describe('POST /api/admin/security/ip-whitelist', () => {
     it('Admin 新增白名單 → 201 + { id } 且落庫', async () => {
-      const res = await post('/api/security/ip-whitelist', {
+      const res = await post('/api/admin/security/ip-whitelist', {
         ip: '10.0.0.1',
         description: '辦公室',
       });
@@ -128,19 +128,19 @@ describe('Security E2E', () => {
     });
 
     it('缺少 ip → 400', async () => {
-      const res = await post('/api/security/ip-whitelist', {});
+      const res = await post('/api/admin/security/ip-whitelist', {});
 
       expect(res.status).toBe(400);
     });
   });
 
-  describe('GET /api/security/ip-whitelist/:id', () => {
+  describe('GET /api/admin/security/ip-whitelist/:id', () => {
     it('Admin 取單筆 → 200', async () => {
       const { id } = await prisma.ipWhitelistRecord.create({
         data: { ipAddress: '10.0.0.1', description: 'office' },
       });
 
-      const res = await get(`/api/security/ip-whitelist/${id}`);
+      const res = await get(`/api/admin/security/ip-whitelist/${id}`);
 
       expect(res.status).toBe(200);
       const body = res.body as { data: { id: string; ipAddress: string } };
@@ -149,20 +149,20 @@ describe('Security E2E', () => {
     });
 
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
-      const res = await get(`/api/security/ip-whitelist/${MISSING_ID}`);
+      const res = await get(`/api/admin/security/ip-whitelist/${MISSING_ID}`);
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
     });
   });
 
-  describe('PATCH /api/security/ip-whitelist/:id', () => {
+  describe('PATCH /api/admin/security/ip-whitelist/:id', () => {
     it('Admin 更新成功 → 204 且落庫', async () => {
       const { id } = await prisma.ipWhitelistRecord.create({
         data: { ipAddress: '10.0.0.1', description: '舊備註' },
       });
 
-      const res = await patch(`/api/security/ip-whitelist/${id}`, {
+      const res = await patch(`/api/admin/security/ip-whitelist/${id}`, {
         description: '新備註',
       });
 
@@ -172,22 +172,25 @@ describe('Security E2E', () => {
     });
 
     it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
-      const res = await patch(`/api/security/ip-whitelist/${MISSING_ID}`, {
-        description: 'x',
-      });
+      const res = await patch(
+        `/api/admin/security/ip-whitelist/${MISSING_ID}`,
+        {
+          description: 'x',
+        },
+      );
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
     });
   });
 
-  describe('DELETE /api/security/ip-whitelist/:id', () => {
+  describe('DELETE /api/admin/security/ip-whitelist/:id', () => {
     it('Admin 移除 → 204 且落庫刪除', async () => {
       const { id } = await prisma.ipWhitelistRecord.create({
         data: { ipAddress: '10.0.0.1' },
       });
 
-      const res = await del(`/api/security/ip-whitelist/${id}`);
+      const res = await del(`/api/admin/security/ip-whitelist/${id}`);
 
       expect(res.status).toBe(204);
       const row = await prisma.ipWhitelistRecord.findUnique({ where: { id } });
@@ -195,13 +198,13 @@ describe('Security E2E', () => {
     });
 
     it('紀錄不存在仍 → 204（靜默通過，硬刪）', async () => {
-      const res = await del(`/api/security/ip-whitelist/${MISSING_ID}`);
+      const res = await del(`/api/admin/security/ip-whitelist/${MISSING_ID}`);
 
       expect(res.status).toBe(204);
     });
 
     it('非 uuid path param → 400', async () => {
-      const res = await del('/api/security/ip-whitelist/not-a-uuid');
+      const res = await del('/api/admin/security/ip-whitelist/not-a-uuid');
 
       expect(res.status).toBe(400);
     });
@@ -209,17 +212,17 @@ describe('Security E2E', () => {
 
   // ── IP 黑名單 ──────────────────────────────
 
-  describe('GET /api/security/ip-blacklist', () => {
+  describe('GET /api/admin/security/ip-blacklist', () => {
     it('Admin JWT → 200', async () => {
-      const res = await get('/api/security/ip-blacklist');
+      const res = await get('/api/admin/security/ip-blacklist');
 
       expect(res.status).toBe(200);
     });
   });
 
-  describe('POST /api/security/ip-blacklist', () => {
+  describe('POST /api/admin/security/ip-blacklist', () => {
     it('Admin 新增黑名單 → 201 + { id }，isAutoBlock 預設 false', async () => {
-      const res = await post('/api/security/ip-blacklist', {
+      const res = await post('/api/admin/security/ip-blacklist', {
         ip: '192.168.1.100',
         reason: '惡意攻擊',
       });
@@ -235,13 +238,13 @@ describe('Security E2E', () => {
     });
   });
 
-  describe('GET /api/security/ip-blacklist/:id', () => {
+  describe('GET /api/admin/security/ip-blacklist/:id', () => {
     it('Admin 取單筆 → 200', async () => {
       const { id } = await prisma.ipBlacklistRecord.create({
         data: { ipAddress: '1.2.3.4', reason: 'brute force' },
       });
 
-      const res = await get(`/api/security/ip-blacklist/${id}`);
+      const res = await get(`/api/admin/security/ip-blacklist/${id}`);
 
       expect(res.status).toBe(200);
       const body = res.body as {
@@ -252,20 +255,20 @@ describe('Security E2E', () => {
     });
 
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
-      const res = await get(`/api/security/ip-blacklist/${MISSING_ID}`);
+      const res = await get(`/api/admin/security/ip-blacklist/${MISSING_ID}`);
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
     });
   });
 
-  describe('PATCH /api/security/ip-blacklist/:id', () => {
+  describe('PATCH /api/admin/security/ip-blacklist/:id', () => {
     it('Admin 更新成功 → 204 且落庫', async () => {
       const { id } = await prisma.ipBlacklistRecord.create({
         data: { ipAddress: '1.2.3.4', reason: '舊理由' },
       });
 
-      const res = await patch(`/api/security/ip-blacklist/${id}`, {
+      const res = await patch(`/api/admin/security/ip-blacklist/${id}`, {
         reason: '新理由',
       });
 
@@ -275,22 +278,25 @@ describe('Security E2E', () => {
     });
 
     it('紀錄不存在 → 404 IP_LIST_NOT_FOUND', async () => {
-      const res = await patch(`/api/security/ip-blacklist/${MISSING_ID}`, {
-        reason: 'x',
-      });
+      const res = await patch(
+        `/api/admin/security/ip-blacklist/${MISSING_ID}`,
+        {
+          reason: 'x',
+        },
+      );
 
       expect(res.status).toBe(404);
       expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
     });
   });
 
-  describe('DELETE /api/security/ip-blacklist/:id', () => {
+  describe('DELETE /api/admin/security/ip-blacklist/:id', () => {
     it('Admin 移除 → 204 且落庫刪除', async () => {
       const { id } = await prisma.ipBlacklistRecord.create({
         data: { ipAddress: '1.2.3.4' },
       });
 
-      const res = await del(`/api/security/ip-blacklist/${id}`);
+      const res = await del(`/api/admin/security/ip-blacklist/${id}`);
 
       expect(res.status).toBe(204);
       const row = await prisma.ipBlacklistRecord.findUnique({ where: { id } });
@@ -298,7 +304,7 @@ describe('Security E2E', () => {
     });
 
     it('紀錄不存在仍 → 204', async () => {
-      const res = await del(`/api/security/ip-blacklist/${MISSING_ID}`);
+      const res = await del(`/api/admin/security/ip-blacklist/${MISSING_ID}`);
 
       expect(res.status).toBe(204);
     });
@@ -306,7 +312,7 @@ describe('Security E2E', () => {
 
   // ── 帳號解鎖 ───────────────────────────────
 
-  describe('POST /api/security/unlock-account', () => {
+  describe('POST /api/admin/security/unlock-account', () => {
     it('Admin 解鎖鎖定帳號 → 204 且落庫清鎖', async () => {
       await prisma.memberRecord.create({
         data: {
@@ -321,7 +327,7 @@ describe('Security E2E', () => {
         },
       });
 
-      const res = await post('/api/security/unlock-account', {
+      const res = await post('/api/admin/security/unlock-account', {
         email: 'locked@test.com',
       });
 
@@ -334,7 +340,7 @@ describe('Security E2E', () => {
     });
 
     it('email 不存在 → 404 EMAIL_NOT_FOUND', async () => {
-      const res = await post('/api/security/unlock-account', {
+      const res = await post('/api/admin/security/unlock-account', {
         email: 'unknown@test.com',
       });
 
@@ -344,7 +350,7 @@ describe('Security E2E', () => {
 
     it('帳號未鎖 → 409 ACCOUNT_NOT_LOCKED', async () => {
       // admin 帳號本身未鎖定
-      const res = await post('/api/security/unlock-account', {
+      const res = await post('/api/admin/security/unlock-account', {
         email: ADMIN_EMAIL,
       });
 
@@ -353,13 +359,13 @@ describe('Security E2E', () => {
     });
 
     it('缺少 email → 400', async () => {
-      const res = await post('/api/security/unlock-account', {});
+      const res = await post('/api/admin/security/unlock-account', {});
 
       expect(res.status).toBe(400);
     });
 
     it('無效 email 格式 → 400', async () => {
-      const res = await post('/api/security/unlock-account', {
+      const res = await post('/api/admin/security/unlock-account', {
         email: 'not-email',
       });
 
@@ -369,10 +375,10 @@ describe('Security E2E', () => {
 
   // ── Auth: forgot-password / reset-password ─
 
-  describe('POST /api/auth/forgot-password', () => {
+  describe('POST /api/admin/auth/forgot-password', () => {
     it('已註冊 email → 204 且落庫產生 reset token', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/forgot-password')
+        .post('/api/admin/auth/forgot-password')
         .send({ email: ADMIN_EMAIL });
 
       expect(res.status).toBe(204);
@@ -382,7 +388,7 @@ describe('Security E2E', () => {
 
     it('不存在 email → 204（同樣回傳成功，防列舉）', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/forgot-password')
+        .post('/api/admin/auth/forgot-password')
         .send({ email: 'nobody@test.com' });
 
       expect(res.status).toBe(204);
@@ -390,17 +396,17 @@ describe('Security E2E', () => {
 
     it('缺少 email → 400', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/forgot-password')
+        .post('/api/admin/auth/forgot-password')
         .send({});
 
       expect(res.status).toBe(400);
     });
   });
 
-  describe('POST /api/auth/reset-password', () => {
+  describe('POST /api/admin/auth/reset-password', () => {
     it('無效 token → 400', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/reset-password')
+        .post('/api/admin/auth/reset-password')
         .send({ token: 'invalid-token', newPassword: 'NewPass123!' });
 
       expect(res.status).toBe(400);
@@ -408,7 +414,7 @@ describe('Security E2E', () => {
 
     it('缺少參數 → 400', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/auth/reset-password')
+        .post('/api/admin/auth/reset-password')
         .send({});
 
       expect(res.status).toBe(400);
