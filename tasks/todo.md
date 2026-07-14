@@ -19,10 +19,6 @@ _（目前無）_
 
 - [ ] **帳號鎖定管理 CRUD（add-account-lock-management）** — `add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/security/locks`、`DELETE /api/security/locks/:id`（list 已鎖帳號 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。
 
-### 工程健壯性
-
-- [ ] **`date.ts` 未真正走 `APP_TIMEZONE`** — 現硬編 `dayjs.tz.setDefault('Asia/Taipei')`，且 `formatDate` / `formatDateWithDay` 用 `dayjs(d).format()`（無 `.tz()`）→ 實際依**伺服器系統時區**格式化，非 `APP_TIMEZONE`（與 project.md 宣稱不符）。應：改讀 `APP_TIMEZONE`（注意 dotenv 時序——勿在 module top-level 就 `getEnv()`，可 lazy 或於首次呼叫時解析）、format helper 一律 `.tz()`、補日邊界 helper（`appDayStartUtc` / `appDayEndUtc` / `rangeToUtc`，見 project.md「時間處理慣例」）。動到既有 `formatDate` 行為，需連同 `date.spec.ts` 更新驗證。
-
 ### 技術債（外部相依卡住，延後）
 
 - [ ] **api `moduleResolution: node`（node10）遷移 `nodenext`** — TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已從 TS 5.9 對齊到 **TS 6.0.2**（與 web / 編輯器同版，消除混版）；`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音（TS 官方機制，須 TS≥6 才吃）+ `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**（NestJS 裝飾器 metadata：`@Body()` DTO + constructor 注入 service 要求 `import type`，注入 service 不能改否則 DI 壞）——與 TS 版本無關，卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時此消音失效、屆時強制處理（可能需關 `isolatedModules` 或大改 import 為 `import type`）。
@@ -41,6 +37,7 @@ _（目前無）_
   - **Prettier 全 repo 統一根一份**：根 `.prettierrc`（`semi:true` + `singleQuote` + `trailingComma:all`）+ 根 `.prettierignore`（排除 `**/*.md`、生成檔、`prisma/migrations`、build/lockfile）+ 根 `format`/`format:check`。前端從 Vite 無分號 reformat 加回分號對齊（~107 檔），後端 0 churn；`.vscode` 補 `[typescriptreact]`/`[javascriptreact]` formatOnSave。詳見 lessons.md「ESLint / 工具鏈」。
 - [x] **後端六角模組產生器 `gen:module`（⑤，僅後端）** — `apps/api/scripts/gen-module.ts`（單檔內嵌 24 模板 map）；`pnpm --filter @app/api gen:module <name> [--force]` 產最小 CRUD 六角骨架（port in/out、5 service+spec、facade、controller+Zod DTO、Prisma repo、NotFound exception、module）+ 自動接線 `app.module` imports 與 `GlobalExceptionFilter`（NotFound→404，冪等）。實測 widget：23 檔 typecheck 乾淨、8 specs 全過、prettier/eslint 乾淨；`PrismaXRepository` 需先在 schema.prisma 建 `<Name>Record` model + db:generate 才 typecheck（設計邊界）。前端 CRUD 頁未做（CP 值低）。詳見 lessons.md「模組產生器 / gen:module」。
 - [x] **`init-project.sh` 衍生專案初始化腳本** — `scripts/init-project.sh --name <kebab> [--yes]`：改寫根 package.json name/version/description（不動 `@app/*` scope）、重置 `tasks/todo.md`（**保留 `lessons.md`** 可重用基建知識）、重置 git 歷史（互動確認或 `--yes`，破壞性）、`pnpm install`。不碰 `.env` / `openspec`。已 `bash -n` + 對複本驗證 JSON 改寫邏輯。
+- [x] **`date.ts` 走 `APP_TIMEZONE` + 日邊界 / 時間 helper** — 移除硬編 `Asia/Taipei`；`formatDate` / `formatDateWithDay` 改走 `.tz(APP_TIMEZONE)`（`getEnv()` 延後到呼叫時、避開 dotenv 時序）；新增 `formatDateTime`（後台時間戳 `YYYY-MM-DD HH:mm`）+ `appDayStartUtc` / `appDayEndUtc` / `rangeToUtc` 日邊界 helper + spec（含「UTC 晚間 → 台北隔日」跨日證明）。api 測試 211→216、typecheck / lint / format 全綠；原 helper 無生產呼叫端故零波及。
 
 ### 2026-06-25
 
