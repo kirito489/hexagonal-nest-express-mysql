@@ -129,14 +129,14 @@ const bootstrap = async (): Promise<void> => {
   const swaggerDocument = loadSwaggerDocument();
 
   // 以 JSON 提供 OpenAPI spec（前端 API client codegen 使用）
-  app.use('/api/docs-json', (_req: Request, res: Response) => {
+  app.use('/api/admin/docs-json', (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.send(JSON.stringify(swaggerDocument));
   });
 
   app.use(
-    '/api/docs',
+    '/api/admin/docs',
     (_req: Request, res: Response, next: NextFunction) => {
       res.setHeader(
         'Cache-Control',
@@ -164,7 +164,10 @@ const bootstrap = async (): Promise<void> => {
   await app.listen(env.PORT);
   app
     .get(Logger)
-    .log(`Swagger 文件：http://localhost:${env.PORT}/api/docs`, 'Bootstrap');
+    .log(
+      `Swagger 文件（後台）：http://localhost:${env.PORT}/api/admin/docs`,
+      'Bootstrap',
+    );
   app.get(Logger).log(`應用程式啟動：${await app.getUrl()}`, 'Bootstrap');
 };
 

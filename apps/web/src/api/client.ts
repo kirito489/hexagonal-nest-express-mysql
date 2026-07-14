@@ -2,10 +2,10 @@ import { createApiClient, createApiQueryHooks } from '@app/api-client';
 
 import { tokenStorage } from '@/lib/storage';
 
-const API_BASE = '/api';
+const API_BASE = '/api/admin';
 const REFRESH_PATH = '/auth/refresh';
 
-// 全 app 共用一個 API client：baseUrl 走 Vite proxy 的 /api，每次請求即時讀 token
+// 全 app 共用一個 API client：baseUrl 走 Vite proxy 的 /api/admin（後台 API），每次請求即時讀 token
 export const apiClient = createApiClient(API_BASE, () => tokenStorage.get());
 
 // 共享 refresh promise：多個並發 401 只觸發一次 refresh

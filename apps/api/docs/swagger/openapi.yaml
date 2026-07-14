@@ -1,14 +1,14 @@
 openapi: 3.0.0
 
 info:
-  title: Hexagonal NestJS API
+  title: Hexagonal NestJS 後台 (Admin) API
   version: 1.0.0
   description: |
     Hexagonal Architecture NestJS + Express API 文件
 
 servers:
-  - url: http://localhost:3000/api
-    description: 本地開發環境
+  - url: http://localhost:3000/api/admin
+    description: 本地開發環境（後台 API）
 
 security:
   - bearerAuth: []
@@ -188,14 +188,6 @@ components:
             timestamp: '2024-01-01T00:00:00.000Z'
 
 paths:
-  /health:
-    get:
-      $ref: './health/liveness.yaml'
-
-  /health/ready:
-    get:
-      $ref: './health/readiness.yaml'
-
   /auth/login:
     post:
       $ref: './auth/login.yaml'
