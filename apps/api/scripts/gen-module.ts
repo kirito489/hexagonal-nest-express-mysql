@@ -1,0 +1,900 @@
+/**
+ * 後端六角模組產生器（借鏡 kgie-nest-backend gen:module 的後端子集）。
+ *
+ * 用法：`pnpm --filter @app/api gen:module <name> [--force]`
+ *   <name> 為 kebab-case（如 `widget`、`task-assignment`）。
+ *   --force 覆寫既有檔（預設 skip-if-exists）。
+ *
+ * 產出一個最小 CRUD 六角模組（port in/out、service+spec、facade、controller+DTO、
+ * Prisma repo、domain exception、module）並自動註冊到 `app.module.ts` 與
+ * `GlobalExceptionFilter`（NotFound → 404）。欄位僅含佔位的 `name`/`status`，
+ * Prisma model 不由本工具建立（見結尾的手動步驟）。
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join, resolve } from 'path';
+
+interface Names {
+  /** kebab 單數，如 `task-assignment` */
+  name: string;
+  /** Pascal 單數，如 `TaskAssignment` */
+  Name: string;
+  /** kebab 複數（路由用），如 `task-assignments` */
+  names: string;
+  /** Pascal 複數，如 `TaskAssignments` */
+  Names: string;
+  /** SCREAMING 單數（DI token 用），如 `TASK_ASSIGNMENT` */
+  NAME: string;
+  /** SCREAMING 複數，如 `TASK_ASSIGNMENTS` */
+  NAMES: string;
+  /** camel 單數（變數 / prisma 屬性用），如 `taskAssignment` */
+  camelName: string;
+}
+
+const toNames = (input: string): Names => {
+  const kebab = input
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+  if (!/^[a-z][a-z0-9-]*$/.test(kebab)) {
+    throw new Error(
+      `模組名稱不合法："${input}"（須 kebab-case，小寫字母開頭，如 widget）`,
+    );
+  }
+  const camelName = kebab
+    .split('-')
+    .map((part, i) =>
+      i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join('');
+  const Name = camelName.charAt(0).toUpperCase() + camelName.slice(1);
+  const NAME = kebab.replace(/-/g, '_').toUpperCase();
+  return {
+    name: kebab,
+    Name,
+    names: `${kebab}s`,
+    Names: `${Name}s`,
+    NAME,
+    NAMES: `${NAME}S`,
+    camelName,
+  };
+};
+
+const render = (source: string, n: Names): string =>
+  source
+    .replaceAll('%camelName%', n.camelName)
+    .replaceAll('%Names%', n.Names)
+    .replaceAll('%names%', n.names)
+    .replaceAll('%Name%', n.Name)
+    .replaceAll('%name%', n.name)
+    .replaceAll('%NAMES%', n.NAMES)
+    .replaceAll('%NAME%', n.NAME);
+
+/** key = 相對 `apps/api/src` 的輸出路徑（含 %token%）；value = 模板內容 */
+const TEMPLATES: Record<string, string> = {
+  'application/port/in/%name%/Create%Name%UseCase.ts': `export const CREATE_%NAME%_USE_CASE = 'CREATE_%NAME%_USE_CASE';
+
+export interface Create%Name%Command {
+  name: string;
+}
+
+export interface Create%Name%Result {
+  id: string;
+}
+
+export interface Create%Name%UseCase {
+  execute(command: Create%Name%Command): Promise<Create%Name%Result>;
+}
+`,
+
+  'application/port/in/%name%/Get%Name%UseCase.ts': `export const GET_%NAME%_USE_CASE = 'GET_%NAME%_USE_CASE';
+
+export interface %Name%Detail {
+  id: string;
+  name: string;
+  status: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Get%Name%UseCase {
+  execute(id: string): Promise<%Name%Detail>;
+}
+`,
+
+  'application/port/in/%name%/List%Names%UseCase.ts': `import { PaginationMeta } from '../../../../infrastructure/pagination';
+
+export const LIST_%NAMES%_USE_CASE = 'LIST_%NAMES%_USE_CASE';
+
+export interface List%Names%Query {
+  page?: number;
+  limit?: number;
+  name?: string;
+  status?: boolean;
+}
+
+export interface %Name%ListItem {
+  id: string;
+  name: string;
+  status: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface List%Names%Result {
+  list: %Name%ListItem[];
+  meta: PaginationMeta;
+}
+
+export interface List%Names%UseCase {
+  execute(query: List%Names%Query): Promise<List%Names%Result>;
+}
+`,
+
+  'application/port/in/%name%/Update%Name%UseCase.ts': `export const UPDATE_%NAME%_USE_CASE = 'UPDATE_%NAME%_USE_CASE';
+
+export interface Update%Name%Command {
+  id: string;
+  name?: string;
+  status?: boolean;
+}
+
+export interface Update%Name%UseCase {
+  execute(command: Update%Name%Command): Promise<void>;
+}
+`,
+
+  'application/port/in/%name%/Delete%Name%UseCase.ts': `export const DELETE_%NAME%_USE_CASE = 'DELETE_%NAME%_USE_CASE';
+
+export interface Delete%Name%UseCase {
+  execute(id: string): Promise<void>;
+}
+`,
+
+  'application/port/out/%name%/%Name%RepositoryPort.ts': `export const %NAME%_REPOSITORY_PORT = '%NAME%_REPOSITORY_PORT';
+
+export interface List%Names%Params {
+  page: number;
+  limit: number;
+  name?: string;
+  status?: boolean;
+}
+
+export interface %Name%Record {
+  id: string;
+  name: string;
+  status: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface List%Names%Page {
+  data: %Name%Record[];
+  total: number;
+}
+
+export interface %Name%RepositoryPort {
+  list(params: List%Names%Params): Promise<List%Names%Page>;
+  findById(id: string): Promise<%Name%Record | null>;
+  create(data: { name: string }): Promise<%Name%Record>;
+  update(id: string, data: { name?: string; status?: boolean }): Promise<void>;
+  softDelete(id: string): Promise<void>;
+}
+`,
+
+  'application/service/%name%/Create%Name%Service.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  CREATE_%NAME%_USE_CASE,
+  Create%Name%Command,
+  Create%Name%Result,
+  Create%Name%UseCase,
+} from '../../port/in/%name%/Create%Name%UseCase';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+} from '../../port/out/%name%/%Name%RepositoryPort';
+
+export { CREATE_%NAME%_USE_CASE };
+
+@Injectable()
+export class Create%Name%Service implements Create%Name%UseCase {
+  constructor(
+    @Inject(%NAME%_REPOSITORY_PORT)
+    private readonly %camelName%Repo: %Name%RepositoryPort,
+  ) {}
+
+  async execute(command: Create%Name%Command): Promise<Create%Name%Result> {
+    const created = await this.%camelName%Repo.create({ name: command.name });
+    return { id: created.id };
+  }
+}
+`,
+
+  'application/service/%name%/Get%Name%Service.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  GET_%NAME%_USE_CASE,
+  %Name%Detail,
+  Get%Name%UseCase,
+} from '../../port/in/%name%/Get%Name%UseCase';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+} from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+export { GET_%NAME%_USE_CASE };
+
+@Injectable()
+export class Get%Name%Service implements Get%Name%UseCase {
+  constructor(
+    @Inject(%NAME%_REPOSITORY_PORT)
+    private readonly %camelName%Repo: %Name%RepositoryPort,
+  ) {}
+
+  async execute(id: string): Promise<%Name%Detail> {
+    const record = await this.%camelName%Repo.findById(id);
+    if (!record) throw new %Name%NotFoundException();
+    return {
+      id: record.id,
+      name: record.name,
+      status: record.status,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+}
+`,
+
+  'application/service/%name%/List%Names%Service.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  LIST_%NAMES%_USE_CASE,
+  List%Names%Query,
+  List%Names%Result,
+  List%Names%UseCase,
+} from '../../port/in/%name%/List%Names%UseCase';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+} from '../../port/out/%name%/%Name%RepositoryPort';
+import {
+  buildPaginationMeta,
+  getPagination,
+} from '../../../infrastructure/pagination';
+
+export { LIST_%NAMES%_USE_CASE };
+
+@Injectable()
+export class List%Names%Service implements List%Names%UseCase {
+  constructor(
+    @Inject(%NAME%_REPOSITORY_PORT)
+    private readonly %camelName%Repo: %Name%RepositoryPort,
+  ) {}
+
+  async execute(query: List%Names%Query): Promise<List%Names%Result> {
+    const { page, limit } = getPagination({
+      page: query.page,
+      limit: query.limit,
+    });
+    const { data, total } = await this.%camelName%Repo.list({
+      page,
+      limit,
+      name: query.name,
+      status: query.status,
+    });
+    return {
+      list: data.map((r) => ({
+        id: r.id,
+        name: r.name,
+        status: r.status,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+      meta: buildPaginationMeta(page, limit, total),
+    };
+  }
+}
+`,
+
+  'application/service/%name%/Update%Name%Service.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  UPDATE_%NAME%_USE_CASE,
+  Update%Name%Command,
+  Update%Name%UseCase,
+} from '../../port/in/%name%/Update%Name%UseCase';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+} from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+export { UPDATE_%NAME%_USE_CASE };
+
+@Injectable()
+export class Update%Name%Service implements Update%Name%UseCase {
+  constructor(
+    @Inject(%NAME%_REPOSITORY_PORT)
+    private readonly %camelName%Repo: %Name%RepositoryPort,
+  ) {}
+
+  async execute(command: Update%Name%Command): Promise<void> {
+    const existing = await this.%camelName%Repo.findById(command.id);
+    if (!existing) throw new %Name%NotFoundException();
+    await this.%camelName%Repo.update(command.id, {
+      name: command.name,
+      status: command.status,
+    });
+  }
+}
+`,
+
+  'application/service/%name%/Delete%Name%Service.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  DELETE_%NAME%_USE_CASE,
+  Delete%Name%UseCase,
+} from '../../port/in/%name%/Delete%Name%UseCase';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+} from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+export { DELETE_%NAME%_USE_CASE };
+
+@Injectable()
+export class Delete%Name%Service implements Delete%Name%UseCase {
+  constructor(
+    @Inject(%NAME%_REPOSITORY_PORT)
+    private readonly %camelName%Repo: %Name%RepositoryPort,
+  ) {}
+
+  async execute(id: string): Promise<void> {
+    const existing = await this.%camelName%Repo.findById(id);
+    if (!existing) throw new %Name%NotFoundException();
+    await this.%camelName%Repo.softDelete(id);
+  }
+}
+`,
+
+  'application/service/%name%/Create%Name%Service.spec.ts': `import { Create%Name%Service } from './Create%Name%Service';
+import { %Name%RepositoryPort } from '../../port/out/%name%/%Name%RepositoryPort';
+
+const NEW_ID = '00000000-0000-4000-8000-000000000001';
+
+const mockRepo = {
+  create: jest.fn(),
+} as unknown as jest.Mocked<%Name%RepositoryPort>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('Create%Name%Service', () => {
+  it('建立成功 → 回傳新 id、repo 收到 name', async () => {
+    (mockRepo.create as jest.Mock).mockResolvedValue({ id: NEW_ID });
+
+    const result = await new Create%Name%Service(mockRepo).execute({
+      name: '測試',
+    });
+
+    expect(result).toEqual({ id: NEW_ID });
+    expect(mockRepo.create).toHaveBeenCalledWith({ name: '測試' });
+  });
+});
+`,
+
+  'application/service/%name%/Get%Name%Service.spec.ts': `import { Get%Name%Service } from './Get%Name%Service';
+import { %Name%RepositoryPort } from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+const ID = '00000000-0000-4000-8000-000000000001';
+
+const mockRepo = {
+  findById: jest.fn(),
+} as unknown as jest.Mocked<%Name%RepositoryPort>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('Get%Name%Service', () => {
+  it('存在 → 回傳明細', async () => {
+    const now = new Date();
+    (mockRepo.findById as jest.Mock).mockResolvedValue({
+      id: ID,
+      name: '測試',
+      status: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await new Get%Name%Service(mockRepo).execute(ID);
+
+    expect(result.id).toBe(ID);
+  });
+
+  it('不存在 → 拋 %Name%NotFoundException', async () => {
+    (mockRepo.findById as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      new Get%Name%Service(mockRepo).execute(ID),
+    ).rejects.toBeInstanceOf(%Name%NotFoundException);
+  });
+});
+`,
+
+  'application/service/%name%/List%Names%Service.spec.ts': `import { List%Names%Service } from './List%Names%Service';
+import { %Name%RepositoryPort } from '../../port/out/%name%/%Name%RepositoryPort';
+
+const mockRepo = {
+  list: jest.fn(),
+} as unknown as jest.Mocked<%Name%RepositoryPort>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('List%Names%Service', () => {
+  it('回傳分頁列表 + meta', async () => {
+    (mockRepo.list as jest.Mock).mockResolvedValue({ data: [], total: 0 });
+
+    const result = await new List%Names%Service(mockRepo).execute({});
+
+    expect(result.list).toEqual([]);
+    expect(result.meta.total).toBe(0);
+  });
+});
+`,
+
+  'application/service/%name%/Update%Name%Service.spec.ts': `import { Update%Name%Service } from './Update%Name%Service';
+import { %Name%RepositoryPort } from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+const ID = '00000000-0000-4000-8000-000000000001';
+
+const mockRepo = {
+  findById: jest.fn(),
+  update: jest.fn(),
+} as unknown as jest.Mocked<%Name%RepositoryPort>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('Update%Name%Service', () => {
+  it('存在 → 更新', async () => {
+    (mockRepo.findById as jest.Mock).mockResolvedValue({ id: ID });
+
+    await new Update%Name%Service(mockRepo).execute({ id: ID, name: '新名' });
+
+    expect(mockRepo.update).toHaveBeenCalledWith(ID, {
+      name: '新名',
+      status: undefined,
+    });
+  });
+
+  it('不存在 → 拋 NotFound，不更新', async () => {
+    (mockRepo.findById as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      new Update%Name%Service(mockRepo).execute({ id: ID, name: '新名' }),
+    ).rejects.toBeInstanceOf(%Name%NotFoundException);
+    expect(mockRepo.update).not.toHaveBeenCalled();
+  });
+});
+`,
+
+  'application/service/%name%/Delete%Name%Service.spec.ts': `import { Delete%Name%Service } from './Delete%Name%Service';
+import { %Name%RepositoryPort } from '../../port/out/%name%/%Name%RepositoryPort';
+import { %Name%NotFoundException } from '../../../domain/exception/%Name%NotFoundException';
+
+const ID = '00000000-0000-4000-8000-000000000001';
+
+const mockRepo = {
+  findById: jest.fn(),
+  softDelete: jest.fn(),
+} as unknown as jest.Mocked<%Name%RepositoryPort>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('Delete%Name%Service', () => {
+  it('存在 → 軟刪', async () => {
+    (mockRepo.findById as jest.Mock).mockResolvedValue({ id: ID });
+
+    await new Delete%Name%Service(mockRepo).execute(ID);
+
+    expect(mockRepo.softDelete).toHaveBeenCalledWith(ID);
+  });
+
+  it('不存在 → 拋 NotFound', async () => {
+    (mockRepo.findById as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      new Delete%Name%Service(mockRepo).execute(ID),
+    ).rejects.toBeInstanceOf(%Name%NotFoundException);
+  });
+});
+`,
+
+  'application/facade/%Name%Facade.ts': `import { Inject, Injectable } from '@nestjs/common';
+import {
+  LIST_%NAMES%_USE_CASE,
+  List%Names%Query,
+  List%Names%Result,
+  List%Names%UseCase,
+} from '../port/in/%name%/List%Names%UseCase';
+import {
+  GET_%NAME%_USE_CASE,
+  %Name%Detail,
+  Get%Name%UseCase,
+} from '../port/in/%name%/Get%Name%UseCase';
+import {
+  CREATE_%NAME%_USE_CASE,
+  Create%Name%Command,
+  Create%Name%Result,
+  Create%Name%UseCase,
+} from '../port/in/%name%/Create%Name%UseCase';
+import {
+  UPDATE_%NAME%_USE_CASE,
+  Update%Name%Command,
+  Update%Name%UseCase,
+} from '../port/in/%name%/Update%Name%UseCase';
+import {
+  DELETE_%NAME%_USE_CASE,
+  Delete%Name%UseCase,
+} from '../port/in/%name%/Delete%Name%UseCase';
+
+@Injectable()
+export class %Name%Facade {
+  constructor(
+    @Inject(LIST_%NAMES%_USE_CASE)
+    private readonly list%Names%UseCase: List%Names%UseCase,
+    @Inject(GET_%NAME%_USE_CASE)
+    private readonly get%Name%UseCase: Get%Name%UseCase,
+    @Inject(CREATE_%NAME%_USE_CASE)
+    private readonly create%Name%UseCase: Create%Name%UseCase,
+    @Inject(UPDATE_%NAME%_USE_CASE)
+    private readonly update%Name%UseCase: Update%Name%UseCase,
+    @Inject(DELETE_%NAME%_USE_CASE)
+    private readonly delete%Name%UseCase: Delete%Name%UseCase,
+  ) {}
+
+  list%Names%(query: List%Names%Query): Promise<List%Names%Result> {
+    return this.list%Names%UseCase.execute(query);
+  }
+
+  get%Name%(id: string): Promise<%Name%Detail> {
+    return this.get%Name%UseCase.execute(id);
+  }
+
+  create%Name%(command: Create%Name%Command): Promise<Create%Name%Result> {
+    return this.create%Name%UseCase.execute(command);
+  }
+
+  update%Name%(command: Update%Name%Command): Promise<void> {
+    return this.update%Name%UseCase.execute(command);
+  }
+
+  delete%Name%(id: string): Promise<void> {
+    return this.delete%Name%UseCase.execute(id);
+  }
+}
+`,
+
+  'adapter/in/web/%name%/Create%Name%Request.ts': `import { z } from 'zod';
+
+export const create%Name%Schema = z.object({
+  name: z.string().trim().min(1, '名稱必填').max(100, '名稱最多 100 字元'),
+});
+
+export type Create%Name%Request = z.infer<typeof create%Name%Schema>;
+`,
+
+  'adapter/in/web/%name%/Update%Name%Request.ts': `import { z } from 'zod';
+
+export const update%Name%Schema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  status: z.boolean().optional(),
+});
+
+export type Update%Name%Request = z.infer<typeof update%Name%Schema>;
+`,
+
+  'adapter/in/web/%name%/List%Names%Query.ts': `import { z } from 'zod';
+
+export const list%Names%QuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+  name: z.string().trim().optional(),
+  status: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+});
+
+export type List%Names%Query = z.infer<typeof list%Names%QuerySchema>;
+`,
+
+  'adapter/in/web/%name%/%Name%Controller.ts': `import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { %Name%Facade } from '../../../../application/facade/%Name%Facade';
+import { ZodValidationPipe } from '../../../../infrastructure/zod-validation.pipe';
+import { list%Names%QuerySchema, List%Names%Query } from './List%Names%Query';
+import { create%Name%Schema, Create%Name%Request } from './Create%Name%Request';
+import { update%Name%Schema, Update%Name%Request } from './Update%Name%Request';
+
+// TODO: 依模組權限掛上 @UseGuards(PermissionsGuard) + @Permissions(...)（見 RoleController）
+@Controller('%names%')
+export class %Name%Controller {
+  constructor(private readonly %camelName%Facade: %Name%Facade) {}
+
+  @Get()
+  list%Names%(
+    @Query(new ZodValidationPipe(list%Names%QuerySchema))
+    query: List%Names%Query,
+  ) {
+    return this.%camelName%Facade.list%Names%(query);
+  }
+
+  @Get(':id')
+  get%Name%(@Param('id', ParseUUIDPipe) id: string) {
+    return this.%camelName%Facade.get%Name%(id);
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  create%Name%(
+    @Body(new ZodValidationPipe(create%Name%Schema)) dto: Create%Name%Request,
+  ) {
+    return this.%camelName%Facade.create%Name%({ name: dto.name });
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async update%Name%(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(update%Name%Schema)) dto: Update%Name%Request,
+  ) {
+    await this.%camelName%Facade.update%Name%({ id, ...dto });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete%Name%(@Param('id', ParseUUIDPipe) id: string) {
+    await this.%camelName%Facade.delete%Name%(id);
+  }
+}
+`,
+
+  'adapter/out/persistence/%name%/Prisma%Name%Repository.ts': `import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import {
+  %NAME%_REPOSITORY_PORT,
+  %Name%RepositoryPort,
+  List%Names%Params,
+  List%Names%Page,
+  %Name%Record,
+} from '../../../../application/port/out/%name%/%Name%RepositoryPort';
+
+// %NAME%_REPOSITORY_PORT re-export 方便 module 綁定一處 import
+export { %NAME%_REPOSITORY_PORT };
+
+/**
+ * Prisma 持久層。依賴 schema.prisma 的 model %Name%Record（欄位 id / name /
+ * status / createdAt / updatedAt / deletedAt）；請先建 model + db:generate 才會 typecheck 過。
+ */
+@Injectable()
+export class Prisma%Name%Repository implements %Name%RepositoryPort {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async list(params: List%Names%Params): Promise<List%Names%Page> {
+    const where = {
+      deletedAt: null,
+      ...(params.name ? { name: { contains: params.name } } : {}),
+      ...(params.status !== undefined ? { status: params.status } : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.%camelName%Record.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.%camelName%Record.count({ where }),
+    ]);
+    return { data: rows.map((r) => this.toRecord(r)), total };
+  }
+
+  async findById(id: string): Promise<%Name%Record | null> {
+    const row = await this.prisma.%camelName%Record.findFirst({
+      where: { id, deletedAt: null },
+    });
+    return row ? this.toRecord(row) : null;
+  }
+
+  async create(data: { name: string }): Promise<%Name%Record> {
+    const row = await this.prisma.%camelName%Record.create({
+      data: { name: data.name },
+    });
+    return this.toRecord(row);
+  }
+
+  async update(
+    id: string,
+    data: { name?: string; status?: boolean },
+  ): Promise<void> {
+    await this.prisma.%camelName%Record.update({ where: { id }, data });
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.prisma.%camelName%Record.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  private toRecord(row: {
+    id: string;
+    name: string;
+    status: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }): %Name%Record {
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+}
+`,
+
+  'domain/exception/%Name%NotFoundException.ts': `export class %Name%NotFoundException extends Error {
+  constructor() {
+    super('%Name% 不存在');
+    this.name = '%Name%NotFoundException';
+  }
+}
+`,
+
+  'modules/%name%.module.ts': `import { Module } from '@nestjs/common';
+import { %Name%Controller } from '../adapter/in/web/%name%/%Name%Controller';
+import { %Name%Facade } from '../application/facade/%Name%Facade';
+import { Prisma%Name%Repository } from '../adapter/out/persistence/%name%/Prisma%Name%Repository';
+import { %NAME%_REPOSITORY_PORT } from '../application/port/out/%name%/%Name%RepositoryPort';
+import { LIST_%NAMES%_USE_CASE } from '../application/port/in/%name%/List%Names%UseCase';
+import { GET_%NAME%_USE_CASE } from '../application/port/in/%name%/Get%Name%UseCase';
+import { CREATE_%NAME%_USE_CASE } from '../application/port/in/%name%/Create%Name%UseCase';
+import { UPDATE_%NAME%_USE_CASE } from '../application/port/in/%name%/Update%Name%UseCase';
+import { DELETE_%NAME%_USE_CASE } from '../application/port/in/%name%/Delete%Name%UseCase';
+import { List%Names%Service } from '../application/service/%name%/List%Names%Service';
+import { Get%Name%Service } from '../application/service/%name%/Get%Name%Service';
+import { Create%Name%Service } from '../application/service/%name%/Create%Name%Service';
+import { Update%Name%Service } from '../application/service/%name%/Update%Name%Service';
+import { Delete%Name%Service } from '../application/service/%name%/Delete%Name%Service';
+
+@Module({
+  controllers: [%Name%Controller],
+  providers: [
+    Prisma%Name%Repository,
+    { provide: %NAME%_REPOSITORY_PORT, useExisting: Prisma%Name%Repository },
+    { provide: LIST_%NAMES%_USE_CASE, useClass: List%Names%Service },
+    { provide: GET_%NAME%_USE_CASE, useClass: Get%Name%Service },
+    { provide: CREATE_%NAME%_USE_CASE, useClass: Create%Name%Service },
+    { provide: UPDATE_%NAME%_USE_CASE, useClass: Update%Name%Service },
+    { provide: DELETE_%NAME%_USE_CASE, useClass: Delete%Name%Service },
+    %Name%Facade,
+  ],
+})
+export class %Name%Module {}
+`,
+};
+
+const API_SRC = resolve(__dirname, '..', 'src');
+
+/** 把新 module 註冊進 app.module.ts（冪等；找不到錨點則警告降級） */
+const patchAppModule = (n: Names): void => {
+  const path = join(API_SRC, 'app.module.ts');
+  let content = readFileSync(path, 'utf8');
+  if (content.includes(`${n.Name}Module`)) {
+    console.log(`  skip AppModule（已含 ${n.Name}Module）`);
+    return;
+  }
+  const importRe = /import \{[^}]*\} from '\.\/modules\/[^']+';/g;
+  let lastEnd = -1;
+  let match: RegExpExecArray | null;
+  while ((match = importRe.exec(content)) !== null) {
+    lastEnd = match.index + match[0].length;
+  }
+  if (lastEnd === -1) {
+    console.warn('  ⚠ 找不到 ./modules import 錨點，請手動註冊 AppModule');
+    return;
+  }
+  const importLine = `\nimport { ${n.Name}Module } from './modules/${n.name}.module';`;
+  content = content.slice(0, lastEnd) + importLine + content.slice(lastEnd);
+  const arrayRe = /^(\s*)AuthModule,$/m;
+  if (arrayRe.test(content)) {
+    content = content.replace(arrayRe, `$1AuthModule,\n$1${n.Name}Module,`);
+  } else {
+    console.warn('  ⚠ 找不到 imports 陣列 AuthModule 錨點，請手動加入 module');
+  }
+  writeFileSync(path, content);
+  console.log(`  ✓ AppModule 註冊 ${n.Name}Module`);
+};
+
+/** 把 NotFound → 404 接進 GlobalExceptionFilter 的 DOMAIN_EXCEPTION_MAP（冪等） */
+const patchFilter = (n: Names): void => {
+  const path = join(API_SRC, 'adapter/in/web/filter/GlobalExceptionFilter.ts');
+  let content = readFileSync(path, 'utf8');
+  if (content.includes(`${n.Name}NotFoundException`)) {
+    console.log(`  skip Filter（已含 ${n.Name}NotFoundException）`);
+    return;
+  }
+  const importRe =
+    /import \{[^}]*\} from '\.\.\/\.\.\/\.\.\/\.\.\/domain\/exception\/[^']+';/g;
+  let lastEnd = -1;
+  let match: RegExpExecArray | null;
+  while ((match = importRe.exec(content)) !== null) {
+    lastEnd = match.index + match[0].length;
+  }
+  if (lastEnd === -1) {
+    console.warn('  ⚠ 找不到 domain/exception import 錨點，請手動接線 Filter');
+    return;
+  }
+  const importLine = `\nimport { ${n.Name}NotFoundException } from '../../../../domain/exception/${n.Name}NotFoundException';`;
+  content = content.slice(0, lastEnd) + importLine + content.slice(lastEnd);
+  const entry = `  [\n    ${n.Name}NotFoundException,\n    { status: HttpStatus.NOT_FOUND, code: '${n.NAME}_NOT_FOUND' },\n  ],\n`;
+  content = content.replace(/(> = \[\n)/, `$1${entry}`);
+  writeFileSync(path, content);
+  console.log(`  ✓ Filter 接線 ${n.Name}NotFoundException → 404`);
+};
+
+const main = (): void => {
+  const rawName = process.argv[2];
+  const force = process.argv.includes('--force');
+  if (!rawName || rawName.startsWith('--')) {
+    console.error('用法: pnpm --filter @app/api gen:module <name> [--force]');
+    process.exit(1);
+  }
+  const n = toNames(rawName);
+  let written = 0;
+  let skipped = 0;
+  for (const [tplPath, tplContent] of Object.entries(TEMPLATES)) {
+    const rel = render(tplPath, n);
+    const outPath = join(API_SRC, rel);
+    if (existsSync(outPath) && !force) {
+      console.log(`  skip（已存在）: ${rel}`);
+      skipped += 1;
+      continue;
+    }
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, render(tplContent, n));
+    written += 1;
+  }
+  console.log(`\n產生 ${written} 檔（略過 ${skipped}）`);
+  patchAppModule(n);
+  patchFilter(n);
+  console.log(
+    `\n${n.Name} 模組完成。後續手動步驟:\n` +
+      `  1. prisma/schema.prisma 新增 model ${n.Name}Record（id / name / status / createdAt / updatedAt / deletedAt 可空）\n` +
+      `  2. pnpm --filter @app/api db:migrate（建表 + 重生 client 型別）\n` +
+      `  3. 依實際欄位調整 DTO / port / service / Prisma repo\n` +
+      `  4. 視需要在 ${n.Name}Controller 掛權限 guard（見 RoleController）\n` +
+      `  5. pnpm --filter @app/api typecheck && pnpm --filter @app/api test`,
+  );
+};
+
+main();

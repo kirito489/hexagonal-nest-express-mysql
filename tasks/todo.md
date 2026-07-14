@@ -15,10 +15,9 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
 
 - [ ] **帳號鎖定管理 CRUD（add-account-lock-management）** — `add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/security/locks`、`DELETE /api/security/locks/:id`（list 已鎖帳號 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。
 
-### 工程設置（kgie-nest-backend 借鏡，未完成批次）
+### 技術債（外部相依卡住，延後）
 
-- [ ] **六角模組產生器 `gen:module` + `module-template/`** — 一行 `pnpm gen:module <name>` 產出 port/service/facade/controller/dto/repo 骨架 + 自動註冊 `app.module`。kgie 是單 package 佈局，需改寫成 `apps/api` + `packages/api-client` 三 workspace 路徑（搬概念、重寫模板）。價值高、工多，獨立排期。
-- [ ] **`init-project.sh` 模板初始化腳本** — 若要把本專案當「衍生專案母體」才值得（重設 package.json name / git 歷史 / reinstall）。
+- [ ] **api `moduleResolution: node`（node10）遷移 `nodenext`** — TS 7.0 會移除 node10；但 api 現用 TS 5.9 build 正常，警告只在編輯器 TS6 language service 出現。實測改 nodenext 爆 124 個 `TS1272`（NestJS 裝飾器 metadata：`@Body()` DTO + constructor 注入的 service 要求 `import type`，而注入 service 不能 `import type` 否則 DI 壞）。**條件**：等 NestJS 改善 nodenext 支援，或 api 升 TS 7 時一併做為獨立遷移（含 ts-jest / ts-node 相容驗證）。現階段不動、不加 `ignoreDeprecations`（api 5.9 可能拒絕該值）。
 
 ---
 
@@ -32,6 +31,8 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
   - **api 從 legacy `.eslintrc.js` 升級 flat config + type-checked（`recommendedTypeChecked`）**：對 `persistence` / `seeds` / `spec` 分區關 `no-unsafe-*`，核心層維持嚴格；加 `prelint: db:generate` 修生成依賴（未生成 client → 假陽性）。
   - type-checked 抓到並修掉 **9 個真發現**：`main.ts` bootstrap 未 catch 的 floating-promise（旗艦發現）、多處多餘 `as`、redis 錯誤未 narrow（`err.message` on any）、PasswordPolicy 冗餘型別（`RoleCode | string`）。
   - **Prettier 全 repo 統一根一份**：根 `.prettierrc`（`semi:true` + `singleQuote` + `trailingComma:all`）+ 根 `.prettierignore`（排除 `**/*.md`、生成檔、`prisma/migrations`、build/lockfile）+ 根 `format`/`format:check`。前端從 Vite 無分號 reformat 加回分號對齊（~107 檔），後端 0 churn；`.vscode` 補 `[typescriptreact]`/`[javascriptreact]` formatOnSave。詳見 lessons.md「ESLint / 工具鏈」。
+- [x] **後端六角模組產生器 `gen:module`（⑤，僅後端）** — `apps/api/scripts/gen-module.ts`（單檔內嵌 24 模板 map）；`pnpm --filter @app/api gen:module <name> [--force]` 產最小 CRUD 六角骨架（port in/out、5 service+spec、facade、controller+Zod DTO、Prisma repo、NotFound exception、module）+ 自動接線 `app.module` imports 與 `GlobalExceptionFilter`（NotFound→404，冪等）。實測 widget：23 檔 typecheck 乾淨、8 specs 全過、prettier/eslint 乾淨；`PrismaXRepository` 需先在 schema.prisma 建 `<Name>Record` model + db:generate 才 typecheck（設計邊界）。前端 CRUD 頁未做（CP 值低）。詳見 lessons.md「模組產生器 / gen:module」。
+- [x] **`init-project.sh` 衍生專案初始化腳本** — `scripts/init-project.sh --name <kebab> [--yes]`：改寫根 package.json name/version/description（不動 `@app/*` scope）、重置 `tasks/todo.md`（**保留 `lessons.md`** 可重用基建知識）、重置 git 歷史（互動確認或 `--yes`，破壞性）、`pnpm install`。不碰 `.env` / `openspec`。已 `bash -n` + 對複本驗證 JSON 改寫邏輯。
 
 ### 2026-06-25
 

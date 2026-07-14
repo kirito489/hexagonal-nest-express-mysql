@@ -123,6 +123,10 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **`@Roles` / RolesGuard 受 feature flag 控制，要注意爆炸半徑**：`RolesGuard` 在 `adminRoleEnabled` 關閉時一律放行，會讓所有 `@Roles` 端點（如 SecurityController 的 IP 黑白名單、帳號解鎖）對任何已登入者開放。生產環境由 validate-env 強制 `adminRoleEnabled=true`（關閉即 `process.exit(1)`）守住；dev 關閉時 security 模組形同不設防，勿在共用環境關閉。
 
+## 模組產生器 / gen:module
+
+- **新後端模組用 `pnpm --filter @app/api gen:module <name>` 產骨架,不要手刻**：產生器 `apps/api/scripts/gen-module.ts`（單檔內嵌模板 map，token 用 `%name%`/`%Name%`/`%NAME%`/`%names%`/`%Names%`/`%NAMES%`/`%camelName%`）一次產出最小 CRUD 六角骨架（port in/out、5 service + spec、facade、controller + Zod DTO、Prisma repo、NotFound exception、module）並自動接線 `app.module` imports 與 `GlobalExceptionFilter` 的 `DOMAIN_EXCEPTION_MAP`（NotFound→404）。冪等 skip-if-exists（`--force` 覆寫），錨點找不到會警告降級不中斷。**邊界**：`Prisma<Name>Repository` 依賴 schema.prisma 的 `<Name>Record` model（欄位 id/name/status/createdAt/updatedAt/deletedAt），要先建 model + `db:generate` 才 typecheck 過（其餘 23 檔立即乾淨）；欄位僅佔位 `name`/`status`，產完依實際欄位調整 DTO/port/service/repo。前端 CRUD 頁不在產生範圍。
+
 ## OpenSpec workflow
 
 - **propose 階段先核對 API contract，不要假設「list 有的欄位 update 也支援」**：例如 role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 DTO / service 沒處理 `status`，誤判成「純前端 change」會在動工後才發現要連動改後端 + Swagger + api-client + spec + e2e。作法：寫 proposal / design 前先讀 `adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充列為 Modified / ADDED 並排在「前端開動前」phase。

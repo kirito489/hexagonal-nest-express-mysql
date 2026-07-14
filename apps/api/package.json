@@ -31,6 +31,7 @@
     "db:migrate:deploy": "ts-node scripts/prisma-env.ts prisma migrate deploy",
     "db:generate": "ts-node scripts/prisma-env.ts prisma generate --no-hints",
     "db:studio": "ts-node scripts/prisma-env.ts prisma studio",
+    "gen:module": "ts-node scripts/gen-module.ts",
     "postinstall": "cd node_modules/@prisma/client && ln -sf ../../.prisma .prisma"
   },
   "dependencies": {
