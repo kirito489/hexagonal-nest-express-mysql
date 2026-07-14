@@ -23,7 +23,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config test/jest.e2e.config.js --runInBand",
-    "swagger:bundle": "swagger-cli bundle docs/swagger/openapi.yaml -o docs/swagger/openapi.bundle.yaml -t yaml",
+    "swagger:bundle": "swagger-cli bundle docs/swagger/openapi.yaml -o docs/swagger/openapi.bundle.yaml -t yaml && swagger-cli bundle docs/swagger/front/openapi.yaml -o docs/swagger/front/openapi.bundle.yaml -t yaml",
     "db:seed": "ts-node -P tsconfig.scripts.json scripts/seed-runner.ts",
     "db:create": "ts-node scripts/create-database.ts",
     "db:drop": "ts-node scripts/drop-database.ts",
