@@ -1,8 +1,11 @@
 /**
  * 後端六角模組產生器（借鏡 kgie-nest-backend gen:module 的後端子集）。
  *
- * 用法：`pnpm --filter @app/api gen:module <name> [--force]`
+ * 用法：`pnpm --filter @app/api gen:module <name> [--admin|--front] [--force]`
  *   <name> 為 kebab-case（如 `widget`、`task-assignment`）。
+ *   --admin（預設）產後台模組 → adapter/in/web/admin/… + 路由 /api/admin/<names>。
+ *   --front 產前台模組 → adapter/in/web/front/… + 路由 /api/front/<names>；module 類名加 Front 前綴。
+ *   in 側（controller/facade/service/port-in/module）進 <side>/；out 側（persistence/port-out）與 domain 共用不分前後台。
  *   --force 覆寫既有檔（預設 skip-if-exists）。
  *
  * 產出一個最小 CRUD 六角模組（port in/out、service+spec、facade、controller+DTO、
@@ -68,6 +71,49 @@ const render = (source: string, n: Names): string =>
     .replaceAll('%name%', n.name)
     .replaceAll('%NAMES%', n.NAMES)
     .replaceAll('%NAME%', n.NAME);
+
+/** in 側各層前綴（controller/facade/service/port-in/module）；out 側與 domain 不列入、維持共用 */
+const IN_SIDE_PREFIXES = [
+  'adapter/in/web/',
+  'application/facade/',
+  'application/service/',
+  'application/port/in/',
+  'modules/',
+] as const;
+
+const isInSide = (rel: string): boolean =>
+  IN_SIDE_PREFIXES.some((p) => rel.startsWith(p));
+
+/** 把輸出路徑的 in 側層插入 `<side>/`（out 側 / domain 原樣回傳） */
+const toSidePath = (rel: string, side: string): string => {
+  const prefix = IN_SIDE_PREFIXES.find((p) => rel.startsWith(p));
+  return prefix ? `${prefix}${side}/${rel.slice(prefix.length)}` : rel;
+};
+
+/**
+ * 把 in 側檔案內容改成 `<side>/` 版：
+ * 1. 指向 in 側各層的 import 插入 `<side>/`（out 側 / domain / infrastructure 維持不動）
+ * 2. `@Controller('<names>')` 加 `<side>/` 前綴
+ * 3. module 類名換成 moduleClass（前台加 Front 前綴，避免與後台同名 module 撞名）
+ * 4. 相對 import 深度整體 +1（檔案往 `<side>/` 深一層）
+ */
+const toSideContent = (
+  content: string,
+  side: string,
+  n: Names,
+  moduleClass: string,
+): string =>
+  content
+    .replaceAll(`facade/${n.Name}Facade`, `facade/${side}/${n.Name}Facade`)
+    .replaceAll(`service/${n.name}/`, `service/${side}/${n.name}/`)
+    .replaceAll(`port/in/${n.name}/`, `port/in/${side}/${n.name}/`)
+    .replaceAll(
+      `adapter/in/web/${n.name}/`,
+      `adapter/in/web/${side}/${n.name}/`,
+    )
+    .replaceAll(`${n.Name}Module`, moduleClass)
+    .replace(/@Controller\('/g, `@Controller('${side}/`)
+    .replace(/(from\s+['"])(\.\.\/)/g, '$1../$2');
 
 /** key = 相對 `apps/api/src` 的輸出路徑（含 %token%）；value = 模板內容 */
 const TEMPLATES: Record<string, string> = {
@@ -806,11 +852,11 @@ export class %Name%Module {}
 const API_SRC = resolve(__dirname, '..', 'src');
 
 /** 把新 module 註冊進 app.module.ts（冪等；找不到錨點則警告降級） */
-const patchAppModule = (n: Names): void => {
+const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
   const path = join(API_SRC, 'app.module.ts');
   let content = readFileSync(path, 'utf8');
-  if (content.includes(`${n.Name}Module`)) {
-    console.log(`  skip AppModule（已含 ${n.Name}Module）`);
+  if (content.includes(moduleClass)) {
+    console.log(`  skip AppModule（已含 ${moduleClass}）`);
     return;
   }
   const importRe = /import \{[^}]*\} from '\.\/modules\/[^']+';/g;
@@ -823,16 +869,23 @@ const patchAppModule = (n: Names): void => {
     console.warn('  ⚠ 找不到 ./modules import 錨點，請手動註冊 AppModule');
     return;
   }
-  const importLine = `\nimport { ${n.Name}Module } from './modules/${n.name}.module';`;
+  const importLine = `\nimport { ${moduleClass} } from './modules/${side}/${n.name}.module';`;
   content = content.slice(0, lastEnd) + importLine + content.slice(lastEnd);
-  const arrayRe = /^(\s*)AuthModule,$/m;
+  // 後台掛在 AuthModule 後；前台掛在 PingModule 後（前台群組），找不到就退回 AuthModule
+  const anchorName =
+    side === 'front' && /^\s*PingModule,$/m.test(content)
+      ? 'PingModule'
+      : 'AuthModule';
+  const arrayRe = new RegExp(`^(\\s*)${anchorName},$`, 'm');
   if (arrayRe.test(content)) {
-    content = content.replace(arrayRe, `$1AuthModule,\n$1${n.Name}Module,`);
+    content = content.replace(arrayRe, `$1${anchorName},\n$1${moduleClass},`);
   } else {
-    console.warn('  ⚠ 找不到 imports 陣列 AuthModule 錨點，請手動加入 module');
+    console.warn(
+      `  ⚠ 找不到 imports 陣列 ${anchorName} 錨點，請手動加入 module`,
+    );
   }
   writeFileSync(path, content);
-  console.log(`  ✓ AppModule 註冊 ${n.Name}Module`);
+  console.log(`  ✓ AppModule 註冊 ${moduleClass}`);
 };
 
 /** 把 NotFound → 404 接進 GlobalExceptionFilter 的 DOMAIN_EXCEPTION_MAP（冪等） */
@@ -863,36 +916,49 @@ const patchFilter = (n: Names): void => {
 };
 
 const main = (): void => {
-  const rawName = process.argv[2];
-  const force = process.argv.includes('--force');
-  if (!rawName || rawName.startsWith('--')) {
-    console.error('用法: pnpm --filter @app/api gen:module <name> [--force]');
+  const args = process.argv.slice(2);
+  const rawName = args.find((a) => !a.startsWith('--'));
+  const force = args.includes('--force');
+  const side = args.includes('--front') ? 'front' : 'admin';
+  if (!rawName) {
+    console.error(
+      '用法: pnpm --filter @app/api gen:module <name> [--admin|--front] [--force]',
+    );
     process.exit(1);
   }
   const n = toNames(rawName);
+  const moduleClass =
+    side === 'front' ? `Front${n.Name}Module` : `${n.Name}Module`;
   let written = 0;
   let skipped = 0;
   for (const [tplPath, tplContent] of Object.entries(TEMPLATES)) {
-    const rel = render(tplPath, n);
+    const rendered = render(tplPath, n);
+    const rel = isInSide(rendered) ? toSidePath(rendered, side) : rendered;
     const outPath = join(API_SRC, rel);
     if (existsSync(outPath) && !force) {
       console.log(`  skip（已存在）: ${rel}`);
       skipped += 1;
       continue;
     }
+    let out = render(tplContent, n);
+    if (isInSide(rendered)) out = toSideContent(out, side, n, moduleClass);
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, render(tplContent, n));
+    writeFileSync(outPath, out);
     written += 1;
   }
-  console.log(`\n產生 ${written} 檔（略過 ${skipped}）`);
-  patchAppModule(n);
+  console.log(`\n產生 ${written} 檔（略過 ${skipped}）｜側別：${side}`);
+  patchAppModule(n, side, moduleClass);
   patchFilter(n);
+  const guardStep =
+    side === 'front'
+      ? '前台通常公開唯讀：視需要移除 write 端點；若需認證再掛 guard'
+      : `視需要在 ${n.Name}Controller 掛權限 guard（見 RoleController）`;
   console.log(
-    `\n${n.Name} 模組完成。後續手動步驟:\n` +
+    `\n${moduleClass} 完成（路由 /api/${side}/${n.names}）。後續手動步驟:\n` +
       `  1. prisma/schema.prisma 新增 model ${n.Name}Record（id / name / status / createdAt / updatedAt / deletedAt 可空）\n` +
       `  2. pnpm --filter @app/api db:migrate（建表 + 重生 client 型別）\n` +
       `  3. 依實際欄位調整 DTO / port / service / Prisma repo\n` +
-      `  4. 視需要在 ${n.Name}Controller 掛權限 guard（見 RoleController）\n` +
+      `  4. ${guardStep}\n` +
       `  5. pnpm --filter @app/api typecheck && pnpm --filter @app/api test`,
   );
 };

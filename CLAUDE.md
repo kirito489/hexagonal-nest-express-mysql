@@ -31,6 +31,7 @@ At the start of every new session:
 > Scannable red-line list; complements the Critical Rules above.
 
 - 🚫 **Never let a controller touch Prisma / a repository directly** — always go through `Facade → UseCase / Service → Port` (hexagonal layering).
+- 🚫 **Never hand-scaffold a feature module or misplace the front/back split** — the codebase has two API sides: 後台 `admin/` (`/api/admin/*`) and 前台 `front/` (`/api/front/*`). The **in-side 5 layers** (controller / facade / service / port-in / module) live under `<side>/`; **out-side** (persistence / port-out), **domain**, and cross-cutting (guard / filter / interceptor / decorator) are **shared — never under a side**. Scaffold new modules with `pnpm --filter @app/api gen:module <name> [--admin|--front]` (defaults to admin); front module classes get a `Front` prefix. Swagger/api-client is admin-only (`/api/admin/docs`); front has its own doc (`/api/front/docs`), see `openspec/project.md`.
 - 🚫 **Never `throw new Error('...')`** — use a domain exception (a named subclass extending `Error`) or a NestJS `HttpException`, and add the mapping in `GlobalExceptionFilter` (status + SCREAMING_SNAKE code).
 - 🚫 **Never hand-write a DTO class** — request / response types are always inferred from a Zod schema via `z.infer`, validated with `ZodValidationPipe`.
 - 🚫 **Never set `"type": "module"` on the root or `apps/api` `package.json`** — stay on the NestJS CommonJS baseline; switching to ESM cascades into breaking nest CLI / ts-jest / decorator metadata (`apps/web` is the exception — it's Vite ESM by design).

@@ -143,9 +143,21 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **`@Roles` / RolesGuard 受 feature flag 控制，要注意爆炸半徑**：`RolesGuard` 在 `adminRoleEnabled` 關閉時一律放行，會讓所有 `@Roles` 端點（如 SecurityController 的 IP 黑白名單、帳號解鎖）對任何已登入者開放。生產環境由 validate-env 強制 `adminRoleEnabled=true`（關閉即 `process.exit(1)`）守住；dev 關閉時 security 模組形同不設防，勿在共用環境關閉。
 
+## 前後台分層 (admin/front)
+
+- **兩套 API 只切 in 側 5 層,out 側 + domain + 橫切共用**：後台 `admin/`（`/api/admin/*`）、前台 `front/`（`/api/front/*`）。切分只在 controller / facade / service / port-in / module（各進 `<side>/`）；persistence / port-out / domain（model・VO・exception）/ guard・filter・interceptor・decorator 一律共用、照 domain 放各層根目錄。中性 infra module（health/redis/jwt…）留 `modules/` 根。前台 module 類名加 `Front` 前綴避免與後台同名在 app.module 撞名（controller/service/facade 類名不需，因只在自己 module 內 import）。
+
+- **搬整包資料夾深一層 = 兩個正交轉換,可腳本化 + typecheck 把關**：把 flat 結構搬進 `<side>/` 時，(1) 全域把 `<side>/` 段插進「指向 in 側各層」的 import 路徑（`adapter/in/web/<name>/`、`facade/<Name>Facade`、`service/<name>/`、`port/in/<name>/`、`modules/<name>.module`；**不碰** `port/out`、`persistence`、`domain`、`infrastructure`）；(2) 被搬檔的每個 `../` import 各 +1 層（`from '../` → `from '../../`）。兩者位置正交（段在中間、深度在前綴），先 (1) 後 (2)。**坑**：`jest.mock('../…')` 是字串字面量、TS 不當 module 解析，typecheck 過但 jest 執行期掛，(2) 的深度 +1 要一併涵蓋 jest.mock/require 的路徑字串（見 [[測試]]）。`git mv` 保留歷史；rename 偵測門檻內容改太多會顯示成 D+A（非掉檔）。
+
+- **swagger 分兩份用 `serveFiles`(非共用 `swaggerUi.serve`)各綁各的 doc**：swagger-ui-express 的 `serve` 有 module 級共用狀態，兩份 UI 掛不同路徑時第二份會載到第一份的 spec。作法：`swaggerUi.serveFiles(doc, opts)` + `swaggerUi.setup(doc, opts)` 每份各一，掛 `/api/admin/docs`、`/api/front/docs`；`swagger:bundle` 打前後台兩份 bundle。
+
+- **api-client 切 `/api/admin` 前綴,靠 baseUrl 承載、path key 不動 → 呼叫端零改**：openapi-typescript 用 yaml 的 **path key**（`/auth/login`）當 schema key，不看 `servers`。所以把 swagger `servers` 改 `/api/admin`、yaml path key 維持 `/auth/login`，重生 schema.ts 內容不變（僅移除中性的 `/health`）；apps/web 只改 `createApiClient` 的 baseUrl `/api`→`/api/admin`，`apiClient.POST('/auth/login')` 全不動。health 是 ops 中性端點（`/api/health`），不入 admin 契約、從 client swagger 移除。
+
 ## 模組產生器 / gen:module
 
-- **新後端模組用 `pnpm --filter @app/api gen:module <name>` 產骨架,不要手刻**：產生器 `apps/api/scripts/gen-module.ts`（單檔內嵌模板 map，token 用 `%name%`/`%Name%`/`%NAME%`/`%names%`/`%Names%`/`%NAMES%`/`%camelName%`）一次產出最小 CRUD 六角骨架（port in/out、5 service + spec、facade、controller + Zod DTO、Prisma repo、NotFound exception、module）並自動接線 `app.module` imports 與 `GlobalExceptionFilter` 的 `DOMAIN_EXCEPTION_MAP`（NotFound→404）。冪等 skip-if-exists（`--force` 覆寫），錨點找不到會警告降級不中斷。**邊界**：`Prisma<Name>Repository` 依賴 schema.prisma 的 `<Name>Record` model（欄位 id/name/status/createdAt/updatedAt/deletedAt），要先建 model + `db:generate` 才 typecheck 過（其餘 23 檔立即乾淨）；欄位僅佔位 `name`/`status`，產完依實際欄位調整 DTO/port/service/repo。前端 CRUD 頁不在產生範圍。
+- **新後端模組用 `pnpm --filter @app/api gen:module <name> [--admin|--front]` 產骨架,不要手刻**：產生器 `apps/api/scripts/gen-module.ts`（單檔內嵌模板 map，token 用 `%name%`/`%Name%`/`%NAME%`/`%names%`/`%Names%`/`%NAMES%`/`%camelName%`）一次產出最小 CRUD 六角骨架（port in/out、5 service + spec、facade、controller + Zod DTO、Prisma repo、NotFound exception、module）並自動接線 `app.module` imports 與 `GlobalExceptionFilter` 的 `DOMAIN_EXCEPTION_MAP`（NotFound→404）。冪等 skip-if-exists（`--force` 覆寫），錨點找不到會警告降級不中斷。**邊界**：`Prisma<Name>Repository` 依賴 schema.prisma 的 `<Name>Record` model（欄位 id/name/status/createdAt/updatedAt/deletedAt），要先建 model + `db:generate` 才 typecheck 過（其餘 23 檔立即乾淨）；欄位僅佔位 `name`/`status`，產完依實際欄位調整 DTO/port/service/repo。前端 CRUD 頁不在產生範圍。
+
+- **`--admin`/`--front` 用「執行期轉換」實作,模板保持扁平**：模板仍寫扁平路徑（如 `adapter/in/web/%name%/`），產生器在寫檔時對「in 側」檔案套上與搬移同款轉換——path 插 `<side>/`、內容把指向 in 側各層的 import 插 `<side>/` + 深度 +1、`@Controller('<names>')` 加 `<side>/` 前綴、前台 module 類名換 `Front<Name>Module`；out 側 / domain 模板原樣輸出。判斷 in 側用 layer 前綴白名單（`adapter/in/web/`、`application/{facade,service,port/in}/`、`modules/`）。`app.module` 註冊：後台掛 `AuthModule,` 後、前台掛 `PingModule,` 後。**驗證產生器**：產一個 admin + 一個 front 模組，typecheck 後**只有 `Prisma<Name>Repository` 因缺 model 報錯、其餘全綠**即證明兩側 import 深度正確；驗完 `git clean -fd` + `git restore app.module/GlobalExceptionFilter` 清測試產物。
 
 ## OpenSpec workflow
 

@@ -29,6 +29,12 @@ _(目前無)_
 
 ### 2026-07-14
 
+- [x] **前後台 API 分層（admin / front）** — 借鏡 KGIE，把單一 API 面重構成兩套：後台 `/api/admin/*`、前台 `/api/front/*`。分 5 block：
+  - **B1 搬 admin**：auth/member/role/security/profile 的 in 側 5 層（controller/facade/service/port-in/module）搬進 `admin/`；out 側 + domain 共用不動；5 controller 加 `admin/` 前綴；88+ rename、全 import 重接（段插入 + 深度 +1）+ e2e URL；114 e2e 綠。
+  - **B2 swagger/api-client 對齊**：swagger serve `/api/admin/docs`、server 改 `/api/admin`、移除中性 `/health`；重生 api-client（path key 不變、僅少 health）；apps/web baseUrl `/api`→`/api/admin`（呼叫端零改）。
+  - **B4 front 骨架**：`front/` in 側 5 層對齊 admin/；示範 `GET /api/front/ping`（@Public）+ front e2e；前台 swagger `docs/swagger/front/*` + `serveFiles` serve `/api/front/docs`；`swagger:bundle` 打兩份。
+  - **B5 gen:module 升級 + 文件**：加 `--admin`/`--front`（預設 admin，執行期轉換插 `<side>/` + 深度 +1 + `@Controller` 前綴 + `Front` module 前綴）；project.md/CLAUDE.md/lessons 補前後台慣例。詳見 lessons「前後台分層」。
+  - 未做（延後）：apps/web 沒有真前台頁（前台目前只有骨架端點）；「純 KGIE 版」（拔後台 swagger + 建 packages/shared-schemas）評估後不做，monorepo 保留後台 swagger 較划算。
 - [x] **e2e 全面改走真 test DB（取代 mock Prisma）** — 6 支 e2e spec（health / serve-static / auth / role / member / security）全轉真庫，**114 tests 全綠** + typecheck 0 + lint pass：
   - 基建（前批 commit `d16cc8e` / `50027d2`）：`helpers/e2e-env.ts`（載真 `.env` 帳密 + 守門測試庫名須含 `test`）、`setup-env.e2e.ts`（覆寫 `DB_DATABASE=*_test` + 補測試 secrets）、`global-setup.ts`（`CREATE DATABASE IF NOT EXISTS` + `pnpm exec prisma migrate deploy`）、`helpers/db.ts`（`resetDb` 依 FK 序清表 / `ensurePermissions` / `seedMember` / `seedRole`）、`test-app.ts` 注入真 `PrismaService`（Redis 仍 mock）。
   - 本批：role / member / security 從「mock 斷言」改「真 DB seed + 查庫斷言」；`seedMember` / `seedRole` 加 `roleCode`（security 走 `@Roles(SUPERADMIN)`、flag 預設開，admin 需 `roleCode:'SUPERADMIN'`，值由 JwtAuthGuard 每次查 DB 補進 `request.member`）；`jest.e2e.config.js` 移除 security 的 `testPathIgnorePatterns`。

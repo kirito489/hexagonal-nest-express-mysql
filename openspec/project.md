@@ -93,27 +93,32 @@ hexagonal-nest-express-mysql/
 ```
 apps/api/src/
 ├── adapter/
-│   ├── in/web/        # Controller、DTO（per-module 子目錄）、Guard、Filter、Decorator
-│   └── out/           # Prisma、Redis、Firebase、Mail、S3 等實作
+│   ├── in/web/
+│   │   ├── admin/     # 後台 Controller + DTO（per-module；路由 /api/admin/<names>）
+│   │   ├── front/     # 前台 Controller + DTO（公開；路由 /api/front/<names>）
+│   │   └── {guard,filter,interceptor,decorator}/  # 共用橫切（與 admin/front 平級）
+│   └── out/           # Prisma、Redis、Firebase、Mail、S3 等實作（共用，不分前後台）
 ├── application/
-│   ├── facade/        # Application 層公開 API（每個 domain area 一個 *Facade）
+│   ├── facade/{admin,front}/     # 每個 domain area 一個 *Facade，分前後台
 │   ├── port/
-│   │   ├── in/{domain}/   # Use case 介面（auth/、member/、role/、security/）
-│   │   └── out/{domain}/  # Repository / 外部服務介面
-│   └── service/       # Use case 實作
+│   │   ├── in/{admin,front}/{module}/   # Use case 介面，分前後台
+│   │   └── out/{module}/                # Repository / 外部服務介面（共用）
+│   └── service/{admin,front,shared}/    # Use case 實作（shared = 跨前後台共用）
 ├── domain/
-│   ├── model/         # 領域實體（private constructor + static factory）
-│   ├── value-object/  # 值物件
-│   └── exception/     # 領域例外（plain Error 子類）
+│   ├── model/         # 領域實體（private constructor + static factory）（共用）
+│   ├── value-object/  # 值物件（共用）
+│   └── exception/     # 領域例外（plain Error 子類）（共用）
 ├── infrastructure/    # PrismaModule / PrismaService、Redis、ZodValidationPipe、Logger
-└── modules/           # NestJS DI 接線（Port Token → 實作）
+└── modules/{admin,front}/   # NestJS DI 接線（中性 infra module 留在 modules/ 根）
 ```
 
 **依賴方向**：`adapter/in` → `application` → `port/out` ← `adapter/out`。`application` 與 `domain` 層**從不**引入 `adapter`。
 
+**前後台分層**：專案有兩套 API —— 後台（admin，管理端，`/api/admin/*`）與前台（front，公開端，`/api/front/*`）。切分只發生在 **in 側 5 層**（controller / facade / service / port-in / module → 各自進 `admin/` 或 `front/`）；**out 側**（port-out / persistence）、**domain**（model / value-object / exception）、以及 **in 側橫切**（guard / filter / interceptor / decorator）一律**共用、不分前後台**，照 domain 分類放各層根目錄。中性 infra module（health / redis / jwt / email…）留在 `modules/` 根。前台 module 類名加 `Front` 前綴避免與後台同名撞名。**新模組一律用 `gen:module <name> [--admin|--front]` 產生（預設 admin），不要手刻。** Swagger 亦分兩份：後台 `/api/admin/docs`（餵 `packages/api-client` 給 `apps/web`）、前台 `/api/front/docs`（`docs/swagger/front/`）。
+
 ### 後端慣例
 
-- **Module naming**：Controller + DTO → `adapter/in/web/<module>/`；Prisma repository → `adapter/out/persistence/<module>/`；service → `application/service/<module>/`（跨模組共用 service 放 `application/service/shared/`）。Guard / Filter / Decorator 等共用 infrastructure 放各自頂層目錄。
+- **Module naming（依 `<side>` = `admin` / `front` 分層）**：in 側依側別分目錄——Controller + DTO → `adapter/in/web/<side>/<module>/`；service → `application/service/<side>/<module>/`（跨前後台共用 service 放 `application/service/shared/`）；facade → `application/facade/<side>/`；port-in → `application/port/in/<side>/<module>/`；module → `modules/<side>/<module>.module.ts`。**共用層不分前後台**：Prisma repository → `adapter/out/persistence/<module>/`、port-out → `application/port/out/<module>/`、domain → `domain/`；Guard / Filter / Decorator / Interceptor 放各自頂層目錄。
 - **Facade**：每個 domain area 對外只暴露 `*Facade`（如 `AuthFacade`、`MemberFacade`），Controller 透過 facade 操作，不直接打 service。
 - **Domain exception → HTTP**：domain exception 是 plain `Error` 子類；HTTP 狀態映射在 `src/adapter/in/web/filter/GlobalExceptionFilter.ts`，新增 exception 必須同步加 `instanceof` 分支與 `code`（SCREAMING_SNAKE_CASE）。
 - **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。
@@ -225,16 +230,17 @@ apps/web/src/
 
 ### API 端點總覽
 
-所有端點以 `/api` 為前綴。需要互動式查詢請打開 Swagger UI（`http://localhost:3000/api/docs`）。
+後台端點以 `/api/admin` 為前綴、前台以 `/api/front`；health 為中性 `/api/health`。Swagger UI：後台 `http://localhost:3000/api/admin/docs`、前台 `http://localhost:3000/api/front/docs`。
 
 | 群組     | 路徑                                | 權限                                     |
 | -------- | ----------------------------------- | ---------------------------------------- |
-| Auth     | `/api/auth/{login,refresh,logout,forgot-password,reset-password}` | 公開（含 reCAPTCHA） |
-| Me       | `GET /api/me`                       | JWT                                      |
-| Members  | `GET/POST/PATCH/DELETE /api/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
-| Roles    | `GET/POST/PATCH/DELETE /api/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
-| Security | `/api/security/ip-{whitelist,blacklist}*`、`/api/security/unlock-account` | JWT + ADMIN 角色 |
-| Health   | `GET /api/health`（liveness）、`GET /api/health/ready`（readiness，探 DB + Redis） | 公開（不計入速率限制） |
+| Auth     | `/api/admin/auth/{login,refresh,logout,forgot-password,reset-password}` | 公開（含 reCAPTCHA） |
+| Me       | `GET /api/admin/me`                 | JWT                                      |
+| Members  | `GET/POST/PATCH/DELETE /api/admin/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
+| Roles    | `GET/POST/PATCH/DELETE /api/admin/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
+| Security | `/api/admin/security/ip-{whitelist,blacklist}*`、`/api/admin/security/unlock-account` | JWT + ADMIN 角色 |
+| Front    | `GET /api/front/ping`（骨架示範，待實際前台端點取代） | 公開                        |
+| Health   | `GET /api/health`（liveness）、`GET /api/health/ready`（readiness，探 DB + Redis） | 公開（中性、不加 /admin，不計速率限制） |
 | Metrics  | `GET /api/metrics`（Prometheus，flag 開啟才掛載） | 公開（不計入速率限制；需網路層保護）     |
 
 ### RBAC 權限系統
