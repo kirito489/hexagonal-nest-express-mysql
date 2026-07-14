@@ -2,6 +2,16 @@
 
 _Accumulated rules and validated decisions. Each entry records the rule, the mechanism, and how to apply it directly — no changelog/history narrative._
 
+## 撰寫格式
+
+每條 lesson 至少涵蓋三件事（短的可濃縮成一句 `**規則**：機制 + 套用`；複雜的分三段寫）：
+
+- **現象 / 規則**：踩到什麼（錯誤訊息 / 症狀），或要遵守的規則。
+- **Why**：根因——哪個工具 / 版本的哪個行為造成，或為何這樣做。
+- **How to apply**：下次怎麼避免 / 怎麼套用。
+
+**只增不減**；被糾正、或踩到非顯而易見的工具 / 設計坑就立即記。**依主題分組**（Prisma / JWT / NestJS…）而非日期流水——同主題聚在一起好找。
+
 ## Prisma / 資料庫
 
 - **修改 schema 後必須執行 `npx prisma generate`**：否則 `@prisma/client` 的 TypeScript 會找不到新 model，甚至 `PrismaClient` 型別報 "has no exported member"。

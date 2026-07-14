@@ -23,6 +23,7 @@ At the start of every new session:
 - **Output data directly**: when asked for data or JSON, print it to stdout. Do not provide placeholder values, setup instructions, or scripts unless explicitly requested.
 - **Verify schema before modifying queries**: always check `apps/api/prisma/schema.prisma` before assuming a field exists on a model.
 - **Reuse before creating**: search `apps/api/src/` (backend), `apps/web/src/` (frontend), and `packages/api-client/src/` (shared) for existing helpers / facades / ports / adapters / hooks before writing new ones.
+- **New env var → add it to `validate-env`**: any new environment variable must also be added to the Zod schema in `apps/api/src/infrastructure/validate-env.ts` (and `.env.example`), or it fails silently as `undefined` at runtime.
 
 ---
 
@@ -130,7 +131,8 @@ After making changes, before suggesting a commit:
 1. `pnpm typecheck` — fix all type errors across all three workspaces. If api typecheck fails with "Property X does not exist on PrismaService", run `pnpm --filter @app/api db:generate` first.
 2. `pnpm lint` — fix all lint warnings / errors.
 3. `pnpm test` — ensure no regressions. Run `pnpm --filter @app/api test:e2e` if controllers or routes changed (requires MySQL + Redis running locally).
-4. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` and `pnpm --filter @app/api-client generate` to keep frontend types in sync.
+4. `pnpm build` — when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
+5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` and `pnpm --filter @app/api-client generate` to keep frontend types in sync.
 
 Once all checks pass, suggest a commit message (Traditional Chinese, conventional commits format). Do not execute `git commit`.
 

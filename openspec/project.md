@@ -118,8 +118,32 @@ apps/api/src/
 - **Domain exception → HTTP**：domain exception 是 plain `Error` 子類；HTTP 狀態映射在 `src/adapter/in/web/filter/GlobalExceptionFilter.ts`，新增 exception 必須同步加 `instanceof` 分支與 `code`（SCREAMING_SNAKE_CASE）。
 - **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。
 - **Controller 回傳**：原始值即可，`TransformInterceptor` 會包成 `{ success, data, timestamp }`；**不要**自行包 `{ data }`，否則前端要挖兩層。
-- **時區**：DB 一律 UTC（Prisma driver 層 `timezone: 'Z'`），JS `Date` 直接寫入 / 讀回。
+- **時區 / 日期**：見下方「時間處理慣例」。
 - **Repository P2002**：Prisma `unique constraint violation` 在 Repository 層 try/catch 轉成 domain exception，service 層不感知 Prisma。
+
+### 命名規範
+
+| 對象                  | 慣例                 | 範例                                          |
+| --------------------- | -------------------- | --------------------------------------------- |
+| API JSON 欄位         | camelCase            | `permissionCodes`、`createdAt`                |
+| TS 變數 / 函式        | camelCase            | `roleFacade`、`listRoles`                     |
+| Class                 | PascalCase           | `RoleController`、`CreateRoleService`         |
+| Zod schema            | `<camel>Schema`      | `createRoleSchema`、`listRolesQuerySchema`    |
+| Zod 推導型別 / DTO    | PascalCase           | `CreateRoleRequest`、`ListRolesQuery`         |
+| DI token / port 常數  | SCREAMING_SNAKE_CASE | `CREATE_ROLE_USE_CASE`、`ROLE_REPOSITORY_PORT`|
+| 錯誤 code             | SCREAMING_SNAKE_CASE | `ROLE_NOT_FOUND`                              |
+| 檔名（class）         | PascalCase           | `RoleController.ts`、`CreateRoleUseCase.ts`   |
+| 檔名（infra / module）| kebab-case           | `zod-validation.pipe.ts`、`role.module.ts`    |
+| 資料夾                | kebab-case           | `adapter/in/web/role`、`application/service/role` |
+
+### 時間處理慣例
+
+**單一原則：UI 一律本地時區（`APP_TIMEZONE`）、DB 儲存與後端運算 / 比較一律 UTC instant、轉換只在後端邊界做。**
+
+- **DB & 運算**：`DateTime` 欄位存 **UTC instant**（`new Date()`；Prisma driver 層 `timezone: 'Z'` 已強制 UTC 寫入 / 讀回）。日期比較（如「開始日是否為未來」）一律用 instant——`start.getTime() > Date.now()`，**不要**用 `YYYY-MM-DD` 字串比大小（會受時區位移錯一天）。
+- **API 契約**：日曆日輸入 / 輸出用 **`APP_TIMEZONE` 日曆日的 `YYYY-MM-DD` 字串**（Zod `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)`，**不要** `z.coerce.date()`——它把字串當 UTC 午夜 parse，跨時區會錯一天）；read-model 的時間欄位回 UTC `Date`，前端負責格式化為本地。
+- **日邊界轉換（只在後端邊界做）**：`APP_TIMEZONE` 日曆日 → UTC instant 用 dayjs tz——開始日 `dayjs.tz(day, tz).startOf('day').toDate()`、結束日 `dayjs.tz(day, tz).endOf('day').toDate()`。首個用到「日區間查詢」的功能把它抽成 `date.ts` 的 `appDayStartUtc` / `appDayEndUtc` / `rangeToUtc`（+ spec）供之後共用。
+- **禁止**：`new Date(d).toISOString().slice(0, 10)` 當「本地日」顯示（那是 UTC 日、會錯一天）；後端直接把前端傳的 `YYYY-MM-DD` 用 `new Date()` 當本地日存（跨環境系統時區不定）。
 
 ### Swagger yaml 慣例
 
@@ -187,6 +211,7 @@ apps/web/src/
 ## 環境變數
 
 - 後端：`apps/api/.env`（範本 `apps/api/.env.example`）。
+- **新增 env 變數必須同步加入 `apps/api/src/infrastructure/validate-env.ts` 的 Zod schema**（並更新 `.env.example`）：漏加驗證的 env 在缺值 / 型別錯時不會被擋，運行期才以 `undefined` 靜默出錯；production 專屬強制檢查（CORS `*`、`BCRYPT_ROUNDS` 下限等）也一併在此宣告。
 - 前端：若需要走 Vite 環境變數，鍵名以 `VITE_` 開頭，放 `apps/web/.env`。目前無前端環境變數需求。
 - **CORS_ORIGIN**：支援逗號分隔多 origin，預設 `http://localhost:3000,http://localhost:5173`。
 - **`*` 在生產環境會擋下**：validate-env 強制要求明確指定 origin。

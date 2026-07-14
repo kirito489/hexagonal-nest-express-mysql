@@ -1,8 +1,12 @@
 # TODO
 
-_跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，完成的歸到下方並按日期分組。_
+_跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依優先序）→ 完成（按日期分組）。_
 
 ---
+
+## 進行中
+
+_（目前無）_
 
 ## 待處理
 
@@ -14,6 +18,10 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
 ### 功能
 
 - [ ] **帳號鎖定管理 CRUD（add-account-lock-management）** — `add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/security/locks`、`DELETE /api/security/locks/:id`（list 已鎖帳號 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。
+
+### 工程健壯性
+
+- [ ] **`date.ts` 未真正走 `APP_TIMEZONE`** — 現硬編 `dayjs.tz.setDefault('Asia/Taipei')`，且 `formatDate` / `formatDateWithDay` 用 `dayjs(d).format()`（無 `.tz()`）→ 實際依**伺服器系統時區**格式化，非 `APP_TIMEZONE`（與 project.md 宣稱不符）。應：改讀 `APP_TIMEZONE`（注意 dotenv 時序——勿在 module top-level 就 `getEnv()`，可 lazy 或於首次呼叫時解析）、format helper 一律 `.tz()`、補日邊界 helper（`appDayStartUtc` / `appDayEndUtc` / `rangeToUtc`，見 project.md「時間處理慣例」）。動到既有 `formatDate` 行為，需連同 `date.spec.ts` 更新驗證。
 
 ### 技術債（外部相依卡住，延後）
 
