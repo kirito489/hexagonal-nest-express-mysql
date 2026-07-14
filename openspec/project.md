@@ -114,7 +114,7 @@ apps/api/src/
 
 **依賴方向**：`adapter/in` → `application` → `port/out` ← `adapter/out`。`application` 與 `domain` 層**從不**引入 `adapter`。
 
-**前後台分層**：專案有兩套 API —— 後台（admin，管理端，`/api/admin/*`）與前台（front，公開端，`/api/front/*`）。切分只發生在 **in 側 5 層**（controller / facade / service / port-in / module → 各自進 `admin/` 或 `front/`）；**out 側**（port-out / persistence）、**domain**（model / value-object / exception）、以及 **in 側橫切**（guard / filter / interceptor / decorator）一律**共用、不分前後台**，照 domain 分類放各層根目錄。中性 infra module（health / redis / jwt / email…）留在 `modules/` 根。前台 module 類名加 `Front` 前綴避免與後台同名撞名。**新模組一律用 `gen:module <name> [--admin|--front]` 產生（預設 admin），不要手刻。** Swagger 亦分兩份：後台 `/api/admin/docs`（餵 `packages/api-client` 給 `apps/web`）、前台 `/api/front/docs`（`docs/swagger/front/`）。
+**前後台分層**：專案有兩套 API —— 後台（admin，管理端，`/api/admin/*`）與前台（front，公開端，`/api/front/*`）。切分只發生在 **in 側 5 層**（controller / facade / service / port-in / module → 各自進 `admin/` 或 `front/`）；**out 側**（port-out / persistence）、**domain**（model / value-object / exception）、以及 **in 側橫切**（guard / filter / interceptor / decorator）一律**共用、不分前後台**，照 domain 分類放各層根目錄。中性 infra module（health / redis / jwt / email…）留在 `modules/` 根。前台 module 類名加 `Front` 前綴避免與後台同名撞名。**新模組一律用 `gen:module <name> [--admin|--front]` 產生（預設 admin），不要手刻。** Swagger 亦分兩份：後台 `/api/admin/docs`（yaml 在 `docs/swagger/admin/`，餵 `packages/api-client` 給 `apps/web`）、前台 `/api/front/docs`（`docs/swagger/front/`）。health 為中性 ops 端點，不入任一份 client 契約。
 
 ### 後端慣例
 

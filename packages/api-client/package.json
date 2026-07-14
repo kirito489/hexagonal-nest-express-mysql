@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "pregenerate": "pnpm --filter @app/api swagger:bundle",
-    "generate": "openapi-typescript ../../apps/api/docs/swagger/openapi.bundle.yaml -o src/schema.ts",
+    "generate": "openapi-typescript ../../apps/api/docs/swagger/admin/openapi.bundle.yaml -o src/schema.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -166,7 +166,7 @@ const bootstrap = async (): Promise<void> => {
 
   mountSwagger(
     '/api/admin',
-    loadSwaggerDocument('docs/swagger/openapi.bundle.yaml'),
+    loadSwaggerDocument('docs/swagger/admin/openapi.bundle.yaml'),
   );
   mountSwagger(
     '/api/front',
