@@ -1,105 +1,62 @@
-import bcrypt from 'bcrypt';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
+import { resetDb, seedMember } from './helpers/db';
 
-// ──────────────────────────────────────────────
-// Mock 資料
-// ──────────────────────────────────────────────
+// 走真 test DB:login 相關 case seed 真會員;黑名單 / throttle 仍走 Redis mock。
+const TEST_EMAIL = 'test@example.com';
 const TEST_PASSWORD = 'TestPass123!';
-const TEST_HASH = bcrypt.hashSync(TEST_PASSWORD, 1);
-const MEMBER_UUID = '00000000-0000-0000-0000-000000000001';
-const ROLE_UUID = '00000000-0000-0000-0000-000000000010';
 
-const MEMBER_RECORD_BASE = {
-  id: MEMBER_UUID,
-  email: 'test@example.com',
-  member: 'Test User',
-  password: TEST_HASH,
-  roleId: ROLE_UUID,
-  status: true,
-  isDefault: false,
-  lastPasswordChange: null,
-  createdAt: new Date('2024-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-  lastLoginAt: null,
-  role: {
-    name: 'member',
-    permissions: [
-      { permission: { permissionCode: 'BACKEND:ACCOUNT:VIEW', status: true } },
-    ],
-  },
-};
+const login = (
+  app: NestExpressApplication,
+  email = TEST_EMAIL,
+  password = TEST_PASSWORD,
+) =>
+  request(app.getHttpServer())
+    .post('/api/auth/login')
+    .send({ email, password });
 
-const MEMBER_RECORD = { ...MEMBER_RECORD_BASE };
-const DISABLED_MEMBER_RECORD = { ...MEMBER_RECORD_BASE, status: false };
-
-const mockPrisma = {
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  memberRecord: {
-    findUnique: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    upsert: jest.fn().mockResolvedValue({}),
-    update: jest.fn().mockResolvedValue({}),
-  },
-  role: {
-    findFirstOrThrow: jest.fn().mockResolvedValue({
-      id: ROLE_UUID,
-      name: 'member',
-      isDefault: true,
-      status: true,
-    }),
-  },
-};
-
-const mockRedis = createMockRedis();
-
-// ──────────────────────────────────────────────
-// E2E Test Suite
-// ──────────────────────────────────────────────
 describe('Auth E2E', () => {
   let app: NestExpressApplication;
+  let prisma: PrismaService;
+  const mockRedis = createMockRedis();
 
   beforeAll(async () => {
-    ({ app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis }));
+    ({ app } = await createE2EApp({ redis: mockRedis }));
+    prisma = app.get(PrismaService);
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.isTokenBlacklisted.mockResolvedValue(false);
     mockRedis.throttleIncrement.mockResolvedValue(1);
+    await resetDb(prisma);
   });
-
-  // ── POST /api/auth/login ──────────────────
 
   describe('POST /api/auth/login', () => {
     it('正確憑證 → 200 + 雙 token + roleName', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
+      await seedMember(prisma, {
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+        roleName: 'member',
+      });
 
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      const res = await login(app);
 
-      expect(response.status).toBe(200);
-      const body = response.body as {
+      expect(res.status).toBe(200);
+      const body = res.body as {
         data: {
           accessToken: string;
           refreshToken: string;
           accessTokenExpiresIn: number;
           refreshTokenExpiresIn: number;
-          member: {
-            id: string;
-            email: string;
-            member: string;
-            roleName: string;
-          };
+          member: { roleName: string };
         };
       };
       expect(typeof body.data.accessToken).toBe('string');
@@ -109,101 +66,75 @@ describe('Auth E2E', () => {
       expect(body.data.member.roleName).toBe('member');
     });
 
-    it('登入成功 → 觸發 memberRecord.update 寫入 lastLoginAt', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      mockPrisma.memberRecord.update.mockClear();
+    it('登入成功 → 寫入 lastLoginAt（真 DB）', async () => {
+      const { memberId } = await seedMember(prisma, {
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+      });
 
-      await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      await login(app);
+      // 等 fire-and-forget 的 lastLoginAt 更新落庫
+      await new Promise((r) => setTimeout(r, 300));
 
-      // 等 fire-and-forget 的 Promise tick 跑完
-      await new Promise((r) => setImmediate(r));
-
-      const updateCalls = mockPrisma.memberRecord.update.mock.calls;
-      const lastLoginUpdate = updateCalls.find(
-        (call) =>
-          (call[0] as { data?: { lastLoginAt?: unknown } })?.data
-            ?.lastLoginAt !== undefined,
-      );
-      expect(lastLoginUpdate).toBeDefined();
+      const member = await prisma.memberRecord.findUnique({
+        where: { id: memberId },
+      });
+      expect(member?.lastLoginAt).not.toBeNull();
     });
 
     it('無效 email 格式 → 400 Zod 驗證錯誤', async () => {
-      const response = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: 'not-an-email', password: 'any' });
-
-      expect(response.status).toBe(400);
+      expect(res.status).toBe(400);
     });
 
     it('使用者不存在 → 401', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(null);
-
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'nobody@example.com', password: 'any' });
-
-      expect(response.status).toBe(401);
+      const res = await login(app, 'nobody@example.com', 'any');
+      expect(res.status).toBe(401);
     });
 
     it('密碼錯誤 → 401', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'wrong-password' });
-
-      expect(response.status).toBe(401);
+      await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
+      const res = await login(app, TEST_EMAIL, 'wrong-password');
+      expect(res.status).toBe(401);
     });
 
     it('帳號停用 → 403 ACCOUNT_DISABLED', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(
-        DISABLED_MEMBER_RECORD,
-      );
-
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
-
-      expect(response.status).toBe(403);
-      const body = response.body as { code: string };
-      expect(body.code).toBe('ACCOUNT_DISABLED');
+      await seedMember(prisma, {
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+        status: false,
+      });
+      const res = await login(app);
+      expect(res.status).toBe(403);
+      expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
     });
   });
-
-  // ── GET /api/members（需 JWT）────────────
 
   describe('GET /api/members', () => {
     it('無 JWT → 401', async () => {
-      const response = await request(app.getHttpServer()).get(
+      const res = await request(app.getHttpServer()).get(
         '/api/members?email=test@example.com',
       );
-      expect(response.status).toBe(401);
+      expect(res.status).toBe(401);
     });
   });
 
-  // ── POST /api/auth/logout ─────────────────
-
   describe('POST /api/auth/logout', () => {
     it('無 JWT → 401', async () => {
-      const response = await request(app.getHttpServer()).post(
-        '/api/auth/logout',
-      );
-      expect(response.status).toBe(401);
+      const res = await request(app.getHttpServer()).post('/api/auth/logout');
+      expect(res.status).toBe(401);
     });
 
-    it('完整流程：login → logout → 204 + access token 加入黑名單', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      const loginRes = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+    it('完整流程：login → logout → 204 + token 進黑名單', async () => {
+      await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
+      const loginRes = await login(app);
       expect(loginRes.status).toBe(200);
       const { accessToken, refreshToken } = (
         loginRes.body as { data: { accessToken: string; refreshToken: string } }
       ).data;
 
-      mockPrisma.memberRecord.findFirst.mockResolvedValue(MEMBER_RECORD);
       const logoutRes = await request(app.getHttpServer())
         .post('/api/auth/logout')
         .set('authorization', `Bearer ${accessToken}`)
@@ -221,25 +152,20 @@ describe('Auth E2E', () => {
     });
   });
 
-  // ── POST /api/auth/refresh ─────────────────
-
   describe('POST /api/auth/refresh', () => {
     it('有效 refresh token → 200 + 新 access token', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      const loginRes = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
+      const loginRes = await login(app);
       const { refreshToken } = (
         loginRes.body as { data: { refreshToken: string } }
       ).data;
 
-      mockPrisma.memberRecord.findFirst.mockResolvedValue(MEMBER_RECORD);
-      const refreshRes = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/api/auth/refresh')
         .send({ refreshToken });
 
-      expect(refreshRes.status).toBe(200);
-      const body = refreshRes.body as {
+      expect(res.status).toBe(200);
+      const body = res.body as {
         data: { accessToken: string; accessTokenExpiresIn: number };
       };
       expect(typeof body.data.accessToken).toBe('string');
@@ -262,10 +188,8 @@ describe('Auth E2E', () => {
     });
 
     it('以 access token 呼叫 → 401 INVALID_REFRESH_TOKEN', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      const loginRes = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
+      const loginRes = await login(app);
       const { accessToken } = (
         loginRes.body as { data: { accessToken: string } }
       ).data;
@@ -278,10 +202,8 @@ describe('Auth E2E', () => {
     });
 
     it('refresh token 在黑名單 → 401 INVALID_REFRESH_TOKEN', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      const loginRes = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
+      const loginRes = await login(app);
       const { refreshToken } = (
         loginRes.body as { data: { refreshToken: string } }
       ).data;
@@ -296,17 +218,20 @@ describe('Auth E2E', () => {
     });
 
     it('帳號停用 → 403 ACCOUNT_DISABLED', async () => {
-      mockPrisma.memberRecord.findUnique.mockResolvedValue(MEMBER_RECORD);
-      const loginRes = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: TEST_PASSWORD });
+      const { memberId } = await seedMember(prisma, {
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD,
+      });
+      const loginRes = await login(app);
       const { refreshToken } = (
         loginRes.body as { data: { refreshToken: string } }
       ).data;
 
-      mockPrisma.memberRecord.findFirst.mockResolvedValue(
-        DISABLED_MEMBER_RECORD,
-      );
+      // 登入後把帳號停用（真 DB）→ refresh 重查應被擋
+      await prisma.memberRecord.update({
+        where: { id: memberId },
+        data: { status: false },
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/auth/refresh')
@@ -316,17 +241,12 @@ describe('Auth E2E', () => {
     });
   });
 
-  // ── Rate Limiting ────────────────────────────
-
   describe('Rate Limiting', () => {
     it('超過速率限制 → 429', async () => {
-      mockRedis.throttleIncrement.mockResolvedValue(101); // 超過 limit=100
+      mockRedis.throttleIncrement.mockResolvedValue(1_000_000);
 
-      const response = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'any' });
-
-      expect(response.status).toBe(429);
+      const res = await login(app, TEST_EMAIL, 'any');
+      expect(res.status).toBe(429);
     });
   });
 });

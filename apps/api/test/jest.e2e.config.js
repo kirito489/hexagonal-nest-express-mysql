@@ -13,7 +13,7 @@ module.exports = {
   // Block B 待轉真 DB：這幾支仍餵 mockPrisma、斷言 mock 行為，暫時排除
   testPathIgnorePatterns: [
     '/node_modules/',
-    '(auth|member|role|security)\\.e2e-spec\\.ts$',
+    '(member|role|security)\\.e2e-spec\\.ts$',
   ],
   forceExit: true,
 };
