@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from 'react';
 
 import {
   AlertDialog,
@@ -9,21 +9,21 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui/alert-dialog';
 
 type DeleteConfirmDialogProps = {
-  open: boolean
-  title: string
+  open: boolean;
+  title: string;
   /** 描述內容；可帶 highlighted entity name 等 ReactNode */
-  description: ReactNode
+  description: ReactNode;
   /** 確認按鈕的處理中文案；預設「刪除中…」 */
-  pendingLabel?: string
+  pendingLabel?: string;
   /** 確認按鈕文案；預設「確認刪除」 */
-  confirmLabel?: string
-  isDeleting: boolean
-  onCancel: () => void
-  onConfirm: () => void
-}
+  confirmLabel?: string;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
 
 /**
  * 列表頁「硬刪確認」共用 AlertDialog。
@@ -54,5 +54,5 @@ export const DeleteConfirmDialog = ({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
-}
+  );
+};

@@ -186,7 +186,7 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **type-checked lint 對「ORM 邊界 / jest mock / seed 腳本」的 `no-unsafe-*` 是雜訊,分區關掉、核心層維持嚴格**：Prisma 查詢結果、mapper、jest mock 回傳天生 `any`,全開 `no-unsafe-*` 會爆數百個假訊號淹沒真發現(本專案 524→9)。作法:`eslint.config.mjs` 對 `src/adapter/out/persistence/**`、`seeds/**`+`scripts/**`、`**/*.spec.ts`(另加 `unbound-method`)關掉 no-unsafe-* 家族;application/domain/infrastructure 維持全嚴格,真發現(floating-promise 等)才浮得出來。
 
-- **本 monorepo 刻意跑兩套格式風格,不要在根目錄用一份 prettier 統一**：後端 `apps/api` 用 prettier + 有分號(NestJS 慣例);前端 `apps/web` + `packages/api-client` 用 eslint flat + 無分號(Vite 慣例)、且不裝 prettier。根 prettier 預設 `semi:true` 會把前端分號全加回去、與前端 eslint 打架。作法:格式各 workspace 自理,共用的是 ESLint 邏輯規則基底而非 prettier。
+- **Prettier 全 repo 統一一份根 `.prettierrc`(`semi:true` + `singleQuote:true` + `trailingComma:all`)**：前後端同一套;前端原為 Vite 無分號,已 reformat 加回分號對齊(一次性 ~107 檔),後端 0 churn(根設定與 api 既有風格一致,`eslint-plugin-prettier` 走 walk-up 解析同一份根設定)。`format`/`format:check` 放**根**(`prettier --write/--check .`)並從 repo root 跑——因為 **`.prettierignore` 相對「執行目錄(CWD)」解析**(不像 `.prettierrc` 逐檔就近),放根 + 根執行才吃得到。根 ignore 必排除:手寫繁中文件(`**/*.md`,否則 openspec / README / CLAUDE 被 reflow)、工具生成檔(`packages/api-client/src/schema.ts`、swagger bundle)、`prisma/migrations`、build / lockfile。shadcn `components/ui` 也一併吃根設定(引號等),格式不另設特例(eslint 的 `components/ui` 特例只關 lint 規則、與格式無關)。formatOnSave 需 `.vscode/settings.json` 對 `[typescriptreact]`/`[javascriptreact]` 也設 prettier formatter(前端多為 .tsx)。
 
 ## 可觀測性 / Sentry & metrics
 

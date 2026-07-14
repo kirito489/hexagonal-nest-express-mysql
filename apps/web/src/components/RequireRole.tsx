@@ -1,16 +1,16 @@
-import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import type { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 
-import { useCurrentMember } from '@/lib/use-current-member'
-import type { RoleCode } from '@/lib/role-codes'
+import { useCurrentMember } from '@/lib/use-current-member';
+import type { RoleCode } from '@/lib/role-codes';
 
 type RequireRoleProps = {
   /** 要求的 roleCode（粗粒度 role gate）；目前只用 SUPERADMIN */
-  roleCode: RoleCode
+  roleCode: RoleCode;
   /** 不通過時導向的路徑；預設 `/` */
-  fallback?: string
-  children: ReactNode
-}
+  fallback?: string;
+  children: ReactNode;
+};
 
 /**
  * Router 層的粗粒度 role gate：roleCode 不符就導向 fallback。
@@ -22,11 +22,11 @@ export const RequireRole = ({
   fallback = '/',
   children,
 }: RequireRoleProps) => {
-  const { roleCode: currentRoleCode, isLoading } = useCurrentMember()
+  const { roleCode: currentRoleCode, isLoading } = useCurrentMember();
 
-  if (isLoading) return null
+  if (isLoading) return null;
   if (currentRoleCode !== roleCode) {
-    return <Navigate to={fallback} replace />
+    return <Navigate to={fallback} replace />;
   }
-  return <>{children}</>
-}
+  return <>{children}</>;
+};

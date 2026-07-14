@@ -1,44 +1,44 @@
-import { useMemo } from 'react'
-import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import type { ColumnDef } from '@tanstack/react-table'
+import { useMemo } from 'react';
+import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Switch } from '@/components/ui/switch'
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { DataTable } from '@/components/data-table/DataTable'
-import { DisabledHint } from '@/components/DisabledHint'
-import { formatRelativeTime } from '@/lib/format-relative-time'
+} from '@/components/ui/tooltip';
+import { DataTable } from '@/components/data-table/DataTable';
+import { DisabledHint } from '@/components/DisabledHint';
+import { formatRelativeTime } from '@/lib/format-relative-time';
 
 export type RoleRow = {
-  id?: string
-  name?: string
-  status?: boolean
-  isDefault?: boolean
-  memberCount?: number
-  createdAt?: string
-  updatedAt?: string
-}
+  id?: string;
+  name?: string;
+  status?: boolean;
+  isDefault?: boolean;
+  memberCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 type RolesTableProps = {
-  data: RoleRow[]
-  isLoading?: boolean
+  data: RoleRow[];
+  isLoading?: boolean;
   /** 是否有 BACKEND:ROLE:EDIT 權限 */
-  canEdit: boolean
-  onView: (role: RoleRow) => void
-  onEdit: (role: RoleRow) => void
-  onDelete: (role: RoleRow) => void
-  onToggleStatus: (role: RoleRow, nextStatus: boolean) => void
-}
+  canEdit: boolean;
+  onView: (role: RoleRow) => void;
+  onEdit: (role: RoleRow) => void;
+  onDelete: (role: RoleRow) => void;
+  onToggleStatus: (role: RoleRow, nextStatus: boolean) => void;
+};
 
 export const RolesTable = ({
   data,
@@ -76,13 +76,13 @@ export const RolesTable = ({
         accessorKey: 'status',
         header: '狀態',
         cell: ({ row }) => {
-          const isDefault = row.original.isDefault === true
-          const disabled = !canEdit || isDefault
+          const isDefault = row.original.isDefault === true;
+          const disabled = !canEdit || isDefault;
           const reason = !canEdit
             ? '無編輯權限'
             : isDefault
               ? '預設角色不可變更狀態'
-              : ''
+              : '';
           const switchNode = (
             <Switch
               checked={row.original.status ?? false}
@@ -91,8 +91,8 @@ export const RolesTable = ({
                 onToggleStatus(row.original, checked)
               }
             />
-          )
-          if (!disabled) return switchNode
+          );
+          if (!disabled) return switchNode;
           return (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -100,20 +100,20 @@ export const RolesTable = ({
               </TooltipTrigger>
               <TooltipContent>{reason}</TooltipContent>
             </Tooltip>
-          )
+          );
         },
       },
       {
         accessorKey: 'createdAt',
         header: '建立時間',
         cell: ({ row }) => {
-          const value = row.original.createdAt
-          if (!value) return <span className="text-muted-foreground">—</span>
+          const value = row.original.createdAt;
+          if (!value) return <span className="text-muted-foreground">—</span>;
           return (
             <span title={new Date(value).toISOString()}>
               {formatRelativeTime(value)}
             </span>
-          )
+          );
         },
       },
       {
@@ -122,15 +122,15 @@ export const RolesTable = ({
         cell: ({ row }) => {
           // VIEW 權限既然能到頁面就一定能看 → 至少顯示「檢視」
           // EDIT 權限再加「編輯」「刪除」
-          const isDefault = row.original.isDefault === true
-          const memberCount = row.original.memberCount ?? 0
-          const editReason = isDefault ? '預設角色不可編輯' : ''
+          const isDefault = row.original.isDefault === true;
+          const memberCount = row.original.memberCount ?? 0;
+          const editReason = isDefault ? '預設角色不可編輯' : '';
           const deleteReason = isDefault
             ? '預設角色不可刪除'
             : memberCount > 0
               ? `角色有 ${memberCount} 位使用者，請先移除才能刪除`
-              : ''
-          const deleteDisabled = isDefault || memberCount > 0
+              : '';
+          const deleteDisabled = isDefault || memberCount > 0;
 
           return (
             <div className="text-right">
@@ -171,12 +171,12 @@ export const RolesTable = ({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          )
+          );
         },
       },
     ],
     [canEdit, onView, onEdit, onDelete, onToggleStatus],
-  )
+  );
 
   return (
     <DataTable
@@ -185,5 +185,5 @@ export const RolesTable = ({
       isLoading={isLoading}
       emptyMessage="目前沒有角色"
     />
-  )
-}
+  );
+};

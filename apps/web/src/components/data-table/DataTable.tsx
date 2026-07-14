@@ -3,7 +3,7 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
-} from '@tanstack/react-table'
+} from '@tanstack/react-table';
 
 import {
   Table,
@@ -12,14 +12,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@/components/ui/table';
 
 type DataTableProps<TData> = {
-  columns: ColumnDef<TData, unknown>[]
-  data: TData[]
-  isLoading?: boolean
-  emptyMessage?: string
-}
+  columns: ColumnDef<TData, unknown>[];
+  data: TData[];
+  isLoading?: boolean;
+  emptyMessage?: string;
+};
 
 /**
  * 共用列表元件：TanStack Table + shadcn Table 原語拼出
@@ -38,7 +38,7 @@ export const DataTable = <TData,>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-  })
+  });
 
   return (
     <div className="rounded-md border">
@@ -89,5 +89,5 @@ export const DataTable = <TData,>({
         </TableBody>
       </Table>
     </div>
-  )
-}
+  );
+};

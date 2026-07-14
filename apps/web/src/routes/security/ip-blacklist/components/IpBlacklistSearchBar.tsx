@@ -1,34 +1,34 @@
-import { useEffect, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { useEffect, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useDebouncedValue } from '@/lib/use-debounced-value'
-import { useIsFirstRun } from '@/lib/use-is-first-run'
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useIsFirstRun } from '@/lib/use-is-first-run';
 
 type IpBlacklistSearchBarProps = {
-  initialSearch: string
-  onSearch: (search: string) => void
-}
+  initialSearch: string;
+  onSearch: (search: string) => void;
+};
 
 export const IpBlacklistSearchBar = ({
   initialSearch,
   onSearch,
 }: IpBlacklistSearchBarProps) => {
-  const [input, setInput] = useState(initialSearch)
-  const debounced = useDebouncedValue(input, 300)
+  const [input, setInput] = useState(initialSearch);
+  const debounced = useDebouncedValue(input, 300);
 
-  const consumeFirstRun = useIsFirstRun()
+  const consumeFirstRun = useIsFirstRun();
   useEffect(() => {
-    if (consumeFirstRun()) return
-    onSearch(debounced)
-  }, [debounced, onSearch, consumeFirstRun])
+    if (consumeFirstRun()) return;
+    onSearch(debounced);
+  }, [debounced, onSearch, consumeFirstRun]);
 
   const handleReset = () => {
-    setInput('')
-    onSearch('')
-  }
+    setInput('');
+    onSearch('');
+  };
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -55,5 +55,5 @@ export const IpBlacklistSearchBar = ({
         重置
       </Button>
     </div>
-  )
-}
+  );
+};

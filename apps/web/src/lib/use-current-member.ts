@@ -1,4 +1,4 @@
-import { useApiQuery } from '@/api/client'
+import { useApiQuery } from '@/api/client';
 
 /**
  * 取得目前登入的會員資料（含 permissions、roleCode、sub 等）。
@@ -7,7 +7,7 @@ import { useApiQuery } from '@/api/client'
 export const useCurrentMember = () => {
   const query = useApiQuery('GET', '/me', undefined, {
     staleTime: 5 * 60 * 1000,
-  })
+  });
 
   return {
     member: query.data,
@@ -16,5 +16,5 @@ export const useCurrentMember = () => {
     /** 角色代碼（roleCode）；給 sidebar 等粗粒度 role gate 用 */
     roleCode: query.data?.roleCode,
     isLoading: query.isLoading,
-  }
-}
+  };
+};

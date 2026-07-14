@@ -1,11 +1,11 @@
-import createClient, { type Client } from 'openapi-fetch'
+import createClient, { type Client } from 'openapi-fetch';
 
-import type { paths } from './schema'
+import type { paths } from './schema';
 
-export type ApiPaths = paths
-export type ApiClient = Client<paths>
+export type ApiPaths = paths;
+export type ApiClient = Client<paths>;
 
-type TokenGetter = () => string | null | undefined
+type TokenGetter = () => string | null | undefined;
 
 /**
  * 建立 openapi-fetch client，並注入 Authorization middleware
@@ -16,19 +16,19 @@ export const createApiClient = (
   baseUrl: string,
   getToken?: TokenGetter,
 ): ApiClient => {
-  const client = createClient<paths>({ baseUrl })
+  const client = createClient<paths>({ baseUrl });
 
   if (getToken) {
     client.use({
       onRequest({ request }) {
-        const token = getToken()
+        const token = getToken();
         if (token) {
-          request.headers.set('Authorization', `Bearer ${token}`)
+          request.headers.set('Authorization', `Bearer ${token}`);
         }
-        return request
+        return request;
       },
-    })
+    });
   }
 
-  return client
-}
+  return client;
+};

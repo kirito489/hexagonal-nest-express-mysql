@@ -1,51 +1,51 @@
-import { useCallback, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useCallback, useState } from 'react';
+import { Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button'
-import { DataTablePagination } from '@/components/data-table/DataTablePagination'
-import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
-import { useApiQuery } from '@/api/client'
-import { useDetailDialog } from '@/lib/use-detail-dialog'
-import { useIpWhitelistQuery } from './hooks/use-ip-whitelist-query'
-import { useIpWhitelistUrlState } from './hooks/use-ip-whitelist-url-state'
-import { useIpWhitelistMutations } from './hooks/use-ip-whitelist-mutations'
-import { IpWhitelistSearchBar } from './components/IpWhitelistSearchBar'
+import { Button } from '@/components/ui/button';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { useApiQuery } from '@/api/client';
+import { useDetailDialog } from '@/lib/use-detail-dialog';
+import { useIpWhitelistQuery } from './hooks/use-ip-whitelist-query';
+import { useIpWhitelistUrlState } from './hooks/use-ip-whitelist-url-state';
+import { useIpWhitelistMutations } from './hooks/use-ip-whitelist-mutations';
+import { IpWhitelistSearchBar } from './components/IpWhitelistSearchBar';
 import {
   IpWhitelistTable,
   type IpWhitelistRow,
-} from './components/IpWhitelistTable'
-import { IpWhitelistFormDialog } from './components/IpWhitelistFormDialog'
-import { IpWhitelistViewDialog } from './components/IpWhitelistViewDialog'
-import type { IpWhitelistForm } from './lib/ip-whitelist-form-schema'
+} from './components/IpWhitelistTable';
+import { IpWhitelistFormDialog } from './components/IpWhitelistFormDialog';
+import { IpWhitelistViewDialog } from './components/IpWhitelistViewDialog';
+import type { IpWhitelistForm } from './lib/ip-whitelist-form-schema';
 
 const mapDetailToForm = (data: {
-  ipAddress?: string
-  description?: string | null
+  ipAddress?: string;
+  description?: string | null;
 }): Partial<IpWhitelistForm> => ({
   ip: data.ipAddress ?? '',
   description: data.description ?? '',
-})
+});
 
 export const IpWhitelistPage = () => {
-  const url = useIpWhitelistUrlState()
-  const { closeEdit, closeView, openEdit, openView } = url
+  const url = useIpWhitelistUrlState();
+  const { closeEdit, closeView, openEdit, openView } = url;
   const listQuery = useIpWhitelistQuery({
     page: url.page,
     limit: url.limit,
     search: url.search,
-  })
-  const mutations = useIpWhitelistMutations()
+  });
+  const mutations = useIpWhitelistMutations();
 
-  const [createOpen, setCreateOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<IpWhitelistRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<IpWhitelistRow | null>(null);
 
-  const detailId = url.edit ?? url.view ?? ''
+  const detailId = url.edit ?? url.view ?? '';
   const detailQuery = useApiQuery(
     'GET',
     '/security/ip-whitelist/{id}',
     { params: { path: { id: detailId } } },
     { enabled: Boolean(url.edit) || Boolean(url.view) },
-  )
+  );
   const detail = useDetailDialog({
     editId: url.edit,
     viewId: url.view,
@@ -54,59 +54,59 @@ export const IpWhitelistPage = () => {
     query: detailQuery,
     mapToInitial: mapDetailToForm,
     errorMessage: '找不到該紀錄或無權限存取',
-  })
+  });
 
   const handleView = useCallback(
     (row: IpWhitelistRow) => {
-      if (row.id) openView(row.id)
+      if (row.id) openView(row.id);
     },
     [openView],
-  )
+  );
   const handleEdit = useCallback(
     (row: IpWhitelistRow) => {
-      if (row.id) openEdit(row.id)
+      if (row.id) openEdit(row.id);
     },
     [openEdit],
-  )
+  );
   const handleDeleteRequest = useCallback((row: IpWhitelistRow) => {
-    setDeleteTarget(row)
-  }, [])
+    setDeleteTarget(row);
+  }, []);
 
-  const list: IpWhitelistRow[] = listQuery.data?.list ?? []
+  const list: IpWhitelistRow[] = listQuery.data?.list ?? [];
   const meta = listQuery.data?.meta ?? {
     page: url.page,
     limit: url.limit,
     total: 0,
     totalPages: 1,
-  }
+  };
 
   const handleCreateSubmit = async (values: IpWhitelistForm) => {
     await mutations.create.mutateAsync({
       body: { ip: values.ip, description: values.description || undefined },
-    })
-    setCreateOpen(false)
-  }
+    });
+    setCreateOpen(false);
+  };
 
   const handleUpdateSubmit = async (values: IpWhitelistForm) => {
-    if (!url.edit) return
+    if (!url.edit) return;
     await mutations.update.mutateAsync({
       params: { path: { id: url.edit } },
       body: { description: values.description || undefined },
-    })
-    closeEdit()
-  }
+    });
+    closeEdit();
+  };
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget?.id) return
+    if (!deleteTarget?.id) return;
     try {
       await mutations.remove.mutateAsync({
         params: { path: { id: deleteTarget.id } },
-      })
-      setDeleteTarget(null)
+      });
+      setDeleteTarget(null);
     } catch {
       // mutation hook 已 toast.error；dialog 留著
     }
-  }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -185,5 +185,5 @@ export const IpWhitelistPage = () => {
         onConfirm={handleConfirmDelete}
       />
     </div>
-  )
-}
+  );
+};

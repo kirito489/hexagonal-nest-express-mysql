@@ -31,7 +31,7 @@ _跨 session 追蹤的待辦與跨模組事項。待處理依優先序在上，�
   - **ESLint 抽共用基底 `packages/eslint-config`**：api / web 皆 extends；基底只放 `ignores` + `js.recommended` + 家規（`houseRules` named export），tseslint 預設由各 workspace 自帶「一組」（避免 Cannot redefine plugin）。
   - **api 從 legacy `.eslintrc.js` 升級 flat config + type-checked（`recommendedTypeChecked`）**：對 `persistence` / `seeds` / `spec` 分區關 `no-unsafe-*`，核心層維持嚴格；加 `prelint: db:generate` 修生成依賴（未生成 client → 假陽性）。
   - type-checked 抓到並修掉 **9 個真發現**：`main.ts` bootstrap 未 catch 的 floating-promise（旗艦發現）、多處多餘 `as`、redis 錯誤未 narrow（`err.message` on any）、PasswordPolicy 冗餘型別（`RoleCode | string`）。
-  - 未搬（刻意）：根 prettier「審全部」——本 repo 前後端刻意兩套風格（後端有分號 / 前端無分號），不統一。詳見 lessons.md「ESLint / 工具鏈」。
+  - **Prettier 全 repo 統一根一份**：根 `.prettierrc`（`semi:true` + `singleQuote` + `trailingComma:all`）+ 根 `.prettierignore`（排除 `**/*.md`、生成檔、`prisma/migrations`、build/lockfile）+ 根 `format`/`format:check`。前端從 Vite 無分號 reformat 加回分號對齊（~107 檔），後端 0 churn；`.vscode` 補 `[typescriptreact]`/`[javascriptreact]` formatOnSave。詳見 lessons.md「ESLint / 工具鏈」。
 
 ### 2026-06-25
 

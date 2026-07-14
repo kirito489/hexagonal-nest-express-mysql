@@ -1,4 +1,4 @@
-import { useApiQuery } from '@/api/client'
+import { useApiQuery } from '@/api/client';
 
 /**
  * 取得可指派的 permission 清單，給 RoleFormDialog 的 PermissionsField 用。
@@ -8,5 +8,5 @@ import { useApiQuery } from '@/api/client'
 export const usePermissionOptionsQuery = () => {
   return useApiQuery('GET', '/roles/permissions', undefined, {
     staleTime: 10 * 60 * 1000,
-  })
-}
+  });
+};

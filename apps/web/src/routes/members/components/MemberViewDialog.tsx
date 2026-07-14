@@ -5,19 +5,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import type { CreateMemberForm } from '../lib/member-form-schema'
-import { RoleCombobox } from './RoleCombobox'
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import type { CreateMemberForm } from '../lib/member-form-schema';
+import { RoleCombobox } from './RoleCombobox';
 
 type MemberViewDialogProps = {
-  open: boolean
-  values: Partial<CreateMemberForm> | undefined
-  onClose: () => void
-}
+  open: boolean;
+  values: Partial<CreateMemberForm> | undefined;
+  onClose: () => void;
+};
 
 /**
  * 純唯讀的會員檢視 dialog：不掛 react-hook-form / resolver / submit。
@@ -73,5 +73,5 @@ export const MemberViewDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

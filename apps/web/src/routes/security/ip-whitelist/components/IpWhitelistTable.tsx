@@ -1,32 +1,32 @@
-import { useMemo } from 'react'
-import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import type { ColumnDef } from '@tanstack/react-table'
+import { useMemo } from 'react';
+import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { DataTable } from '@/components/data-table/DataTable'
-import { formatRelativeTime } from '@/lib/format-relative-time'
+} from '@/components/ui/dropdown-menu';
+import { DataTable } from '@/components/data-table/DataTable';
+import { formatRelativeTime } from '@/lib/format-relative-time';
 
 export type IpWhitelistRow = {
-  id?: string
-  ipAddress?: string
-  description?: string | null
-  createdBy?: string | null
-  createdAt?: string
-}
+  id?: string;
+  ipAddress?: string;
+  description?: string | null;
+  createdBy?: string | null;
+  createdAt?: string;
+};
 
 type IpWhitelistTableProps = {
-  data: IpWhitelistRow[]
-  isLoading?: boolean
-  onView: (row: IpWhitelistRow) => void
-  onEdit: (row: IpWhitelistRow) => void
-  onDelete: (row: IpWhitelistRow) => void
-}
+  data: IpWhitelistRow[];
+  isLoading?: boolean;
+  onView: (row: IpWhitelistRow) => void;
+  onEdit: (row: IpWhitelistRow) => void;
+  onDelete: (row: IpWhitelistRow) => void;
+};
 
 export const IpWhitelistTable = ({
   data,
@@ -64,11 +64,13 @@ export const IpWhitelistTable = ({
         accessorKey: 'createdAt',
         header: '建立時間',
         cell: ({ row }) => {
-          const v = row.original.createdAt
-          if (!v) return <span className="text-muted-foreground">—</span>
+          const v = row.original.createdAt;
+          if (!v) return <span className="text-muted-foreground">—</span>;
           return (
-            <span title={new Date(v).toISOString()}>{formatRelativeTime(v)}</span>
-          )
+            <span title={new Date(v).toISOString()}>
+              {formatRelativeTime(v)}
+            </span>
+          );
         },
       },
       {
@@ -105,7 +107,7 @@ export const IpWhitelistTable = ({
       },
     ],
     [onView, onEdit, onDelete],
-  )
+  );
 
   return (
     <DataTable
@@ -114,5 +116,5 @@ export const IpWhitelistTable = ({
       isLoading={isLoading}
       emptyMessage="目前沒有 IP 白名單"
     />
-  )
-}
+  );
+};

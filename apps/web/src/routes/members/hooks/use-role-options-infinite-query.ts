@@ -1,6 +1,6 @@
-import type { paths } from '@app/api-client'
+import type { paths } from '@app/api-client';
 
-import { useApiInfiniteQuery } from '@/api/client'
+import { useApiInfiniteQuery } from '@/api/client';
 
 /**
  * 從 generated schema 推 GET /members/role/options 的 200 data 形狀
@@ -8,10 +8,10 @@ import { useApiInfiniteQuery } from '@/api/client'
  */
 export type RoleOptionsPage = NonNullable<
   paths['/members/role/options']['get']['responses'][200]['content']['application/json']['data']
->
+>;
 
-const PAGE_LIMIT = 20
-const STALE_TIME = 10 * 60 * 1000
+const PAGE_LIMIT = 20;
+const STALE_TIME = 10 * 60 * 1000;
 
 /**
  * 會員 dialog 角色 Combobox 的資料來源。每次 fetchNextPage 拉下一頁 20 筆，
@@ -31,15 +31,15 @@ export const useRoleOptionsInfiniteQuery = (search: string) => {
       },
     }),
     (lastPage) => {
-      const meta = lastPage?.meta
-      if (!meta) return undefined
-      const next = (meta.page ?? 1) + 1
-      return next <= (meta.totalPages ?? 1) ? next : undefined
+      const meta = lastPage?.meta;
+      if (!meta) return undefined;
+      const next = (meta.page ?? 1) + 1;
+      return next <= (meta.totalPages ?? 1) ? next : undefined;
     },
     {
       initialPageParam: 1,
       queryKeyExtra: [search],
       staleTime: STALE_TIME,
     },
-  )
-}
+  );
+};

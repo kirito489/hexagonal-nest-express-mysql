@@ -1,33 +1,33 @@
-import { useMemo } from 'react'
-import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import type { ColumnDef } from '@tanstack/react-table'
+import { useMemo } from 'react';
+import { Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { DataTable } from '@/components/data-table/DataTable'
-import { formatRelativeTime } from '@/lib/format-relative-time'
+} from '@/components/ui/dropdown-menu';
+import { DataTable } from '@/components/data-table/DataTable';
+import { formatRelativeTime } from '@/lib/format-relative-time';
 
 export type IpBlacklistRow = {
-  id?: string
-  ipAddress?: string
-  reason?: string | null
-  isAutoBlock?: boolean
-  createdBy?: string | null
-  createdAt?: string
-}
+  id?: string;
+  ipAddress?: string;
+  reason?: string | null;
+  isAutoBlock?: boolean;
+  createdBy?: string | null;
+  createdAt?: string;
+};
 
 type IpBlacklistTableProps = {
-  data: IpBlacklistRow[]
-  isLoading?: boolean
-  onView: (row: IpBlacklistRow) => void
-  onEdit: (row: IpBlacklistRow) => void
-  onDelete: (row: IpBlacklistRow) => void
-}
+  data: IpBlacklistRow[];
+  isLoading?: boolean;
+  onView: (row: IpBlacklistRow) => void;
+  onEdit: (row: IpBlacklistRow) => void;
+  onDelete: (row: IpBlacklistRow) => void;
+};
 
 export const IpBlacklistTable = ({
   data,
@@ -80,11 +80,13 @@ export const IpBlacklistTable = ({
         accessorKey: 'createdAt',
         header: '建立時間',
         cell: ({ row }) => {
-          const v = row.original.createdAt
-          if (!v) return <span className="text-muted-foreground">—</span>
+          const v = row.original.createdAt;
+          if (!v) return <span className="text-muted-foreground">—</span>;
           return (
-            <span title={new Date(v).toISOString()}>{formatRelativeTime(v)}</span>
-          )
+            <span title={new Date(v).toISOString()}>
+              {formatRelativeTime(v)}
+            </span>
+          );
         },
       },
       {
@@ -121,7 +123,7 @@ export const IpBlacklistTable = ({
       },
     ],
     [onView, onEdit, onDelete],
-  )
+  );
 
   return (
     <DataTable
@@ -130,5 +132,5 @@ export const IpBlacklistTable = ({
       isLoading={isLoading}
       emptyMessage="目前沒有 IP 黑名單"
     />
-  )
-}
+  );
+};

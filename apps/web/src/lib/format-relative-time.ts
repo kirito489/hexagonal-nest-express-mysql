@@ -1,7 +1,7 @@
 // 用原生 Intl.RelativeTimeFormat 顯示「N 分鐘前」，不引入 dayjs 等第三方
-const rtf = new Intl.RelativeTimeFormat('zh-Hant', { numeric: 'auto' })
+const rtf = new Intl.RelativeTimeFormat('zh-Hant', { numeric: 'auto' });
 
-type Unit = 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second'
+type Unit = 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second';
 
 const UNIT_SECONDS: Array<{ unit: Unit; seconds: number }> = [
   { unit: 'year', seconds: 60 * 60 * 24 * 365 },
@@ -11,7 +11,7 @@ const UNIT_SECONDS: Array<{ unit: Unit; seconds: number }> = [
   { unit: 'hour', seconds: 60 * 60 },
   { unit: 'minute', seconds: 60 },
   { unit: 'second', seconds: 1 },
-]
+];
 
 /**
  * 把 ISO 字串或 Date 轉成相對時間，如「3 分鐘前」「剛剛」
@@ -21,20 +21,20 @@ export const formatRelativeTime = (
   iso: string | Date | null | undefined,
   fallback = '—',
 ): string => {
-  if (!iso) return fallback
+  if (!iso) return fallback;
 
-  const date = typeof iso === 'string' ? new Date(iso) : iso
-  if (Number.isNaN(date.getTime())) return fallback
+  const date = typeof iso === 'string' ? new Date(iso) : iso;
+  if (Number.isNaN(date.getTime())) return fallback;
 
-  const diffSec = Math.round((date.getTime() - Date.now()) / 1000)
-  const absSec = Math.abs(diffSec)
+  const diffSec = Math.round((date.getTime() - Date.now()) / 1000);
+  const absSec = Math.abs(diffSec);
 
-  if (absSec < 5) return '剛剛'
+  if (absSec < 5) return '剛剛';
 
   for (const { unit, seconds } of UNIT_SECONDS) {
     if (absSec >= seconds) {
-      return rtf.format(Math.round(diffSec / seconds), unit)
+      return rtf.format(Math.round(diffSec / seconds), unit);
     }
   }
-  return rtf.format(diffSec, 'second')
-}
+  return rtf.format(diffSec, 'second');
+};

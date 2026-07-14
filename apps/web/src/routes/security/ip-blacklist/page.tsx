@@ -1,51 +1,51 @@
-import { useCallback, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useCallback, useState } from 'react';
+import { Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button'
-import { DataTablePagination } from '@/components/data-table/DataTablePagination'
-import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
-import { useApiQuery } from '@/api/client'
-import { useDetailDialog } from '@/lib/use-detail-dialog'
-import { useIpBlacklistQuery } from './hooks/use-ip-blacklist-query'
-import { useIpBlacklistUrlState } from './hooks/use-ip-blacklist-url-state'
-import { useIpBlacklistMutations } from './hooks/use-ip-blacklist-mutations'
-import { IpBlacklistSearchBar } from './components/IpBlacklistSearchBar'
+import { Button } from '@/components/ui/button';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { useApiQuery } from '@/api/client';
+import { useDetailDialog } from '@/lib/use-detail-dialog';
+import { useIpBlacklistQuery } from './hooks/use-ip-blacklist-query';
+import { useIpBlacklistUrlState } from './hooks/use-ip-blacklist-url-state';
+import { useIpBlacklistMutations } from './hooks/use-ip-blacklist-mutations';
+import { IpBlacklistSearchBar } from './components/IpBlacklistSearchBar';
 import {
   IpBlacklistTable,
   type IpBlacklistRow,
-} from './components/IpBlacklistTable'
-import { IpBlacklistFormDialog } from './components/IpBlacklistFormDialog'
-import { IpBlacklistViewDialog } from './components/IpBlacklistViewDialog'
-import type { IpBlacklistForm } from './lib/ip-blacklist-form-schema'
+} from './components/IpBlacklistTable';
+import { IpBlacklistFormDialog } from './components/IpBlacklistFormDialog';
+import { IpBlacklistViewDialog } from './components/IpBlacklistViewDialog';
+import type { IpBlacklistForm } from './lib/ip-blacklist-form-schema';
 
 const mapDetailToForm = (data: {
-  ipAddress?: string
-  reason?: string | null
+  ipAddress?: string;
+  reason?: string | null;
 }): Partial<IpBlacklistForm> => ({
   ip: data.ipAddress ?? '',
   reason: data.reason ?? '',
-})
+});
 
 export const IpBlacklistPage = () => {
-  const url = useIpBlacklistUrlState()
-  const { closeEdit, closeView, openEdit, openView } = url
+  const url = useIpBlacklistUrlState();
+  const { closeEdit, closeView, openEdit, openView } = url;
   const listQuery = useIpBlacklistQuery({
     page: url.page,
     limit: url.limit,
     search: url.search,
-  })
-  const mutations = useIpBlacklistMutations()
+  });
+  const mutations = useIpBlacklistMutations();
 
-  const [createOpen, setCreateOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<IpBlacklistRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<IpBlacklistRow | null>(null);
 
-  const detailId = url.edit ?? url.view ?? ''
+  const detailId = url.edit ?? url.view ?? '';
   const detailQuery = useApiQuery(
     'GET',
     '/security/ip-blacklist/{id}',
     { params: { path: { id: detailId } } },
     { enabled: Boolean(url.edit) || Boolean(url.view) },
-  )
+  );
   const detail = useDetailDialog({
     editId: url.edit,
     viewId: url.view,
@@ -54,59 +54,59 @@ export const IpBlacklistPage = () => {
     query: detailQuery,
     mapToInitial: mapDetailToForm,
     errorMessage: '找不到該紀錄或無權限存取',
-  })
+  });
 
   const handleView = useCallback(
     (row: IpBlacklistRow) => {
-      if (row.id) openView(row.id)
+      if (row.id) openView(row.id);
     },
     [openView],
-  )
+  );
   const handleEdit = useCallback(
     (row: IpBlacklistRow) => {
-      if (row.id) openEdit(row.id)
+      if (row.id) openEdit(row.id);
     },
     [openEdit],
-  )
+  );
   const handleDeleteRequest = useCallback((row: IpBlacklistRow) => {
-    setDeleteTarget(row)
-  }, [])
+    setDeleteTarget(row);
+  }, []);
 
-  const list: IpBlacklistRow[] = listQuery.data?.list ?? []
+  const list: IpBlacklistRow[] = listQuery.data?.list ?? [];
   const meta = listQuery.data?.meta ?? {
     page: url.page,
     limit: url.limit,
     total: 0,
     totalPages: 1,
-  }
+  };
 
   const handleCreateSubmit = async (values: IpBlacklistForm) => {
     await mutations.create.mutateAsync({
       body: { ip: values.ip, reason: values.reason || undefined },
-    })
-    setCreateOpen(false)
-  }
+    });
+    setCreateOpen(false);
+  };
 
   const handleUpdateSubmit = async (values: IpBlacklistForm) => {
-    if (!url.edit) return
+    if (!url.edit) return;
     await mutations.update.mutateAsync({
       params: { path: { id: url.edit } },
       body: { reason: values.reason || undefined },
-    })
-    closeEdit()
-  }
+    });
+    closeEdit();
+  };
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget?.id) return
+    if (!deleteTarget?.id) return;
     try {
       await mutations.remove.mutateAsync({
         params: { path: { id: deleteTarget.id } },
-      })
-      setDeleteTarget(null)
+      });
+      setDeleteTarget(null);
     } catch {
       // mutation hook 已 toast.error
     }
-  }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -185,5 +185,5 @@ export const IpBlacklistPage = () => {
         onConfirm={handleConfirmDelete}
       />
     </div>
-  )
-}
+  );
+};

@@ -14,6 +14,12 @@
     "preserveWatchOutput": true,
     "types": ["jest", "node"]
   },
-  "include": ["src/**/*", "scripts/**/*", "seeds/**/*", "test/**/*", "prisma.config.ts"],
+  "include": [
+    "src/**/*",
+    "scripts/**/*",
+    "seeds/**/*",
+    "test/**/*",
+    "prisma.config.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,7 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
-import { useApiMutation } from '@/api/client'
+import { useApiMutation } from '@/api/client';
 
 /**
  * Create / Update / Delete 三個 mutation 集中管理。
@@ -16,47 +16,47 @@ import { useApiMutation } from '@/api/client'
  * toast 文案統一用「角色已更新 / 更新失敗」，與 form 編輯共用。
  */
 export const useRoleMutations = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   const invalidateRolesAndMembers = () => {
-    void queryClient.invalidateQueries({ queryKey: ['GET', '/roles'] })
+    void queryClient.invalidateQueries({ queryKey: ['GET', '/roles'] });
     void queryClient.invalidateQueries({
       queryKey: ['GET', '/members/role/options'],
-    })
-    void queryClient.invalidateQueries({ queryKey: ['GET', '/members'] })
-  }
+    });
+    void queryClient.invalidateQueries({ queryKey: ['GET', '/members'] });
+  };
 
   const create = useApiMutation('POST', '/roles', {
     onSuccess: () => {
-      toast.success('角色已新增')
-      invalidateRolesAndMembers()
+      toast.success('角色已新增');
+      invalidateRolesAndMembers();
     },
     onError: (err) => {
-      toast.error(err.message || '新增失敗')
+      toast.error(err.message || '新增失敗');
     },
-  })
+  });
 
   const update = useApiMutation('PATCH', '/roles/{id}', {
     onSuccess: () => {
-      toast.success('角色已更新')
-      invalidateRolesAndMembers()
+      toast.success('角色已更新');
+      invalidateRolesAndMembers();
     },
     onError: (err) => {
-      toast.error(err.message || '更新失敗')
+      toast.error(err.message || '更新失敗');
       // optimistic rollback：失敗後重抓 list 把 row.status 等翻回真實值
-      void queryClient.invalidateQueries({ queryKey: ['GET', '/roles'] })
+      void queryClient.invalidateQueries({ queryKey: ['GET', '/roles'] });
     },
-  })
+  });
 
   const remove = useApiMutation('DELETE', '/roles/{id}', {
     onSuccess: () => {
-      toast.success('角色已刪除')
-      invalidateRolesAndMembers()
+      toast.success('角色已刪除');
+      invalidateRolesAndMembers();
     },
     onError: (err) => {
-      toast.error(err.message || '刪除失敗')
+      toast.error(err.message || '刪除失敗');
     },
-  })
+  });
 
-  return { create, update, remove }
-}
+  return { create, update, remove };
+};

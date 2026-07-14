@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 
 import {
   Dialog,
@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -20,25 +20,25 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import { roleFormSchema, type RoleFormValues } from '../lib/role-form-schema'
-import { usePermissionOptionsQuery } from '../hooks/use-permission-options-query'
-import { PermissionsField } from './PermissionsField'
+} from '@/components/ui/form';
+import { roleFormSchema, type RoleFormValues } from '../lib/role-form-schema';
+import { usePermissionOptionsQuery } from '../hooks/use-permission-options-query';
+import { PermissionsField } from './PermissionsField';
 
 type RoleFormDialogProps = {
-  open: boolean
-  mode: 'create' | 'edit'
-  initialValues?: Partial<RoleFormValues>
-  isSubmitting: boolean
-  onClose: () => void
-  onSubmit: (values: RoleFormValues) => Promise<void> | void
-}
+  open: boolean;
+  mode: 'create' | 'edit';
+  initialValues?: Partial<RoleFormValues>;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (values: RoleFormValues) => Promise<void> | void;
+};
 
 const DEFAULT_VALUES: RoleFormValues = {
   name: '',
   permissionCodes: [],
   status: true,
-}
+};
 
 export const RoleFormDialog = ({
   open,
@@ -48,24 +48,24 @@ export const RoleFormDialog = ({
   onClose,
   onSubmit,
 }: RoleFormDialogProps) => {
-  const permissionOptions = usePermissionOptionsQuery()
+  const permissionOptions = usePermissionOptionsQuery();
 
   const form = useForm<RoleFormValues>({
     resolver: standardSchemaResolver(roleFormSchema),
     defaultValues: { ...DEFAULT_VALUES, ...initialValues },
-  })
+  });
 
   // dialog 開啟或 initialValues 變更時重置表單。
   // 父層需以 useMemo 穩定 initialValues 參考，避免每次 render 都 reset
   useEffect(() => {
     if (open) {
-      form.reset({ ...DEFAULT_VALUES, ...initialValues })
+      form.reset({ ...DEFAULT_VALUES, ...initialValues });
     }
-  }, [open, initialValues, form])
+  }, [open, initialValues, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(values)
-  })
+    await onSubmit(values);
+  });
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -142,16 +142,12 @@ export const RoleFormDialog = ({
                 取消
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? '儲存中…'
-                  : mode === 'create'
-                    ? '新增'
-                    : '儲存'}
+                {isSubmitting ? '儲存中…' : mode === 'create' ? '新增' : '儲存'}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

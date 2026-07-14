@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 
 import {
   Dialog,
@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -20,26 +20,26 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
+} from '@/components/ui/form';
 import {
   createMemberFormSchema,
   updateMemberFormSchema,
   type CreateMemberForm,
-} from '../lib/member-form-schema'
-import { RoleCombobox } from './RoleCombobox'
+} from '../lib/member-form-schema';
+import { RoleCombobox } from './RoleCombobox';
 
 type MemberFormDialogProps = {
-  open: boolean
-  mode: 'create' | 'edit'
+  open: boolean;
+  mode: 'create' | 'edit';
   /** edit 模式時帶入欄位預設值 */
-  initialValues?: Partial<CreateMemberForm>
-  isSubmitting: boolean
-  onClose: () => void
+  initialValues?: Partial<CreateMemberForm>;
+  isSubmitting: boolean;
+  onClose: () => void;
   /**
    * 提交時的回呼。edit 模式下若 password 為空字串會被剝掉，由父層決定是否帶到 PATCH body
    */
-  onSubmit: (values: CreateMemberForm) => Promise<void> | void
-}
+  onSubmit: (values: CreateMemberForm) => Promise<void> | void;
+};
 
 const DEFAULT_VALUES: CreateMemberForm = {
   email: '',
@@ -47,7 +47,7 @@ const DEFAULT_VALUES: CreateMemberForm = {
   password: '',
   roleId: '',
   status: true,
-}
+};
 
 export const MemberFormDialog = ({
   open,
@@ -65,19 +65,19 @@ export const MemberFormDialog = ({
         ? standardSchemaResolver(updateMemberFormSchema)
         : standardSchemaResolver(createMemberFormSchema),
     defaultValues: { ...DEFAULT_VALUES, ...initialValues },
-  })
+  });
 
   // dialog 開啟或 initialValues 變更時重置表單。
   // 父層需以 useMemo 穩定 initialValues 參考（MembersPage 已做），避免每次 render 都觸發 reset
   useEffect(() => {
     if (open) {
-      form.reset({ ...DEFAULT_VALUES, ...initialValues })
+      form.reset({ ...DEFAULT_VALUES, ...initialValues });
     }
-  }, [open, initialValues, form])
+  }, [open, initialValues, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(values)
-  })
+    await onSubmit(values);
+  });
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -196,16 +196,12 @@ export const MemberFormDialog = ({
                 取消
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? '儲存中…'
-                  : mode === 'create'
-                    ? '新增'
-                    : '儲存'}
+                {isSubmitting ? '儲存中…' : mode === 'create' ? '新增' : '儲存'}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

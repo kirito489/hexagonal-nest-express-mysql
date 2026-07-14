@@ -1,24 +1,24 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
-import { Tooltip as TooltipPrimitive } from 'radix-ui'
+import { Tooltip as TooltipPrimitive } from 'radix-ui';
 
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { RequireAuth } from '@/components/RequireAuth'
-import { RequireRole } from '@/components/RequireRole'
-import { Layout } from '@/routes/_layout'
-import { LoginPage } from '@/routes/login/page'
-import { HomePage } from '@/routes/home/page'
-import { MembersPage } from '@/routes/members/page'
-import { RolesPage } from '@/routes/roles/page'
-import { IpWhitelistPage } from '@/routes/security/ip-whitelist/page'
-import { IpBlacklistPage } from '@/routes/security/ip-blacklist/page'
-import { queryClient } from '@/api/query-client'
-import { Toaster } from '@/components/ui/sonner'
-import { ROLE_CODE } from '@/lib/role-codes'
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { RequireAuth } from '@/components/RequireAuth';
+import { RequireRole } from '@/components/RequireRole';
+import { Layout } from '@/routes/_layout';
+import { LoginPage } from '@/routes/login/page';
+import { HomePage } from '@/routes/home/page';
+import { MembersPage } from '@/routes/members/page';
+import { RolesPage } from '@/routes/roles/page';
+import { IpWhitelistPage } from '@/routes/security/ip-whitelist/page';
+import { IpBlacklistPage } from '@/routes/security/ip-blacklist/page';
+import { queryClient } from '@/api/query-client';
+import { Toaster } from '@/components/ui/sonner';
+import { ROLE_CODE } from '@/lib/role-codes';
 
-const TooltipProvider = TooltipPrimitive.Provider
+const TooltipProvider = TooltipPrimitive.Provider;
 
 export const App = () => {
   return (
@@ -62,5 +62,5 @@ export const App = () => {
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
     </ErrorBoundary>
-  )
-}
+  );
+};

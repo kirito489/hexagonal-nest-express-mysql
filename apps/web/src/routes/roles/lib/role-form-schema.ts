@@ -1,6 +1,6 @@
-import { z } from 'zod'
+import { z } from 'zod';
 
-const permissionCodeRegex = /^[A-Z_]+:[A-Z_]+:(VIEW|EDIT)$/
+const permissionCodeRegex = /^[A-Z_]+:[A-Z_]+:(VIEW|EDIT)$/;
 
 /**
  * 由一組 permissionCodes 推導出「EDIT 蘊含 VIEW」normalize 後的結果：
@@ -11,13 +11,13 @@ const permissionCodeRegex = /^[A-Z_]+:[A-Z_]+:(VIEW|EDIT)$/
 export const normalizePermissionCodes = (
   codes: readonly string[],
 ): string[] => {
-  const set = new Set<string>(codes)
+  const set = new Set<string>(codes);
   for (const code of codes) {
-    const match = code.match(/^([A-Z_]+):([A-Z_]+):EDIT$/)
-    if (match) set.add(`${match[1]}:${match[2]}:VIEW`)
+    const match = code.match(/^([A-Z_]+):([A-Z_]+):EDIT$/);
+    if (match) set.add(`${match[1]}:${match[2]}:VIEW`);
   }
-  return Array.from(set).sort()
-}
+  return Array.from(set).sort();
+};
 
 // 與後端 createRoleSchema / updateRoleSchema 對齊
 // 名稱 1-100、permissionCodes string[]、status boolean
@@ -31,6 +31,6 @@ export const roleFormSchema = z.object({
     z.string().regex(permissionCodeRegex, 'permissionCode 格式不合法'),
   ),
   status: z.boolean(),
-})
+});
 
-export type RoleFormValues = z.infer<typeof roleFormSchema>
+export type RoleFormValues = z.infer<typeof roleFormSchema>;

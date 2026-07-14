@@ -5,20 +5,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import type { RoleFormValues } from '../lib/role-form-schema'
-import { usePermissionOptionsQuery } from '../hooks/use-permission-options-query'
-import { PermissionsField } from './PermissionsField'
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import type { RoleFormValues } from '../lib/role-form-schema';
+import { usePermissionOptionsQuery } from '../hooks/use-permission-options-query';
+import { PermissionsField } from './PermissionsField';
 
 type RoleViewDialogProps = {
-  open: boolean
-  values: Partial<RoleFormValues> | undefined
-  onClose: () => void
-}
+  open: boolean;
+  values: Partial<RoleFormValues> | undefined;
+  onClose: () => void;
+};
 
 /**
  * 純唯讀的角色檢視 dialog：不掛 react-hook-form / resolver / submit。
@@ -29,7 +29,7 @@ export const RoleViewDialog = ({
   values,
   onClose,
 }: RoleViewDialogProps) => {
-  const permissionOptions = usePermissionOptionsQuery()
+  const permissionOptions = usePermissionOptionsQuery();
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -74,5 +74,5 @@ export const RoleViewDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

@@ -1,47 +1,47 @@
-import { useMemo, useState } from 'react'
-import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
-import type { paths } from '@app/api-client'
+import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import type { paths } from '@app/api-client';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
+} from '@/components/ui/command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
-import { useDebouncedValue } from '@/lib/use-debounced-value'
-import { useInfiniteScrollSentinel } from '@/lib/use-infinite-scroll-sentinel'
-import { useRoleOptionsInfiniteQuery } from '../hooks/use-role-options-infinite-query'
-import { useRoleOptionFallbackQuery } from '../hooks/use-role-option-fallback-query'
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useInfiniteScrollSentinel } from '@/lib/use-infinite-scroll-sentinel';
+import { useRoleOptionsInfiniteQuery } from '../hooks/use-role-options-infinite-query';
+import { useRoleOptionFallbackQuery } from '../hooks/use-role-option-fallback-query';
 
 // 從 generated schema 推導；raw 三欄都是 optional（後端 contract）
 type RoleOptionRaw = NonNullable<
   paths['/members/role/options/{id}']['get']['responses'][200]['content']['application/json']['data']
->
+>;
 
 // Combobox 渲染需要的 narrowed 形狀
 type RoleOption = {
-  id: string
-  name: string
-  isAssignable: boolean
-}
+  id: string;
+  name: string;
+  isAssignable: boolean;
+};
 
 type RoleComboboxProps = {
   /** 表單目前選的 roleId（uuid 字串；空字串表示未選） */
-  value: string
-  onChange: (next: string) => void
+  value: string;
+  onChange: (next: string) => void;
   /** 編輯模式時帶入既有 roleId，做 fallback fetch */
-  editingRoleId?: string
+  editingRoleId?: string;
   /** 表單 disabled 時整個 trigger disabled */
-  disabled?: boolean
-}
+  disabled?: boolean;
+};
 
 /**
  * 把 generated schema 的 optional 欄位 narrow 成 Combobox 需要的 non-null 形狀；
@@ -49,25 +49,25 @@ type RoleComboboxProps = {
  */
 const toRoleOption = (raw: RoleOptionRaw | undefined): RoleOption | null => {
   if (!raw?.id || raw.name === undefined || raw.isAssignable === undefined) {
-    return null
+    return null;
   }
-  return { id: raw.id, name: raw.name, isAssignable: raw.isAssignable }
-}
+  return { id: raw.id, name: raw.name, isAssignable: raw.isAssignable };
+};
 
 /**
  * 依 id 去重，保留陣列中第一次出現的順序（fallback 在前、分頁資料在後）
  */
 const dedupeById = <T extends { id: string }>(items: T[]): T[] => {
-  const seen = new Set<string>()
-  const result: T[] = []
+  const seen = new Set<string>();
+  const result: T[] = [];
   for (const item of items) {
     if (!seen.has(item.id)) {
-      seen.add(item.id)
-      result.push(item)
+      seen.add(item.id);
+      result.push(item);
     }
   }
-  return result
-}
+  return result;
+};
 
 /**
  * 會員 dialog 的角色選擇 Combobox：cmdk + popover + useInfiniteQuery + IntersectionObserver
@@ -86,37 +86,37 @@ export const RoleCombobox = ({
   editingRoleId,
   disabled,
 }: RoleComboboxProps) => {
-  const [open, setOpen] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const debouncedSearch = useDebouncedValue(searchInput, 300)
+  const [open, setOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  const listQuery = useRoleOptionsInfiniteQuery(debouncedSearch)
-  const fallbackQuery = useRoleOptionFallbackQuery(editingRoleId)
+  const listQuery = useRoleOptionsInfiniteQuery(debouncedSearch);
+  const fallbackQuery = useRoleOptionFallbackQuery(editingRoleId);
 
   // 合併分頁與 fallback：fallback 放頂端、依 id 去重、過濾欄位缺失的 row
   const options: RoleOption[] = useMemo(() => {
-    const fallback = toRoleOption(fallbackQuery.data)
-    const pages = listQuery.data?.pages ?? []
+    const fallback = toRoleOption(fallbackQuery.data);
+    const pages = listQuery.data?.pages ?? [];
     const fromPages = pages
       .flatMap((page) => page?.list ?? [])
-      .map(toRoleOption)
+      .map(toRoleOption);
     return dedupeById(
       [fallback, ...fromPages].filter((opt): opt is RoleOption => opt !== null),
-    )
-  }, [listQuery.data, fallbackQuery.data])
+    );
+  }, [listQuery.data, fallbackQuery.data]);
 
   // 顯示「目前選中角色」名稱：先用 options 內找，找不到看 fallback 失敗 → 顯示 placeholder
   const selectedLabel = useMemo(() => {
-    if (!value) return ''
-    const found = options.find((opt) => opt.id === value)
-    if (found) return found.name
+    if (!value) return '';
+    const found = options.find((opt) => opt.id === value);
+    if (found) return found.name;
     // value 存在但找不到對應角色（fallback 404 / 角色已停用）
-    if (fallbackQuery.isError) return '（已停用 / 不可用）'
-    return ''
-  }, [value, options, fallbackQuery.isError])
+    if (fallbackQuery.isError) return '（已停用 / 不可用）';
+    return '';
+  }, [value, options, fallbackQuery.isError]);
 
   // sentinel + IntersectionObserver：在清單底端觸發 fetchNextPage；popover 關閉時 disable
-  const sentinelRef = useInfiniteScrollSentinel(listQuery, open)
+  const sentinelRef = useInfiniteScrollSentinel(listQuery, open);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -136,7 +136,10 @@ export const RoleCombobox = ({
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+      <PopoverContent
+        className="w-(--radix-popover-trigger-width) p-0"
+        align="start"
+      >
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="搜尋角色名稱"
@@ -158,9 +161,9 @@ export const RoleCombobox = ({
                     value={opt.id}
                     disabled={!opt.isAssignable}
                     onSelect={() => {
-                      if (!opt.isAssignable) return
-                      onChange(opt.id)
-                      setOpen(false)
+                      if (!opt.isAssignable) return;
+                      onChange(opt.id);
+                      setOpen(false);
                     }}
                   >
                     <Check
@@ -189,5 +192,5 @@ export const RoleCombobox = ({
         </Command>
       </PopoverContent>
     </Popover>
-  )
-}
+  );
+};

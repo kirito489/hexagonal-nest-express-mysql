@@ -1,14 +1,14 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 
 type ErrorBoundaryProps = {
-  children: ReactNode
-}
+  children: ReactNode;
+};
 
 type ErrorBoundaryState = {
-  error: Error | null
-}
+  error: Error | null;
+};
 
 // React 19 仍需 class component 處理 render error；
 // 攔截子樹 render 階段的拋錯，避免整個 app 白屏
@@ -16,24 +16,24 @@ export class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
-  state: ErrorBoundaryState = { error: null }
+  state: ErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { error }
+    return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     // 開發階段印 stack 方便除錯；生產可改為送到 Sentry 等服務
-    console.error('[ErrorBoundary]', error, info.componentStack)
+    console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
   reset = (): void => {
-    this.setState({ error: null })
-  }
+    this.setState({ error: null });
+  };
 
   render(): ReactNode {
-    const { error } = this.state
-    if (!error) return this.props.children
+    const { error } = this.state;
+    if (!error) return this.props.children;
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted px-4">
@@ -53,6 +53,6 @@ export class ErrorBoundary extends Component<
           </div>
         </div>
       </div>
-    )
+    );
   }
 }

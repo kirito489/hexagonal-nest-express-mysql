@@ -1,9 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useApiQuery } from '@/api/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useApiQuery } from '@/api/client';
 
 export const HomePage = () => {
   // 示範：呼叫 /me 取登入者資料，型別會自動推導為 yaml 內的 data shape
-  const meQuery = useApiQuery('GET', '/me')
+  const meQuery = useApiQuery('GET', '/me');
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,5 +44,5 @@ export const HomePage = () => {
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};

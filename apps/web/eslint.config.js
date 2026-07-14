@@ -1,16 +1,20 @@
-import { defineConfig } from 'eslint/config'
-import baseConfig, { houseRules } from '@app/eslint-config'
-import globals from 'globals'
-import tseslint from 'typescript-eslint'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig } from 'eslint/config';
+import baseConfig, { houseRules } from '@app/eslint-config';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default defineConfig([
   // 共用基底:ignores + js recommended（不含 tseslint 預設,由本檔自帶）
   ...baseConfig,
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
+    extends: [
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
     languageOptions: {
       globals: globals.browser,
     },
@@ -26,4 +30,4 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
-])
+]);

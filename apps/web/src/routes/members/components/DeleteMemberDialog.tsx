@@ -1,12 +1,12 @@
-import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
-import type { MemberRow } from './MembersTable'
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import type { MemberRow } from './MembersTable';
 
 type DeleteMemberDialogProps = {
-  member: MemberRow | null
-  isDeleting: boolean
-  onCancel: () => void
-  onConfirm: (member: MemberRow) => void
-}
+  member: MemberRow | null;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: (member: MemberRow) => void;
+};
 
 export const DeleteMemberDialog = ({
   member,
@@ -32,5 +32,5 @@ export const DeleteMemberDialog = ({
       onCancel={onCancel}
       onConfirm={() => member && onConfirm(member)}
     />
-  )
-}
+  );
+};

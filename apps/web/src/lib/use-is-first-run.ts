@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef } from 'react';
 
 /**
  * 「跳過 mount 首次」的微抽象：回傳一個函式，第一次呼叫回 true（並消費掉），之後永遠回 false。
@@ -18,12 +18,12 @@ import { useCallback, useRef } from 'react'
  * 的 abstraction 有嚴格 lint，抽 useEffect 本體會被擋；只抽 ref 概念就能繞過
  */
 export const useIsFirstRun = (): (() => boolean) => {
-  const ref = useRef(true)
+  const ref = useRef(true);
   return useCallback(() => {
     if (ref.current) {
-      ref.current = false
-      return true
+      ref.current = false;
+      return true;
     }
-    return false
-  }, [])
-}
+    return false;
+  }, []);
+};

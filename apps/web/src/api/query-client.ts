@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query';
 
 // 全 app 共用一個 QueryClient；可在這裡集中設定快取策略
 export const queryClient = new QueryClient({
@@ -13,4 +13,4 @@ export const queryClient = new QueryClient({
       retry: 0,
     },
   },
-})
+});

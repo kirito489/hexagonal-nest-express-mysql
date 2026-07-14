@@ -5,17 +5,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import type { IpBlacklistForm } from '../lib/ip-blacklist-form-schema'
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import type { IpBlacklistForm } from '../lib/ip-blacklist-form-schema';
 
 type IpBlacklistViewDialogProps = {
-  open: boolean
-  values: Partial<IpBlacklistForm> | undefined
-  onClose: () => void
-}
+  open: boolean;
+  values: Partial<IpBlacklistForm> | undefined;
+  onClose: () => void;
+};
 
 /**
  * 純唯讀的黑名單檢視 dialog：不掛 react-hook-form / resolver / submit
@@ -51,5 +51,5 @@ export const IpBlacklistViewDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

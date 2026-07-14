@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react';
 
 type InfiniteQueryLike = {
-  hasNextPage: boolean
-  isFetchingNextPage: boolean
-  fetchNextPage: () => unknown
-}
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => unknown;
+};
 
 /**
  * 把「sentinel + IntersectionObserver → fetchNextPage」樣板收斂成一個 hook。
@@ -17,22 +17,22 @@ export const useInfiniteScrollSentinel = <T extends InfiniteQueryLike>(
   query: T,
   enabled: boolean = true,
 ) => {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query
+  const ref = useRef<HTMLDivElement | null>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
 
   useEffect(() => {
-    if (!enabled) return
-    const target = ref.current
-    if (!target) return
+    if (!enabled) return;
+    const target = ref.current;
+    if (!target) return;
     const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0]
+      const entry = entries[0];
       if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        void fetchNextPage()
+        void fetchNextPage();
       }
-    })
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [enabled, hasNextPage, isFetchingNextPage, fetchNextPage])
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [enabled, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  return ref
-}
+  return ref;
+};

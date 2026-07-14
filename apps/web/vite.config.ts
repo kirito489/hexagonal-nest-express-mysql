@@ -1,8 +1,8 @@
 /// <reference types="vitest/config" />
-import path from 'node:path'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 // 設定 Vite：React + Tailwind v4 + path alias + dev 期間將 /api proxy 到後端
 export default defineConfig({
@@ -58,4 +58,4 @@ export default defineConfig({
       },
     },
   },
-})
+});

@@ -1,12 +1,12 @@
-import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog'
-import type { RoleRow } from './RolesTable'
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import type { RoleRow } from './RolesTable';
 
 type DeleteRoleDialogProps = {
-  role: RoleRow | null
-  isDeleting: boolean
-  onCancel: () => void
-  onConfirm: (role: RoleRow) => void
-}
+  role: RoleRow | null;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: (role: RoleRow) => void;
+};
 
 export const DeleteRoleDialog = ({
   role,
@@ -32,5 +32,5 @@ export const DeleteRoleDialog = ({
       onCancel={onCancel}
       onConfirm={() => role && onConfirm(role)}
     />
-  )
-}
+  );
+};

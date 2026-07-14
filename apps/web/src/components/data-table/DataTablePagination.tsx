@@ -1,22 +1,22 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from '@/components/ui/select';
 
 type DataTablePaginationProps = {
-  page: number
-  limit: number
-  total: number
-  onPageChange: (page: number) => void
-  onLimitChange: (limit: number) => void
-  pageSizeOptions?: number[]
-}
+  page: number;
+  limit: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  pageSizeOptions?: number[];
+};
 
 /**
  * 控制 page/limit 的分頁列。由呼叫端提供當前值與 setter，內部不持有 state
@@ -29,9 +29,9 @@ export const DataTablePagination = ({
   onLimitChange,
   pageSizeOptions = [10, 20, 50, 100],
 }: DataTablePaginationProps) => {
-  const totalPages = Math.max(1, Math.ceil(total / limit))
-  const canPrev = page > 1
-  const canNext = page < totalPages
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
 
   return (
     <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-4 text-sm">
@@ -84,5 +84,5 @@ export const DataTablePagination = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

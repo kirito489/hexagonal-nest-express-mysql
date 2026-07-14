@@ -5,6 +5,6 @@
  */
 export const ROLE_CODE = {
   SUPERADMIN: 'SUPERADMIN',
-} as const
+} as const;
 
-export type RoleCode = (typeof ROLE_CODE)[keyof typeof ROLE_CODE]
+export type RoleCode = (typeof ROLE_CODE)[keyof typeof ROLE_CODE];

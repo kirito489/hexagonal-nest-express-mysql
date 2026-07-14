@@ -1,4 +1,4 @@
-import { useApiQuery } from '@/api/client'
+import { useApiQuery } from '@/api/client';
 
 /**
  * 編輯模式時若初值的 roleId 不在第一頁，並列 fetch 該角色當作 fallback option，
@@ -17,5 +17,5 @@ export const useRoleOptionFallbackQuery = (id: string | undefined) => {
       // 404（角色已停用）不重試，讓 UI 立刻顯示 fallback
       retry: false,
     },
-  )
-}
+  );
+};

@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
-import { z } from 'zod'
-import { useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { z } from 'zod';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
@@ -14,67 +14,70 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
+} from '@/components/ui/form';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { useApiMutation } from '@/api/client'
-import { tokenStorage } from '@/lib/storage'
+} from '@/components/ui/card';
+import { useApiMutation } from '@/api/client';
+import { tokenStorage } from '@/lib/storage';
 
 const loginSchema = z.object({
   email: z.string().min(1, '請輸入電子郵件').email('電子郵件格式不正確'),
   password: z.string().min(1, '請輸入密碼'),
-})
+});
 
-type LoginForm = z.infer<typeof loginSchema>
+type LoginForm = z.infer<typeof loginSchema>;
 
 type LocationState = {
-  from?: { pathname: string }
-}
+  from?: { pathname: string };
+};
 
 export const LoginPage = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const queryClient = useQueryClient()
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const loginMutation = useApiMutation('POST', '/auth/login')
+  const loginMutation = useApiMutation('POST', '/auth/login');
 
   const form = useForm<LoginForm>({
     resolver: standardSchemaResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-  })
+  });
 
   // 已登入則直接回首頁，避免重複登入
   if (tokenStorage.get()) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
 
   const onSubmit = async (values: LoginForm) => {
-    setSubmitError(null)
+    setSubmitError(null);
     try {
-      const res = await loginMutation.mutateAsync({ body: values })
+      const res = await loginMutation.mutateAsync({ body: values });
       if (res?.accessToken) {
-        tokenStorage.set(res.accessToken)
+        tokenStorage.set(res.accessToken);
         if (res.refreshToken) {
-          tokenStorage.setRefresh(res.refreshToken)
+          tokenStorage.setRefresh(res.refreshToken);
         }
         // 換帳號要清掉前一個使用者的 query cache（/me、permissions、list 等），
         // 否則直到 staleTime 過期才會重抓，使用者會看到前一個身分的資料
-        queryClient.clear()
-        const from = (location.state as LocationState | null)?.from?.pathname ?? '/'
-        navigate(from, { replace: true })
+        queryClient.clear();
+        const from =
+          (location.state as LocationState | null)?.from?.pathname ?? '/';
+        navigate(from, { replace: true });
       }
     } catch (err) {
       setSubmitError(
-        err instanceof Error ? err.message || '登入失敗，請稍後再試' : '登入失敗，請稍後再試',
-      )
+        err instanceof Error
+          ? err.message || '登入失敗，請稍後再試'
+          : '登入失敗，請稍後再試',
+      );
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
@@ -130,7 +133,9 @@ export const LoginPage = () => {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loginMutation.isPending || form.formState.isSubmitting}
+                disabled={
+                  loginMutation.isPending || form.formState.isSubmitting
+                }
               >
                 {loginMutation.isPending ? '登入中…' : '登入'}
               </Button>
@@ -139,5 +144,5 @@ export const LoginPage = () => {
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};
