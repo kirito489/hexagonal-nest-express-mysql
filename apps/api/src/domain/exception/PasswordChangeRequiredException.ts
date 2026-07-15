@@ -1,10 +1,16 @@
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
 /**
  * 密碼已過期需要更換時拋出。
  * GlobalExceptionFilter 會將此 exception 映射為 403 + PASSWORD_CHANGE_REQUIRED code。
  */
-export class PasswordChangeRequiredException extends Error {
+export class PasswordChangeRequiredException extends DomainException {
   constructor() {
-    super('密碼已過期，請更換密碼後再繼續操作');
-    this.name = 'PasswordChangeRequiredException';
+    super(
+      ResponseCodes.PASSWORD_CHANGE_REQUIRED,
+      'FORBIDDEN',
+      '密碼已過期，請更換密碼後再繼續操作',
+    );
   }
 }

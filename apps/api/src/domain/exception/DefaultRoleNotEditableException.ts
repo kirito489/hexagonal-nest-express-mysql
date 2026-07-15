@@ -1,5 +1,12 @@
-export class DefaultRoleNotEditableException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class DefaultRoleNotEditableException extends DomainException {
   constructor() {
-    super('預設角色不可編輯');
+    super(
+      ResponseCodes.DEFAULT_ROLE_NOT_EDITABLE,
+      'INVALID',
+      '預設角色不可編輯',
+    );
   }
 }

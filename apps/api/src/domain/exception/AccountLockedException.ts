@@ -1,9 +1,15 @@
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
 /**
  * 帳號已被鎖定時拋出
  */
-export class AccountLockedException extends Error {
+export class AccountLockedException extends DomainException {
   constructor() {
-    super('帳號已被鎖定，請聯繫管理員解鎖');
-    this.name = 'AccountLockedException';
+    super(
+      ResponseCodes.ACCOUNT_LOCKED,
+      'LOCKED',
+      '帳號已被鎖定，請聯繫管理員解鎖',
+    );
   }
 }

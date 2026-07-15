@@ -75,7 +75,7 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 ## Domain Exception / GlobalExceptionFilter
 
-- **新增 domain exception 後，GlobalExceptionFilter 必須同步加 `instanceof` 分支**：否則 fallback 到 500。每個 domain exception 對應：(1) `src/domain/exception/` 檔案；(2) Filter 有 instanceof 判斷 + 正確 HttpStatus + `code`（SCREAMING_SNAKE_CASE）。Repository 層不要讓 Prisma 原生錯誤（P2025 等）冒泡到 service，轉成明確的 domain exception。
+- **domain exception 一律 `extends DomainException(code, kind)`，filter 靠 `kind → status` 自動映射，新增例外不用改 filter**：每個 domain exception：(1) `src/domain/exception/` 檔 `extends DomainException`，`super(ResponseCodes.XXX, '<kind>', message)`；(2) code 加進 `src/shared/constants/response-codes.ts`；(3) 選 kind（`NOT_FOUND/UNAUTHORIZED/FORBIDDEN/INVALID/CONFLICT/LOCKED/INTERNAL`），`GlobalExceptionFilter` 的 `KIND_TO_STATUS` 表自動給 HTTP status——**不再需要在 filter 加 instanceof / map**（舊做法：filter 維護一張隨例外數膨脹的 `DOMAIN_EXCEPTION_MAP`，已廢除）。Repository 層不要讓 Prisma 原生錯誤（P2025 等）冒泡到 service，轉成明確的 domain exception。
 
 ## 測試
 

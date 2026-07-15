@@ -1,6 +1,12 @@
-export class DefaultRoleNotFoundException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class DefaultRoleNotFoundException extends DomainException {
   constructor() {
-    super('系統未設定預設角色，請聯繫管理員');
-    this.name = 'DefaultRoleNotFoundException';
+    super(
+      ResponseCodes.DEFAULT_ROLE_NOT_FOUND,
+      'INTERNAL',
+      '系統未設定預設角色，請聯繫管理員',
+    );
   }
 }

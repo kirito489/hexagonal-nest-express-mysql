@@ -1,6 +1,12 @@
-export class AccountNotLockedException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class AccountNotLockedException extends DomainException {
   constructor() {
-    super('帳號未處於鎖定狀態，無需解鎖');
-    this.name = 'AccountNotLockedException';
+    super(
+      ResponseCodes.ACCOUNT_NOT_LOCKED,
+      'CONFLICT',
+      '帳號未處於鎖定狀態，無需解鎖',
+    );
   }
 }

@@ -15,26 +15,11 @@ import {
 } from '../../../../application/port/out/shared/SaveSystemLogPort';
 import { buildSystemLogData } from '../helper/system-log-helper';
 import { getRequestStartTime } from '../helper/request-start-time';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
-import { PasswordChangeRequiredException } from '../../../../domain/exception/PasswordChangeRequiredException';
-import { InvalidRefreshTokenException } from '../../../../domain/exception/InvalidRefreshTokenException';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { CannotDeleteSelfException } from '../../../../domain/exception/CannotDeleteSelfException';
-import { DefaultMemberNotDeletableException } from '../../../../domain/exception/DefaultMemberNotDeletableException';
-import { DefaultMemberNotEditableException } from '../../../../domain/exception/DefaultMemberNotEditableException';
-import { CannotDisableSelfException } from '../../../../domain/exception/CannotDisableSelfException';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
-import { DefaultRoleNotDeletableException } from '../../../../domain/exception/DefaultRoleNotDeletableException';
-import { DefaultRoleNotEditableException } from '../../../../domain/exception/DefaultRoleNotEditableException';
-import { RoleHasMembersException } from '../../../../domain/exception/RoleHasMembersException';
-import { InvalidPermissionCodeException } from '../../../../domain/exception/InvalidPermissionCodeException';
-import { InvalidPermissionCombinationException } from '../../../../domain/exception/InvalidPermissionCombinationException';
-import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
-import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
-import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
-import { DefaultRoleNotFoundException } from '../../../../domain/exception/DefaultRoleNotFoundException';
+import {
+  DomainException,
+  DomainExceptionKind,
+} from '../../../../domain/exception/DomainException';
+import { ResponseCodes } from '../../../../shared/constants/response-codes';
 
 export interface ApiErrorResponse {
   success: false;
@@ -43,101 +28,17 @@ export interface ApiErrorResponse {
   timestamp: string;
 }
 
-// 未預期 fallback 500 的 error code：resolveError 產生與 Sentry 上報判斷共用，避免字面值散落
-const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
-
-// Domain exception → { HTTP status, error code } 映射表
-// 新增 domain exception 時只需在此加一筆，不用再追長串 if/else if
-type DomainExceptionCtor = new (...args: never[]) => Error;
-
-const DOMAIN_EXCEPTION_MAP: ReadonlyArray<
-  readonly [DomainExceptionCtor, { status: HttpStatus; code: string }]
-> = [
-  [
-    MemberNotFoundException,
-    { status: HttpStatus.NOT_FOUND, code: 'MEMBER_NOT_FOUND' },
-  ],
-  [
-    EmailAlreadyExistsException,
-    { status: HttpStatus.CONFLICT, code: 'EMAIL_ALREADY_EXISTS' },
-  ],
-  [
-    AccountDisabledException,
-    { status: HttpStatus.FORBIDDEN, code: 'ACCOUNT_DISABLED' },
-  ],
-  [
-    PasswordChangeRequiredException,
-    { status: HttpStatus.FORBIDDEN, code: 'PASSWORD_CHANGE_REQUIRED' },
-  ],
-  [
-    InvalidRefreshTokenException,
-    { status: HttpStatus.UNAUTHORIZED, code: 'INVALID_REFRESH_TOKEN' },
-  ],
-  [
-    RoleNotFoundException,
-    { status: HttpStatus.NOT_FOUND, code: 'ROLE_NOT_FOUND' },
-  ],
-  [
-    CannotDeleteSelfException,
-    { status: HttpStatus.CONFLICT, code: 'CANNOT_DELETE_SELF' },
-  ],
-  [
-    DefaultMemberNotDeletableException,
-    { status: HttpStatus.CONFLICT, code: 'DEFAULT_MEMBER_NOT_DELETABLE' },
-  ],
-  [
-    DefaultMemberNotEditableException,
-    { status: HttpStatus.CONFLICT, code: 'DEFAULT_MEMBER_NOT_EDITABLE' },
-  ],
-  [
-    CannotDisableSelfException,
-    { status: HttpStatus.CONFLICT, code: 'CANNOT_DISABLE_SELF' },
-  ],
-  [
-    DuplicateRoleNameException,
-    { status: HttpStatus.CONFLICT, code: 'DUPLICATE_ROLE_NAME' },
-  ],
-  [
-    DefaultRoleNotDeletableException,
-    { status: HttpStatus.BAD_REQUEST, code: 'DEFAULT_ROLE_NOT_DELETABLE' },
-  ],
-  [
-    DefaultRoleNotEditableException,
-    { status: HttpStatus.BAD_REQUEST, code: 'DEFAULT_ROLE_NOT_EDITABLE' },
-  ],
-  [
-    RoleHasMembersException,
-    { status: HttpStatus.CONFLICT, code: 'ROLE_HAS_MEMBERS' },
-  ],
-  [
-    InvalidPermissionCodeException,
-    { status: HttpStatus.BAD_REQUEST, code: 'INVALID_PERMISSION_CODE' },
-  ],
-  [
-    InvalidPermissionCombinationException,
-    { status: HttpStatus.BAD_REQUEST, code: 'INVALID_PERMISSION_COMBINATION' },
-  ],
-  [
-    EmailNotFoundException,
-    { status: HttpStatus.NOT_FOUND, code: 'EMAIL_NOT_FOUND' },
-  ],
-  [
-    AccountNotLockedException,
-    { status: HttpStatus.CONFLICT, code: 'ACCOUNT_NOT_LOCKED' },
-  ],
-  [
-    IpListNotFoundException,
-    { status: HttpStatus.NOT_FOUND, code: 'IP_LIST_NOT_FOUND' },
-  ],
-  [
-    // 系統缺預設角色屬伺服器組態問題（seed 未跑），回 500 但給明確 code，不外洩 Prisma 細節
-    DefaultRoleNotFoundException,
-    {
-      status: HttpStatus.INTERNAL_SERVER_ERROR,
-      code: 'DEFAULT_ROLE_NOT_FOUND',
-    },
-  ],
-];
+// domain exception 的語意 kind → HTTP status。
+// 新增 domain exception 時只需在該 exception 選一個 kind，此表與 filter 完全不用改。
+const KIND_TO_STATUS: Record<DomainExceptionKind, HttpStatus> = {
+  NOT_FOUND: HttpStatus.NOT_FOUND,
+  UNAUTHORIZED: HttpStatus.UNAUTHORIZED,
+  FORBIDDEN: HttpStatus.FORBIDDEN,
+  INVALID: HttpStatus.BAD_REQUEST,
+  CONFLICT: HttpStatus.CONFLICT,
+  LOCKED: HttpStatus.LOCKED,
+  INTERNAL: HttpStatus.INTERNAL_SERVER_ERROR,
+};
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -165,7 +66,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // 僅上報未預期的 fallback 500；domain exception 與 HttpException 為可預期錯誤，不上報以免噪音。
     // Sentry 未啟用時 captureException 為 no-op。
-    if (code === INTERNAL_SERVER_ERROR_CODE) {
+    if (code === ResponseCodes.INTERNAL_SERVER_ERROR) {
       Sentry.captureException(exception);
     }
 
@@ -202,17 +103,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     message: string;
     code: string;
   } {
-    // 1. domain exception：查表
-    if (exception instanceof Error) {
-      for (const [Ctor, meta] of DOMAIN_EXCEPTION_MAP) {
-        if (exception instanceof Ctor) {
-          return {
-            status: meta.status,
-            message: exception.message,
-            code: meta.code,
-          };
-        }
-      }
+    // 1. domain exception：以自帶的 kind → status、code 直接取用
+    if (exception instanceof DomainException) {
+      return {
+        status: KIND_TO_STATUS[exception.kind],
+        message: exception.message,
+        code: exception.code,
+      };
     }
 
     // 2. NestJS HttpException：透過 class name 自動轉 SCREAMING_SNAKE_CASE
@@ -232,7 +129,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
-      code: INTERNAL_SERVER_ERROR_CODE,
+      code: ResponseCodes.INTERNAL_SERVER_ERROR,
     };
   }
 }

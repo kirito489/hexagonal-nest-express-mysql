@@ -1,6 +1,12 @@
-export class CannotDeleteSelfException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class CannotDeleteSelfException extends DomainException {
   constructor() {
-    super('不可刪除登入中的自己帳號');
-    this.name = 'CannotDeleteSelfException';
+    super(
+      ResponseCodes.CANNOT_DELETE_SELF,
+      'CONFLICT',
+      '不可刪除登入中的自己帳號',
+    );
   }
 }

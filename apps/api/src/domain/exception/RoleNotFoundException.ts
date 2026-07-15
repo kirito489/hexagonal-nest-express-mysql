@@ -1,6 +1,8 @@
-export class RoleNotFoundException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class RoleNotFoundException extends DomainException {
   constructor() {
-    super('角色不存在');
-    this.name = 'RoleNotFoundException';
+    super(ResponseCodes.ROLE_NOT_FOUND, 'NOT_FOUND', '角色不存在');
   }
 }

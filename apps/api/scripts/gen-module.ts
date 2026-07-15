@@ -9,9 +9,9 @@
  *   --force 覆寫既有檔（預設 skip-if-exists）。
  *
  * 產出一個最小 CRUD 六角模組（port in/out、service+spec、facade、controller+DTO、
- * Prisma repo、domain exception、module）並自動註冊到 `app.module.ts` 與
- * `GlobalExceptionFilter`（NotFound → 404）。欄位僅含佔位的 `name`/`status`，
- * Prisma model 不由本工具建立（見結尾的手動步驟）。
+ * Prisma repo、DomainException 子類、module）並自動註冊到 `app.module.ts`。
+ * 例外靠 DomainException 的 kind 自動映射 HTTP status，不需再接 `GlobalExceptionFilter`。
+ * 欄位僅含佔位的 `name`/`status`，Prisma model 不由本工具建立（見結尾的手動步驟）。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
@@ -808,10 +808,11 @@ export class Prisma%Name%Repository implements %Name%RepositoryPort {
 }
 `,
 
-  'domain/exception/%Name%NotFoundException.ts': `export class %Name%NotFoundException extends Error {
+  'domain/exception/%Name%NotFoundException.ts': `import { DomainException } from './DomainException';
+
+export class %Name%NotFoundException extends DomainException {
   constructor() {
-    super('%Name% 不存在');
-    this.name = '%Name%NotFoundException';
+    super('%NAME%_NOT_FOUND', 'NOT_FOUND', '%Name% 不存在');
   }
 }
 `,
@@ -856,7 +857,7 @@ const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
   const path = join(API_SRC, 'app.module.ts');
   let content = readFileSync(path, 'utf8');
   if (content.includes(moduleClass)) {
-    console.log(`  skip AppModule（已含 ${moduleClass}）`);
+    console.log(`skip AppModule（已含 ${moduleClass}）`);
     return;
   }
   const importRe = /import \{[^}]*\} from '\.\/modules\/[^']+';/g;
@@ -866,7 +867,7 @@ const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
     lastEnd = match.index + match[0].length;
   }
   if (lastEnd === -1) {
-    console.warn('  ⚠ 找不到 ./modules import 錨點，請手動註冊 AppModule');
+    console.warn('找不到 ./modules import 錨點，請手動註冊 AppModule');
     return;
   }
   const importLine = `\nimport { ${moduleClass} } from './modules/${side}/${n.name}.module';`;
@@ -880,39 +881,10 @@ const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
   if (arrayRe.test(content)) {
     content = content.replace(arrayRe, `$1${anchorName},\n$1${moduleClass},`);
   } else {
-    console.warn(
-      `  ⚠ 找不到 imports 陣列 ${anchorName} 錨點，請手動加入 module`,
-    );
+    console.warn(`找不到 imports 陣列 ${anchorName} 錨點，請手動加入 module`);
   }
   writeFileSync(path, content);
-  console.log(`  ✓ AppModule 註冊 ${moduleClass}`);
-};
-
-/** 把 NotFound → 404 接進 GlobalExceptionFilter 的 DOMAIN_EXCEPTION_MAP（冪等） */
-const patchFilter = (n: Names): void => {
-  const path = join(API_SRC, 'adapter/in/web/filter/GlobalExceptionFilter.ts');
-  let content = readFileSync(path, 'utf8');
-  if (content.includes(`${n.Name}NotFoundException`)) {
-    console.log(`  skip Filter（已含 ${n.Name}NotFoundException）`);
-    return;
-  }
-  const importRe =
-    /import \{[^}]*\} from '\.\.\/\.\.\/\.\.\/\.\.\/domain\/exception\/[^']+';/g;
-  let lastEnd = -1;
-  let match: RegExpExecArray | null;
-  while ((match = importRe.exec(content)) !== null) {
-    lastEnd = match.index + match[0].length;
-  }
-  if (lastEnd === -1) {
-    console.warn('  ⚠ 找不到 domain/exception import 錨點，請手動接線 Filter');
-    return;
-  }
-  const importLine = `\nimport { ${n.Name}NotFoundException } from '../../../../domain/exception/${n.Name}NotFoundException';`;
-  content = content.slice(0, lastEnd) + importLine + content.slice(lastEnd);
-  const entry = `  [\n    ${n.Name}NotFoundException,\n    { status: HttpStatus.NOT_FOUND, code: '${n.NAME}_NOT_FOUND' },\n  ],\n`;
-  content = content.replace(/(> = \[\n)/, `$1${entry}`);
-  writeFileSync(path, content);
-  console.log(`  ✓ Filter 接線 ${n.Name}NotFoundException → 404`);
+  console.log(`AppModule 註冊 ${moduleClass}`);
 };
 
 const main = (): void => {
@@ -936,7 +908,7 @@ const main = (): void => {
     const rel = isInSide(rendered) ? toSidePath(rendered, side) : rendered;
     const outPath = join(API_SRC, rel);
     if (existsSync(outPath) && !force) {
-      console.log(`  skip（已存在）: ${rel}`);
+      console.log(`skip（已存在）: ${rel}`);
       skipped += 1;
       continue;
     }
@@ -948,7 +920,6 @@ const main = (): void => {
   }
   console.log(`\n產生 ${written} 檔（略過 ${skipped}）｜側別：${side}`);
   patchAppModule(n, side, moduleClass);
-  patchFilter(n);
   const guardStep =
     side === 'front'
       ? '前台通常公開唯讀：視需要移除 write 端點；若需認證再掛 guard'

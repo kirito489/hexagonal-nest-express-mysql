@@ -1,11 +1,17 @@
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
 /**
  * 無效的 Refresh Token
  *
  * 過期、簽名不符、type 不符、在黑名單一律以此例外表達。
  */
-export class InvalidRefreshTokenException extends Error {
+export class InvalidRefreshTokenException extends DomainException {
   constructor() {
-    super('無效的 Refresh Token，請重新登入');
-    this.name = 'InvalidRefreshTokenException';
+    super(
+      ResponseCodes.INVALID_REFRESH_TOKEN,
+      'UNAUTHORIZED',
+      '無效的 Refresh Token，請重新登入',
+    );
   }
 }

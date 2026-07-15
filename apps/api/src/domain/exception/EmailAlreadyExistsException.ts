@@ -1,6 +1,8 @@
-export class EmailAlreadyExistsException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class EmailAlreadyExistsException extends DomainException {
   constructor() {
-    super('Email 已被使用');
-    this.name = 'EmailAlreadyExistsException';
+    super(ResponseCodes.EMAIL_ALREADY_EXISTS, 'CONFLICT', 'Email 已被使用');
   }
 }

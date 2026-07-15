@@ -120,7 +120,7 @@ apps/api/src/
 
 - **Module naming（依 `<side>` = `admin` / `front` 分層）**：in 側依側別分目錄——Controller + DTO → `adapter/in/web/<side>/<module>/`；service → `application/service/<side>/<module>/`（跨前後台共用 service 放 `application/service/shared/`）；facade → `application/facade/<side>/`；port-in → `application/port/in/<side>/<module>/`；module → `modules/<side>/<module>.module.ts`。**共用層不分前後台**：Prisma repository → `adapter/out/persistence/<module>/`、port-out → `application/port/out/<module>/`、domain → `domain/`；Guard / Filter / Decorator / Interceptor 放各自頂層目錄。
 - **Facade**：每個 domain area 對外只暴露 `*Facade`（如 `AuthFacade`、`MemberFacade`），Controller 透過 facade 操作，不直接打 service。
-- **Domain exception → HTTP**：domain exception 是 plain `Error` 子類；HTTP 狀態映射在 `src/adapter/in/web/filter/GlobalExceptionFilter.ts`，新增 exception 必須同步加 `instanceof` 分支與 `code`（SCREAMING_SNAKE_CASE）。
+- **Domain exception → HTTP**：domain exception 一律 `extends DomainException`（建構子傳 `ResponseCodes` 的 code + 語意 `kind`）；`GlobalExceptionFilter` 以一張 `kind → HttpStatus` 表自動映射，**新增 exception 不用改 filter**，只需把 code 加進 `src/shared/constants/response-codes.ts`。kind 可選 `NOT_FOUND / UNAUTHORIZED / FORBIDDEN / INVALID / CONFLICT / LOCKED / INTERNAL`。
 - **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。
 - **Controller 回傳**：原始值即可，`TransformInterceptor` 會包成 `{ success, data, timestamp }`；**不要**自行包 `{ data }`，否則前端要挖兩層。
 - **時區 / 日期**：見下方「時間處理慣例」。

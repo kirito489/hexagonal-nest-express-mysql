@@ -1,9 +1,11 @@
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
 /**
  * 帳號已停用
  */
-export class AccountDisabledException extends Error {
+export class AccountDisabledException extends DomainException {
   constructor() {
-    super('帳號已停用');
-    this.name = 'AccountDisabledException';
+    super(ResponseCodes.ACCOUNT_DISABLED, 'FORBIDDEN', '帳號已停用');
   }
 }

@@ -1,5 +1,12 @@
-export class InvalidPermissionCombinationException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class InvalidPermissionCombinationException extends DomainException {
   constructor(domain: string) {
-    super(`設定 ${domain}:EDIT 時必須同時設定 ${domain}:VIEW`);
+    super(
+      ResponseCodes.INVALID_PERMISSION_COMBINATION,
+      'INVALID',
+      `設定 ${domain}:EDIT 時必須同時設定 ${domain}:VIEW`,
+    );
   }
 }

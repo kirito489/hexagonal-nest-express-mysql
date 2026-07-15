@@ -1,6 +1,12 @@
-export class DefaultMemberNotEditableException extends Error {
+import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
+
+export class DefaultMemberNotEditableException extends DomainException {
   constructor() {
-    super('預設帳號不可編輯');
-    this.name = 'DefaultMemberNotEditableException';
+    super(
+      ResponseCodes.DEFAULT_MEMBER_NOT_EDITABLE,
+      'CONFLICT',
+      '預設帳號不可編輯',
+    );
   }
 }
