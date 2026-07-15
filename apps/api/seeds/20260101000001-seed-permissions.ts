@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import pino from 'pino';
+import {
+  PERMISSION_CATALOG,
+  parsePermissionCode,
+} from '../src/shared/constants/permissions';
 
 const log = pino({
   name: 'seed-permissions',
@@ -9,72 +13,25 @@ const log = pino({
   },
 });
 
-type PermissionSeed = {
-  permissionCode: string;
-  name: string;
-  platform: string;
-  module: string;
-  subModule?: string | null;
-  action: string;
-};
-
-const PERMISSIONS: PermissionSeed[] = [
-  // 後台 - 帳號管理
-  {
-    permissionCode: 'BACKEND:ACCOUNT:VIEW',
-    name: '後台-帳號管理-檢視',
-    platform: 'BACKEND',
-    module: 'ACCOUNT',
-    action: 'VIEW',
-  },
-  {
-    permissionCode: 'BACKEND:ACCOUNT:EDIT',
-    name: '後台-帳號管理-編輯',
-    platform: 'BACKEND',
-    module: 'ACCOUNT',
-    action: 'EDIT',
-  },
-
-  // 後台 - 角色管理
-  {
-    permissionCode: 'BACKEND:ROLE:VIEW',
-    name: '後台-角色管理-檢視',
-    platform: 'BACKEND',
-    module: 'ROLE',
-    action: 'VIEW',
-  },
-  {
-    permissionCode: 'BACKEND:ROLE:EDIT',
-    name: '後台-角色管理-編輯',
-    platform: 'BACKEND',
-    module: 'ROLE',
-    action: 'EDIT',
-  },
-];
-
 export default async function seed(prisma: PrismaClient): Promise<void> {
   log.info('插入權限資料...');
 
-  for (const p of PERMISSIONS) {
+  // code 來自 PermissionCode（單一真相）；platform/module/action 由 code 拆解，不重複硬寫
+  for (const { code, name } of PERMISSION_CATALOG) {
+    const { platform, module, subModule, action } = parsePermissionCode(code);
     await prisma.permission.upsert({
-      where: { permissionCode: p.permissionCode },
-      update: {
-        name: p.name,
-        platform: p.platform,
-        module: p.module,
-        subModule: p.subModule ?? null,
-        action: p.action,
-      },
+      where: { permissionCode: code },
+      update: { name, platform, module, subModule, action },
       create: {
-        permissionCode: p.permissionCode,
-        name: p.name,
-        platform: p.platform,
-        module: p.module,
-        subModule: p.subModule ?? null,
-        action: p.action,
+        permissionCode: code,
+        name,
+        platform,
+        module,
+        subModule,
+        action,
       },
     });
   }
 
-  log.info(`完成：${PERMISSIONS.length} 個 permissions`);
+  log.info(`完成：${PERMISSION_CATALOG.length} 個 permissions`);
 }

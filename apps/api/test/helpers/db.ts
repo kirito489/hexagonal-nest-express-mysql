@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { parsePermissionCode } from '../../src/shared/constants/permissions';
 
 /**
  * 依外鍵順序清空所有表（e2e 每個 test 前重置，確保隔離）。
@@ -25,10 +26,17 @@ export const ensurePermissions = async (
 ): Promise<string[]> => {
   const ids: string[] = [];
   for (const code of codes) {
-    const [platform, module, action] = code.split(':');
+    const { platform, module, subModule, action } = parsePermissionCode(code);
     const perm = await prisma.permission.upsert({
       where: { permissionCode: code },
-      create: { permissionCode: code, name: code, platform, module, action },
+      create: {
+        permissionCode: code,
+        name: code,
+        platform,
+        module,
+        subModule,
+        action,
+      },
       update: {},
     });
     ids.push(perm.id);
