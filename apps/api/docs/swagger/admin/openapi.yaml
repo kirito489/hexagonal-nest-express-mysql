@@ -283,3 +283,11 @@ paths:
   /security/unlock-account:
     post:
       $ref: './security/unlock-account.yaml'
+
+  /attachments:
+    post:
+      $ref: './attachments/upload.yaml'
+
+  /attachments/{id}:
+    delete:
+      $ref: './attachments/delete.yaml'

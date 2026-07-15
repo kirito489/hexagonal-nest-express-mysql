@@ -1,0 +1,22 @@
+tags: [Attachments]
+summary: 刪除附件
+description: 依 id 刪除附件（同時刪除 storage 檔案與 DB 紀錄）。找不到回 404。
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid
+    description: 附件 id
+responses:
+  '204':
+    description: 刪除成功（無內容）
+  '404':
+    description: 找不到附件
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+  '401':
+    $ref: '../openapi.yaml#/components/responses/NoToken'

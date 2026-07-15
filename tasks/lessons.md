@@ -238,6 +238,20 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **e2e 測 serve-static 要把 `AbstractLoader` override 成 `ExpressLoader`**：`@nestjs/serve-static` 的 loader factory 依 `httpAdapter` 是否存在挑 loader；測試用 `Test...compile()` 在 `createNestApplication(ExpressAdapter)` 之前就實例化 loader → 拿到 **NoopLoader**（靜態檔全 404）。作法：測試 `.overrideProvider(AbstractLoader).useClass(ExpressLoader)`（`test-app.ts` 的 `forceServeStatic` 旗標）對齊生產；fixture 目錄由 `WEB_STATIC_ROOT`（setup-env 指向 `os.tmpdir()`）指定，spec 的 `beforeAll` 先寫 `index.html`。
 
+## 檔案儲存 / 上傳
+
+- **儲存走 port + driver 切換（`STORAGE_DRIVER=local|s3`），module 用 `useFactory` 綁**：`FileStoragePort`（upload/getSignedUrl/delete）由 `StorageModule` 依 env 綁 `LocalFileStorageAdapter`（寫本機、dev/衍生專案免 AWS，預設）或 `S3FileStorageAdapter`；兩 adapter 都註冊、factory 選一個，呼叫端只認 port。local 的 `getSignedUrl` 無簽章意義，直接回靜態 URL。
+
+- **上傳安全三件套：MIME 白名單 + 副檔名由 MIME 推導 + 大小上限**：`shared/constants/upload.ts` 的 `EXT_BY_MIME` 同時是 MIME 白名單與「MIME→正規副檔名」表。key 一律 `<folder>/<uuid>.<extForMime(mime)>`，**絕不取 client 原始檔名的副檔名**（擋 `evil.png.html` stored XSS）；folder 走白名單；size ≤ env `MAX_UPLOAD_BYTES` 在 **service** 檢查（不放 decorator——decorator 選項在模組載入時求值、讀不到 env）。multer decorator 另設大的靜態硬上限防 OOM。
+
+- **multipart 中文檔名要 latin1→UTF-8 還原**：busboy/multer 預設以 latin1 讀 filename，中文變亂碼；存入前 `Buffer.from(originalName, 'latin1').toString('utf8')` 還原（schema 的 `file_name` 欄位已註明此慣例）。
+
+- **multer 2.x 的 `Express.Multer.File` 全域型別解不到**：multer 2.x + @types/multer 2.x 不再穩定擴充 `Express.Multer` 全域 namespace，`@UploadedFile() file: Express.Multer.File` 報 `Namespace 'global.Express' has no exported member 'Multer'`。作法：controller 自定最小型別（只取 `buffer/mimetype/size/originalname`），避開 ambient 擴充版本差異。
+
+- **刪除時 key 由 fileUrl 尾兩段還原，與 base URL / driver 無關**：AttachmentRecord 存完整 fileUrl，刪 storage 需 key。因 key 固定 `<folder>/<uuid>.<ext>`（兩段），`fileUrl.split('/').slice(-2).join('/')` 即還原，不依賴 base 前綴（避免 env 改動 / driver 差異踩雷）。
+
+- **本機媒體 static 要排除 SPA fallback + 加 nosniff/CSP**：local driver 檔案由 `main.ts` 的 `express.static(LOCAL_MEDIA_ROOT)` 服務在 `LOCAL_MEDIA_BASE_URL`（`/media`），設 `X-Content-Type-Options: nosniff` + `Content-Security-Policy: default-src 'none'`。因 bootstrap 的 `app.use` static 晚於 ServeStaticModule 註冊，須在 `app.module` 的 web ServeStaticModule `exclude` 加 `/media/{*path}`，否則 `/media` 被 SPA fallback 攔成 index.html。e2e 走 local driver、`LOCAL_MEDIA_ROOT` 指 tmp 避免汙染專案。
+
 ## 排程 / @nestjs/schedule
 
 - **`@Cron('expr')` decorator 的表達式在「模組載入時」就求值，讀不到 `.env`**：import 會 hoist 到檔案最上方，`AppModule`（含排程器）在 `main.ts` 的 `dotenv.config()` 之前就被 require，decorator 內 `process.env.X` 拿到 undefined；在 decorator 內呼叫 `getEnv()` 更會在 env 未載入時觸發驗證而 `process.exit(1)`。作法：改在 `onModuleInit()`（dotenv 已載入）用 `SchedulerRegistry.addCronJob(name, CronJob.from({ cronTime, onTick, timeZone }))` 動態註冊（範式見 `ExampleScheduler`）；env gate（`SCHEDULE_ENABLED`）預設關，測試環境保持關閉避免背景 cron 與開檔 handle。

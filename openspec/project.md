@@ -239,6 +239,7 @@ apps/web/src/
 | Members  | `GET/POST/PATCH/DELETE /api/admin/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
 | Roles    | `GET/POST/PATCH/DELETE /api/admin/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
 | Security | `/api/admin/security/ip-{whitelist,blacklist}*`、`/api/admin/security/unlock-account` | JWT + ADMIN 角色 |
+| Attachments | `POST /api/admin/attachments`（multipart 上傳）、`DELETE /api/admin/attachments/{id}` | JWT |
 | Front    | `GET /api/front/ping`（骨架示範，待實際前台端點取代） | 公開                        |
 | Health   | `GET /api/health`（liveness）、`GET /api/health/ready`（readiness，探 DB + Redis） | 公開（中性、不加 /admin，不計速率限制） |
 | Metrics  | `GET /api/metrics`（Prometheus，flag 開啟才掛載） | 公開（不計入速率限制；需網路層保護）     |

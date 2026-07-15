@@ -21,6 +21,8 @@ _(目前無)_
 
 ### 技術債（外部相依卡住，延後）
 
+- [ ] **path alias（`@app/*`）導入** — KGIE 用 `@api`/`@shared`/`@admin` + tsc-alias；目標專案有 187 處 4 層以上相對 import，alias 可提升可讀性 / 重構安全。**延後原因（2026-07-15）**：`nest build` 走 tsc builder，不自動改寫 alias，三種機制皆有硬傷——tsc-alias 讓 dev（`nest start --watch` + `tsc-alias -w` 兩 watch 賽跑）偶發「找不到 @app/x」；SWC 換編譯器踩 Hard Rule 的 cascade（decorator metadata / 與 ts-jest 並存）。純可讀性改善不值得動搖模板的 build baseline 穩定性。**條件**：改用 SWC/webpack builder、或有大重構痛點時再一起上。
+
 - [ ] **api `moduleResolution: node`（node10）遷移 `nodenext`** — TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已從 TS 5.9 對齊到 **TS 6.0.2**（與 web / 編輯器同版，消除混版）；`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音（TS 官方機制，須 TS≥6 才吃）+ `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**（NestJS 裝飾器 metadata：`@Body()` DTO + constructor 注入 service 要求 `import type`，注入 service 不能改否則 DI 壞）——與 TS 版本無關，卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時此消音失效、屆時強制處理（可能需關 `isolatedModules` 或大改 import 為 `import type`）。
 
 ---

@@ -2371,6 +2371,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 上傳附件
+         * @description multipart/form-data 上傳單一檔案。驗證 MIME 白名單 / 大小上限 / folder 白名單；
+         *     副檔名一律由驗過的 MIME 推導（不取原始檔名，擋 stored XSS）。回傳附件 id 與可存取 URL。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description 上傳檔案（欄位名固定為 file）
+                         */
+                        file: string;
+                        /**
+                         * @description 上傳資料夾（白名單）
+                         * @enum {string}
+                         */
+                        folder: "avatars" | "attachments";
+                        /**
+                         * @description 附屬的資料表（如 members）
+                         * @example members
+                         */
+                        relatedTable: string;
+                        /** @description 附屬的紀錄 id */
+                        relatedId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 上傳成功 */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @description 可存取的檔案 URL（local 為 static、s3 為公開/預簽 URL） */
+                                url: string;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["NoToken"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attachments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 刪除附件
+         * @description 依 id 刪除附件（同時刪除 storage 檔案與 DB 紀錄）。找不到回 404。
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description 附件 id */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 刪除成功（無內容） */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: components["responses"]["NoToken"];
+                /** @description 找不到附件 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
