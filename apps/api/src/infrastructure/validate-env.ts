@@ -69,6 +69,15 @@ const envSchema = z.object({
   /** S3 bucket 內的最上層 prefix（環境隔離用，如 local / staging / production） */
   AWS_MEDIA_LIBRARY_ROOT: z.string().min(1),
 
+  // ─── 檔案儲存 ───
+  // driver：local（寫本機、免 AWS，dev / 衍生專案預設）或 s3（走 AWS + presigned URL）
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  // local driver：上傳落地目錄（相對 cwd）與對外服務的 URL 前綴
+  LOCAL_MEDIA_ROOT: z.string().default('media'),
+  LOCAL_MEDIA_BASE_URL: z.string().default('/media'),
+  // 單檔上傳大小上限（bytes），預設 5MB
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(5_242_880),
+
   // SMTP（選填）
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),

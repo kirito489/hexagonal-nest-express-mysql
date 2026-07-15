@@ -54,9 +54,11 @@ class BootFilteredLogger implements LoggerService {
 import helmet from 'helmet';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import cookieParser = require('cookie-parser');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import express = require('express');
 import * as swaggerUi from 'swagger-ui-express';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import * as yaml from 'js-yaml';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
@@ -125,6 +127,21 @@ const bootstrap = async (): Promise<void> => {
 
   // API 前綴（Swagger UI 路由不受影響）
   app.setGlobalPrefix('api');
+
+  // 本機媒體檔（STORAGE_DRIVER=local）：static 服務上傳目錄，加 nosniff + 嚴格 CSP 防內容嗅探。
+  // /media 已在 app.module 的 ServeStaticModule exclude，避免被前端 SPA fallback 攔截。
+  if (env.STORAGE_DRIVER === 'local') {
+    app.use(
+      env.LOCAL_MEDIA_BASE_URL,
+      express.static(resolve(env.LOCAL_MEDIA_ROOT), {
+        index: false,
+        setHeaders: (res: Response) => {
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Content-Security-Policy', "default-src 'none'");
+        },
+      }),
+    );
+  }
 
   // 前後台各一份 swagger：後台 /api/admin/docs（餵 api-client codegen）、前台 /api/front/docs。
   // 兩份都用 serveFiles（而非共用的 swaggerUi.serve）各自綁定文件，

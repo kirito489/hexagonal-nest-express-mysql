@@ -19,7 +19,7 @@ import { RecaptchaModule } from './modules/recaptcha.module';
 import { SystemLogModule } from './modules/system-log.module';
 import { EmailModule } from './modules/email.module';
 import { FirebaseModule } from './modules/firebase.module';
-import { S3Module } from './modules/s3.module';
+import { StorageModule } from './modules/storage.module';
 import { MemberModule } from './modules/admin/member.module';
 import { AuthModule } from './modules/admin/auth.module';
 import { JwtModule } from './modules/jwt.module';
@@ -168,7 +168,7 @@ const resolveWebStaticRoot = (): string | null => {
     SystemLogModule,
     EmailModule,
     FirebaseModule,
-    S3Module,
+    StorageModule,
     RoleModule,
     MemberModule,
     AuthModule,
@@ -186,7 +186,15 @@ const resolveWebStaticRoot = (): string | null => {
     ServeStaticModule.forRootAsync({
       useFactory: () => {
         const rootPath = resolveWebStaticRoot();
-        return rootPath ? [{ rootPath, exclude: ['/api/{*path}'] }] : [];
+        if (!rootPath) return [];
+        // 排除 /api 與（local driver 時）媒體路徑，讓它們不被 SPA fallback 攔截
+        const env = getEnv();
+        const exclude = ['/api/{*path}'];
+        if (env.STORAGE_DRIVER === 'local') {
+          const base = env.LOCAL_MEDIA_BASE_URL.replace(/\/$/, '');
+          exclude.push(`${base}/{*path}`);
+        }
+        return [{ rootPath, exclude }];
       },
     }),
     // Sentry NestJS 整合（事件實際送出與否由 instrument.ts 的 enabled 控制）
