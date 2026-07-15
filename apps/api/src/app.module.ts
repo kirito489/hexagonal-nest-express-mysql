@@ -24,6 +24,7 @@ import { MemberModule } from './modules/admin/member.module';
 import { AuthModule } from './modules/admin/auth.module';
 import { JwtModule } from './modules/jwt.module';
 import { RoleModule } from './modules/admin/role.module';
+import { AttachmentModule } from './modules/admin/attachment.module';
 import { PingModule } from './modules/front/ping.module';
 import { GlobalExceptionFilter } from './adapter/in/web/filter/GlobalExceptionFilter';
 import { LoggingInterceptor } from './adapter/in/web/interceptor/LoggingInterceptor';
@@ -172,6 +173,7 @@ const resolveWebStaticRoot = (): string | null => {
     RoleModule,
     MemberModule,
     AuthModule,
+    AttachmentModule,
     // 前台（公開）模組：與後台平鋪 import，路由前綴 /api/front
     PingModule,
     // 全域 JwtAuthGuard（APP_GUARD）需在 AppModule 直接取得 JwtService
