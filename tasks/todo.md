@@ -38,6 +38,7 @@ _(目前無)_
 
 ### 2026-08-14
 
+- [x] **fix-gen-module-compliance** — 修復本輪護欄造成的回歸：`gen:module` 產出的模組原本 typecheck 失敗（字面值 code 不是 `ResponseCode`）+ 3 條架構規則紅 + 9 個 lint 錯誤。產生器改為引用 `ResponseCodes`、自動注入錯誤碼與訊息（冪等）、產出 swagger yaml 骨架並自動重跑 bundle / generate。**產出物零手改即通過 typecheck / lint / 20 條架構守則**（admin 與 front 兩側皆實測）。順帶修掉 `project.md` 模組範本中過時的「GlobalExceptionFilter 新增例外對應」。
 - [x] **enforce-quality-thresholds** — 讓四個覆蓋率門檻真的會失敗：web 新增 `test:cov`（原本連 script 都沒有）、api 的 `test:cov` 補上架構測試（否則 CI 換用後會靜默漏掉 20 條規則）、root 串接 `pnpm -r test:cov`、CI `quality-check` 改用它。另補前端分層邊界（eslint 兩條 + vitest 架構測試一條，因「routes 互不相依」靜態 glob 表達不了）。**稽核修正**：原判斷「前端護欄遠落後」不成立——實測前端覆蓋率 94%、分層 0 違規，檔案數比例會誤導（shadcn 元件與整合層不在分母內）。
 - [x] **add-ci-quality-gate** — CI 新增 `quality` stage：`quality-check`（typecheck + lint + 234 單元 + 20 架構守則）與 `e2e-test`（`mysql:9` service container 跑 138 支 e2e），**兩者於 MR 即觸發**（原本 MR 階段只跑 `pnpm install`），`prepare-production` 加 `needs: quality-check`。e2e 連線走 job variables 而非偽造 `.env`（已驗證 dotenv 不覆寫既有 `process.env`）。**注意：CI 正確性無法本機完全驗證**，首次 pipeline 需人工觀察（見待處理）。
 - [x] **清單稽核：兩條「安全強化」待辦其實早已完成** — 稽核時比對原始碼發現，`審查#7` 全域 JwtAuthGuard（預設拒絕）已實作於 `app.module.ts:215` 的 `APP_GUARD` + `public.decorator.ts` 白名單（health / auth 4 支 / front ping 共 5 處 `@Public()`）；`審查#10` refresh token 重用連坐撤銷已實作於 `RefreshTokenService.ts:66` 的重用偵測 → `revokeAllSessions()`，`schema.prisma:82` 有 `tokenVersion` 欄位且簽發 / 驗證均帶入比對。**兩者實作於先前 session 但未回頭更新本檔**，導致清單失真近一個月。教訓見 [lessons.md]。

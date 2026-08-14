@@ -611,25 +611,39 @@ const meta = buildPaginationMeta(page, limit, totalCount);
 
 ### 新增 Domain Module 範本
 
-以新增 `Order` 模組為例：
+**一律用產生器，不要手刻**：`pnpm --filter @app/api gen:module <name> [--admin|--front]`
+
+產生器**自動**完成（以 `order` 為例）：
 
 ```
-1.  apps/api/prisma/schema.prisma                                        # 加 OrderRecord model → db:migrate
-2.  apps/api/src/domain/model/Order.ts                                   # 領域實體
-3.  apps/api/src/domain/exception/OrderNotFoundException.ts              # 領域例外
-4.  apps/api/src/application/port/in/order/CreateOrderUseCase.ts         # Inbound Port
-5.  apps/api/src/application/port/out/order/SaveOrderPort.ts             # Outbound Port
-6.  apps/api/src/application/service/order/CreateOrderService.ts         # Use Case 實作
-7.  apps/api/src/application/facade/OrderFacade.ts                       # Facade
-8.  apps/api/src/adapter/out/persistence/order/PrismaOrderRepository.ts
-9.  apps/api/src/adapter/in/web/order/CreateOrderRequest.ts              # Zod schema + DTO
-10. apps/api/src/adapter/in/web/order/OrderController.ts
-11. apps/api/src/modules/order.module.ts                                 # DI 接線（含 JwtModule import）
-12. apps/api/src/app.module.ts                                           # 引入 OrderModule
-13. apps/api/src/adapter/in/web/filter/GlobalExceptionFilter.ts          # 新增例外對應
-14. apps/api/docs/swagger/orders/create-order.yaml                       # Swagger 文件（inline shape，不用 SuccessResponse $ref）
-15. apps/api/test/order.e2e-spec.ts                                      # E2E 測試
+domain/exception/OrderNotFoundException.ts          # 引用 ResponseCodes，靜態訊息只傳 (code, kind)
+application/port/{in,out}/…/                        # Inbound / Outbound Port
+application/service/<side>/order/                   # Use Case 實作 + spec
+application/facade/<side>/OrderFacade.ts
+adapter/out/persistence/order/PrismaOrderRepository.ts
+adapter/in/web/<side>/order/{OrderController,…Request}.ts
+modules/<side>/order.module.ts
+app.module.ts                                       # 自動註冊 OrderModule
+shared/constants/response-codes.ts                  # 自動注入 ORDER_NOT_FOUND
+shared/constants/response-messages.ts               # 自動注入對應訊息（型別要求兩者成對）
+docs/swagger/<side>/orders/*.yaml                   # 5 支 endpoint 的 yaml 骨架
+docs/swagger/<side>/openapi.yaml                    # 自動註冊 paths
+→ 自動重跑 swagger:bundle 與 api-client generate
 ```
+
+**產出物零手改即通過 `typecheck` / `lint` / 20 條架構守則**（唯一例外是 Prisma model 尚未建立造成的型別錯誤）。
+
+你要手動完成的：
+
+```
+1. prisma/schema.prisma          # 加 OrderRecord model → db:migrate
+2. 依實際欄位調整 DTO / port / service / Prisma repo
+3. 同步 docs/swagger/<side>/orders/ 的 yaml 骨架（欄位、描述）
+4. 視需要在 Controller 掛權限 guard（見 RoleController）
+5. test/order.e2e-spec.ts        # E2E 測試（用 test/helpers/assertions.ts 的共用斷言）
+```
+
+> **`GlobalExceptionFilter` 不需要修改** —— domain exception 的 `kind` 會自動映射 HTTP status。
 
 > 若 Controller 使用 `JwtAuthGuard`，記得在對應 Module 的 `imports` 加入 `JwtModule`。
 >

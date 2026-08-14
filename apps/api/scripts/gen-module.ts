@@ -10,9 +10,13 @@
  *
  * 產出一個最小 CRUD 六角模組（port in/out、service+spec、facade、controller+DTO、
  * Prisma repo、DomainException 子類、module）並自動註冊到 `app.module.ts`。
+ * 同時注入 `response-codes.ts` / `response-messages.ts`（型別要求兩者成對存在）、
+ * 產出 swagger yaml 骨架並註冊進 `openapi.yaml`,最後重跑 bundle 與 api-client generate——
+ * 目的是讓產出物**零手改即通過 typecheck / lint / 架構守則**（見 test/architecture/）。
  * 例外靠 DomainException 的 kind 自動映射 HTTP status，不需再接 `GlobalExceptionFilter`。
  * 欄位僅含佔位的 `name`/`status`，Prisma model 不由本工具建立（見結尾的手動步驟）。
  */
+import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 
@@ -809,10 +813,11 @@ export class Prisma%Name%Repository implements %Name%RepositoryPort {
 `,
 
   'domain/exception/%Name%NotFoundException.ts': `import { DomainException } from './DomainException';
+import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class %Name%NotFoundException extends DomainException {
   constructor() {
-    super('%NAME%_NOT_FOUND', 'NOT_FOUND', '%Name% 不存在');
+    super(ResponseCodes.%NAME%_NOT_FOUND, 'NOT_FOUND');
   }
 }
 `,
@@ -850,7 +855,178 @@ export class %Name%Module {}
 `,
 };
 
+/**
+ * swagger yaml 骨架（路徑相對 `docs/swagger/<side>/`）。
+ *
+ * 沿用專案慣例：成功回應一律 inline 寫出 `{ success, data, timestamp }`，
+ * 不用 `$ref: SuccessResponse`——後者的 data 是 generic object，
+ * openapi-typescript 會推導成 `Record<string, unknown> | null`，前端型別失去意義。
+ */
+const SWAGGER_TEMPLATES: Record<string, string> = {
+  '%names%/list.yaml': `tags: [%Names%]
+summary: %Name% 列表
+description: |
+  分頁取得 %Name% 列表。骨架由 gen:module 產生，請依實際欄位調整。
+security:
+  - bearerAuth: []
+parameters:
+  - in: query
+    name: page
+    required: false
+    schema: { type: integer, minimum: 1, default: 1 }
+    description: 頁碼
+  - in: query
+    name: limit
+    required: false
+    schema: { type: integer, minimum: 1, maximum: 200 }
+    description: 每頁筆數（未指定用 env DEFAULT_PAGE_LIMIT）
+responses:
+  '200':
+    description: 查詢成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  description: %Name% 清單
+                  items:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid, description: ID }
+                      name: { type: string, description: 名稱 }
+                      status: { type: boolean, description: 是否啟用 }
+                meta:
+                  type: object
+                  properties:
+                    total: { type: integer, description: 總筆數 }
+                    page: { type: integer, description: 目前頁碼 }
+                    limit: { type: integer, description: 每頁筆數 }
+            timestamp: { type: string, format: date-time }
+`,
+  '%names%/get.yaml': `tags: [%Names%]
+summary: %Name% 明細
+security:
+  - bearerAuth: []
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: %Name% ID
+responses:
+  '200':
+    description: 查詢成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data:
+              type: object
+              properties:
+                id: { type: string, format: uuid, description: ID }
+                name: { type: string, description: 名稱 }
+                status: { type: boolean, description: 是否啟用 }
+            timestamp: { type: string, format: date-time }
+`,
+  '%names%/create.yaml': `tags: [%Names%]
+summary: 建立 %Name%
+security:
+  - bearerAuth: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [name]
+        properties:
+          name: { type: string, description: 名稱 }
+          status: { type: boolean, description: 是否啟用, default: true }
+responses:
+  '201':
+    description: 建立成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data:
+              type: object
+              properties:
+                id: { type: string, format: uuid, description: ID }
+            timestamp: { type: string, format: date-time }
+`,
+  '%names%/update.yaml': `tags: [%Names%]
+summary: 更新 %Name%
+security:
+  - bearerAuth: []
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: %Name% ID
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          name: { type: string, description: 名稱 }
+          status: { type: boolean, description: 是否啟用 }
+responses:
+  '200':
+    description: 更新成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data: { type: object, nullable: true }
+            timestamp: { type: string, format: date-time }
+`,
+  '%names%/delete.yaml': `tags: [%Names%]
+summary: 刪除 %Name%
+security:
+  - bearerAuth: []
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: %Name% ID
+responses:
+  '200':
+    description: 刪除成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data: { type: object, nullable: true }
+            timestamp: { type: string, format: date-time }
+`,
+};
+
 const API_SRC = resolve(__dirname, '..', 'src');
+const API_DOCS = resolve(__dirname, '..', 'docs', 'swagger');
 
 /** 把新 module 註冊進 app.module.ts（冪等；找不到錨點則警告降級） */
 const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
@@ -887,6 +1063,111 @@ const patchAppModule = (n: Names, side: string, moduleClass: string): void => {
   console.log(`AppModule 註冊 ${moduleClass}`);
 };
 
+/**
+ * 把錯誤碼注入 response-codes.ts（冪等）。
+ *
+ * 必須與 patchResponseMessages 成對執行：response-messages.ts 以
+ * `satisfies Record<ResponseCode, …>` 約束，只加 code 不加訊息會讓 typecheck 失敗。
+ */
+const patchResponseCodes = (n: Names): void => {
+  const path = join(API_SRC, 'shared', 'constants', 'response-codes.ts');
+  const key = `${n.NAME}_NOT_FOUND`;
+  let content = readFileSync(path, 'utf8');
+  if (content.includes(`${key}:`)) {
+    console.log(`skip ResponseCodes（已含 ${key}）`);
+    return;
+  }
+  // 錨點取物件的最後一個項目（INTERNAL_SERVER_ERROR），插在它之前以維持既有分組
+  const anchor = /^([ \t]*)INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',$/m;
+  if (!anchor.test(content)) {
+    console.warn(`找不到 ResponseCodes 錨點，請手動加入 ${key}`);
+    return;
+  }
+  content = content.replace(
+    anchor,
+    `$1${key}: '${key}',\n$1INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',`,
+  );
+  writeFileSync(path, content);
+  console.log(`ResponseCodes 注入 ${key}`);
+};
+
+/** 把對應訊息注入 response-messages.ts（冪等；與 patchResponseCodes 成對） */
+const patchResponseMessages = (n: Names): void => {
+  const path = join(API_SRC, 'shared', 'constants', 'response-messages.ts');
+  const key = `${n.NAME}_NOT_FOUND`;
+  let content = readFileSync(path, 'utf8');
+  if (content.includes(`${key}:`)) {
+    console.log(`skip ResponseMessages（已含 ${key}）`);
+    return;
+  }
+  const anchor = /^([ \t]*)(\/\/ 系統：刻意維持通用英文訊息.*)$/m;
+  if (!anchor.test(content)) {
+    console.warn(`找不到 ResponseMessages 錨點，請手動加入 ${key}`);
+    return;
+  }
+  content = content.replace(
+    anchor,
+    `$1// ${n.Name}\n$1${key}: '${n.Name} 不存在',\n\n$1$2`,
+  );
+  writeFileSync(path, content);
+  console.log(`ResponseMessages 注入 ${key}`);
+};
+
+/** 產生 swagger yaml 骨架並註冊進 openapi.yaml 的 paths（冪等） */
+const writeSwagger = (n: Names, side: string, force: boolean): void => {
+  for (const [tplPath, tplContent] of Object.entries(SWAGGER_TEMPLATES)) {
+    const outPath = join(API_DOCS, side, render(tplPath, n));
+    if (existsSync(outPath) && !force) continue;
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, render(tplContent, n));
+  }
+
+  const indexPath = join(API_DOCS, side, 'openapi.yaml');
+  let content = readFileSync(indexPath, 'utf8');
+  if (content.includes(`  /${n.names}:`)) {
+    console.log(`skip openapi.yaml（已含 /${n.names}）`);
+    return;
+  }
+  if (!/^paths:$/m.test(content)) {
+    console.warn('找不到 openapi.yaml 的 paths 錨點，請手動註冊路由');
+    return;
+  }
+  // 路由順序對齊 controller：list / create 在集合路徑，get / update / delete 在 {id}
+  const block =
+    `\n  /${n.names}:\n` +
+    `    get:\n      $ref: './${n.names}/list.yaml'\n` +
+    `    post:\n      $ref: './${n.names}/create.yaml'\n` +
+    `\n  /${n.names}/{id}:\n` +
+    `    get:\n      $ref: './${n.names}/get.yaml'\n` +
+    `    patch:\n      $ref: './${n.names}/update.yaml'\n` +
+    `    delete:\n      $ref: './${n.names}/delete.yaml'\n`;
+  content = content.replace(/^paths:$/m, `paths:${block}`);
+  writeFileSync(indexPath, content);
+  console.log(`openapi.yaml 註冊 /${n.names}`);
+};
+
+/** 重新產生 swagger bundle 與 api-client 型別（失敗僅警告，檔案已寫出） */
+const syncSwaggerArtifacts = (side: string): void => {
+  const run = (label: string, command: string, cwd: string): void => {
+    try {
+      execSync(command, { cwd, stdio: 'pipe' });
+      console.log(`${label} 完成`);
+    } catch {
+      console.warn(`${label} 失敗，請手動執行：${command}`);
+    }
+  };
+  const apiRoot = resolve(__dirname, '..');
+  run('swagger:bundle', 'pnpm swagger:bundle', apiRoot);
+  // api-client 目前只生成 admin 側型別
+  if (side === 'admin') {
+    run(
+      'api-client generate',
+      'pnpm --filter @app/api-client generate',
+      resolve(apiRoot, '..', '..'),
+    );
+  }
+};
+
 const main = (): void => {
   const args = process.argv.slice(2);
   const rawName = args.find((a) => !a.startsWith('--'));
@@ -920,6 +1201,10 @@ const main = (): void => {
   }
   console.log(`\n產生 ${written} 檔（略過 ${skipped}）｜側別：${side}`);
   patchAppModule(n, side, moduleClass);
+  patchResponseCodes(n);
+  patchResponseMessages(n);
+  writeSwagger(n, side, force);
+  syncSwaggerArtifacts(side);
   const guardStep =
     side === 'front'
       ? '前台通常公開唯讀：視需要移除 write 端點；若需認證再掛 guard'
@@ -928,7 +1213,7 @@ const main = (): void => {
     `\n${moduleClass} 完成（路由 /api/${side}/${n.names}）。後續手動步驟:\n` +
       `  1. prisma/schema.prisma 新增 model ${n.Name}Record（id / name / status / createdAt / updatedAt / deletedAt 可空）\n` +
       `  2. pnpm --filter @app/api db:migrate（建表 + 重生 client 型別）\n` +
-      `  3. 依實際欄位調整 DTO / port / service / Prisma repo\n` +
+      `  3. 依實際欄位調整 DTO / port / service / Prisma repo,並同步 docs/swagger/${side}/${n.names}/ 的 yaml 骨架\n` +
       `  4. ${guardStep}\n` +
       `  5. pnpm --filter @app/api typecheck && pnpm --filter @app/api test`,
   );
