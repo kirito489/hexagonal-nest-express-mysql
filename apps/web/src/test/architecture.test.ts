@@ -1,3 +1,12 @@
+/**
+ * 前端架構守則測試。
+ *
+ * **為何放在 `src/` 而非與 api 對稱的 `apps/web/test/`**：`tsconfig.app.json` 的 include
+ * 只有 `src`、`tsconfig.node.json` 只有 `vite.config.ts`——放到 `test/` 會落在所有 tsconfig
+ * 之外，`pnpm typecheck` 掃不到，而 vitest 用 esbuild 轉譯**不做型別檢查**，型別錯誤會靜默通過。
+ * 本檔第一版就因為誤用 node 的 fs / __dirname 被 typecheck 攔下——正是因為它在 `src` 內。
+ * 要搬到 `test/` 得另加 `tsconfig.test.json` 並掛進 references，為了目錄對稱動型別環境不划算。
+ */
 import { describe, it, expect } from 'vitest';
 
 /** 取出 import / export ... from '路徑' 的模組路徑 */

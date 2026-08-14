@@ -78,6 +78,14 @@ export default defineConfig([
       '@typescript-eslint/unbound-method': 'off',
     },
   },
+  // .js 設定檔(jest.arch.config.js / jest.e2e.config.js):納入 lint 只為了擋語法錯誤——
+  // 這類檔案沒有型別資訊(parserOptions.projectService 只設給 **/*.ts),
+  // 不關掉 type-aware 規則會直接 crash。
+  {
+    files: ['**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: { ...globals.node } },
+  },
   // 分層邊界:import 違規在 lint 期即攔截(跨檔語意規則由 test/architecture 的架構測試負責)
   // 用 @typescript-eslint 版而非 base 版,才會一併涵蓋 import type
   //

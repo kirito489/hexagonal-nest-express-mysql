@@ -31,8 +31,10 @@ At the start of every new session:
 > Scannable red-line list; complements the Critical Rules above.
 
 - 🚫 **Never let a controller touch Prisma / a repository directly** — always go through `Facade → UseCase / Service → Port` (hexagonal layering).
-- 🚫 **Never hand-scaffold a feature module or misplace the front/back split** — the codebase has two API sides: 後台 `admin/` (`/api/admin/*`) and 前台 `front/` (`/api/front/*`). The **in-side 5 layers** (controller / facade / service / port-in / module) live under `<side>/`; **out-side** (persistence / port-out), **domain**, and cross-cutting (guard / filter / interceptor / decorator) are **shared — never under a side**. Scaffold new modules with `pnpm --filter @app/api gen:module <name> [--admin|--front]` (defaults to admin); front module classes get a `Front` prefix. Swagger/api-client is admin-only (`/api/admin/docs`); front has its own doc (`/api/front/docs`), see `openspec/project.md`.
-- 🚫 **Never `throw new Error('...')`** — use a domain exception (a subclass of `DomainException` passing a `ResponseCodes` code + a semantic `kind`) or a NestJS `HttpException`. The filter maps `kind → HTTP status` automatically, so you do **not** touch `GlobalExceptionFilter` when adding an exception; just add the code to `shared/constants/response-codes.ts`.
+- 🚫 **Never hand-scaffold a feature module or misplace the front/back split** — the codebase has two API sides: 後台 `admin/` (`/api/admin/*`) and 前台 `front/` (`/api/front/*`). The **in-side 5 layers** (controller / facade / service / port-in / module) live under `<side>/`; **out-side** (persistence / port-out), **domain**, and cross-cutting (guard / filter / interceptor / decorator) are **shared — never under a side**. Scaffold new modules with `pnpm --filter @app/api gen:module <name> [--admin|--front]` (defaults to admin); front module classes get a `Front` prefix. The generator also injects the error code + message, writes swagger yaml stubs, registers them in `openapi.yaml`, and re-runs bundle/generate — **its output passes typecheck / lint / all guardrails with zero hand edits**. If you ever change a domain base class, shared constant, or layering rule, re-run the generator on a throwaway name and verify it still comes out green. Swagger/api-client is admin-only (`/api/admin/docs`); front has its own doc (`/api/front/docs`), see `openspec/project.md`.
+- 🚫 **Never `throw new Error('...')`** — use a domain exception (a subclass of `DomainException` passing a `ResponseCodes` code + a semantic `kind`) or a NestJS `HttpException`. The filter maps `kind → HTTP status` automatically, so you do **not** touch `GlobalExceptionFilter` when adding an exception. Adding a code means editing **two** files: `shared/constants/response-codes.ts` and `shared/constants/response-messages.ts` — the message table is `satisfies Record<ResponseCode, …>`, so a missing message fails typecheck immediately.
+- 🚫 **Never inline a user-facing message inside an exception** — messages live only in `response-messages.ts`. Static messages take `super(code, kind)` (two args, the base looks it up); parameterised ones take `super(code, kind, ResponseMessages.X(arg))`. A constructor overload makes the parameterised case a **compile error** if you forget the message, and an architecture test rejects Chinese string literals under `domain/exception/`.
+- 🚫 **Never validate domain input with `of()` on a DB-restore path** — value objects have two entry points: `of()` validates and throws `INVALID` (→ 400) for user input; `trusted()` skips validation for `reconstitute()`. Re-validating on restore reports data corruption as a client input error.
 - 🚫 **Never hand-write a DTO class** — request / response types are always inferred from a Zod schema via `z.infer`, validated with `ZodValidationPipe`.
 - 🚫 **Never set `"type": "module"` on the root or `apps/api` `package.json`** — stay on the NestJS CommonJS baseline; switching to ESM cascades into breaking nest CLI / ts-jest / decorator metadata (`apps/web` is the exception — it's Vite ESM by design).
 - 🚫 **Never skip env validation** — any new env var must be added to the `envSchema` in `apps/api/src/infrastructure/validate-env.ts` (production-mandatory ones also into `productionErrors`), or it fails silently as `undefined` at runtime.
@@ -153,7 +155,7 @@ After making changes, before suggesting a commit:
 
 1. `pnpm typecheck` — fix all type errors across the three workspaces. If api typecheck reports "Property X does not exist on PrismaService", run `pnpm --filter @app/api db:generate` first.
 2. `pnpm lint` — fix all lint warnings / errors.
-3. `pnpm test` — ensure no regressions. If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked).
+3. `pnpm test` — unit tests **plus the architecture guardrails** (7 rule files / 20 assertions) (the `test` script chains both). If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked). Before suggesting a commit, prefer `pnpm test:cov` — that is what CI runs, and it additionally enforces the coverage thresholds (api 70/60/70/70, web 75/75/60/75).
 4. `pnpm build` — run when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
 5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` + `pnpm --filter @app/api-client generate` to keep frontend types in sync. Verify with `pnpm --filter @app/api swagger:check` — it regenerates into a temp dir and diffs, so it never touches the working tree. (Route-level drift is already caught by `pnpm test`; `swagger:check` covers content-level drift where the path set is unchanged.)
 
@@ -168,7 +170,8 @@ Package manager: **pnpm 11+**. Run from repo root.
 ```bash
 pnpm install                                  # install all workspace deps
 pnpm dev                                      # start apps/api + apps/web in parallel (user runs this; don't run it yourself)
-pnpm typecheck && pnpm lint && pnpm test      # the pre-commit triad
+pnpm typecheck && pnpm lint && pnpm test:cov  # the pre-commit chain (test:cov = tests + coverage thresholds + guardrails; CI runs this)
+pnpm --filter @app/api test:arch              # guardrails only — 7 rule files, 20 assertions, ~0.2s, no DB
 pnpm --filter @app/api db:generate            # run after every pnpm install, before typecheck
 pnpm --filter @app/api swagger:bundle && pnpm --filter @app/api-client generate   # after Swagger changes
 ```
@@ -183,7 +186,9 @@ See **`openspec/project.md`** for:
 
 - Backend hexagonal layout (`adapter` / `application` / `domain` / `infrastructure`), module naming, and the `gen:module` generator.
 - Frontend directory layout, path aliases, shadcn integration, form / API conventions.
-- Swagger yaml inline-data convention (never `$ref: SuccessResponse`).
+- Swagger yaml inline-data convention (never `$ref: SuccessResponse`), plus the three-hop contract sync guardrail (controller → source yaml → bundle → api-client).
+- Architecture guardrail tests: where they live, how to add a rule, the exemption list, and the eslint-vs-test split.
+- CI job responsibilities and the local command each one maps to.
 - Auth flow, token storage, CORS, environment variables, time-handling convention, naming conventions.
 - API client design (source-first, auto-unwrap of `{ success, data, timestamp }`).
 

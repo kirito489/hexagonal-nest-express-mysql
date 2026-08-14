@@ -14,6 +14,12 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 ## 工作流程 / 文件維護
 
+- **JSDoc / block comment 裡不要寫含 `*/` 的 glob（如 `test/**/*`）**：`*/` 會提前終止註解，整個檔案語法爆掉。這個坑在 `.js` 設定檔特別致命——`jest.arch.config.js` 壞掉後 `typecheck` 與 `lint` 都是綠的（前者不掃 .js、後者當時的 glob 只有 `.ts`），只有實際跑 `test:arch` 才會炸。作法：註解裡改寫成「整個 `test/` 目錄」這類自然語言；並確保 **`.js` 設定檔也在 lint 範圍內**（`eslint "{src,scripts,seeds,test}/**/*.{ts,js}"`），eslint 的 parsing error 能擋下這類語法問題。注意 `.js` 沒有型別資訊，config 需對 `**/*.js` 套 `tseslint.configs.disableTypeChecked`，否則 type-aware 規則會直接 crash。
+
+- **用 `cp` 還原探針檔案不可靠**：多數環境把 `cp` alias 成 `cp -i`，覆寫既有檔時會跳互動提示，在非互動的自動化流程中會靜默變成「not overwritten」——探針就留在原地了。作法：還原一律用 python 的字串替換或 `git checkout --`，並在還原後**實際驗證**（跑一次該檔的載入或測試），不要假設還原成功。
+
+- **文件裡的路徑與指令可以（也應該）用機器驗證，別靠肉眼複查**：2026-08-14 更新三份文件時，用兩個小腳本抓出 4 處過時——README 的 Swagger 網址還停在前後台分層前的 `/api/docs`（實際已是 `/api/admin/docs`）、`project.md` 兩處 swagger 範例路徑少了 `admin/` 層、以及「新增 exception 只需加 code」漏了訊息表。作法：改完文件跑兩個檢查——(1) 用 regex 抓出文件中所有 `` `apps/**` `` 路徑，逐一 `exists()`；(2) 抓出提到的 `pnpm` script 名，逐一比對 `package.json` 是否存在。執行期產生的檔案（`logs/*.log`）與使用者自建的 `.env` 會是預期的例外。大型重構（改目錄結構、拆分模組、改 script 名）後一定要跑一次。
+
 - **新增護欄後必須回頭檢查「誰會產出程式碼」——產生器、腳本、模板是最容易被遺漏的受害者**：本輪加完架構守則與 `DomainException` 建構子重載後，`gen:module` 產出的模組立刻 typecheck 失敗（`super('X_NOT_FOUND', …)` 不是 `ResponseCode`）、3 條架構規則變紅、9 個 lint 錯誤——**模板最常被使用的入口壞了整整一輪都沒發現**，因為架構測試只掃既有原始碼，掃不到「還沒被產生出來的程式碼」。作法：任何改動 domain 基底、共用常數、分層規則後，實跑一次 `pnpm --filter @app/api gen:module <probe>` → 驗證 typecheck / lint / 架構守則全綠 → 清除探針；產生器若需維護共用檔（錯誤碼、訊息表、swagger 索引），注入一律做成冪等並在找不到錨點時警告降級。這與下一則是同一問題的兩面：一個是「規則沒有執行路徑」，一個是「規則沒有涵蓋產出路徑」。
 
 - **正規表示式的 `\s` 包含換行，在多行模式下會讓 `^(\s*)` 夾帶換行**：`/^(\s*)ANCHOR$/m` 的 `^` 可能匹配到前一個空行的行首，`\s*` 再跨行吃掉換行，於是 `$1` 變成「換行 + 縮排」，用它組回去就會多出空行。作法：只想抓「行首縮排」時一律用 `[ \t]*` 而非 `\s*`；注入類的字串處理寫完務必實跑一次並逐行檢視產出（`print(f'{i:3} |{line}|')` 這種帶邊界符的輸出最容易看出多餘空行）。

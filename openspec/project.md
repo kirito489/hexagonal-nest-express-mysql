@@ -107,7 +107,7 @@ apps/api/src/
 ├── domain/
 │   ├── model/         # 領域實體（private constructor + static factory）（共用）
 │   ├── value-object/  # 值物件（共用）
-│   └── exception/     # 領域例外（plain Error 子類）（共用）
+│   └── exception/     # 領域例外（DomainException 子類，訊息取自 response-messages）（共用）
 ├── infrastructure/    # PrismaModule / PrismaService、Redis、ZodValidationPipe、Logger
 └── modules/{admin,front}/   # NestJS DI 接線（中性 infra module 留在 modules/ 根）
 ```
@@ -120,7 +120,7 @@ apps/api/src/
 
 - **Module naming（依 `<side>` = `admin` / `front` 分層）**：in 側依側別分目錄——Controller + DTO → `adapter/in/web/<side>/<module>/`；service → `application/service/<side>/<module>/`（跨前後台共用 service 放 `application/service/shared/`）；facade → `application/facade/<side>/`；port-in → `application/port/in/<side>/<module>/`；module → `modules/<side>/<module>.module.ts`。**共用層不分前後台**：Prisma repository → `adapter/out/persistence/<module>/`、port-out → `application/port/out/<module>/`、domain → `domain/`；Guard / Filter / Decorator / Interceptor 放各自頂層目錄。
 - **Facade**：每個 domain area 對外只暴露 `*Facade`（如 `AuthFacade`、`MemberFacade`），Controller 透過 facade 操作，不直接打 service。
-- **Domain exception → HTTP**：domain exception 一律 `extends DomainException`（建構子傳 `ResponseCodes` 的 code + 語意 `kind`）；`GlobalExceptionFilter` 以一張 `kind → HttpStatus` 表自動映射，**新增 exception 不用改 filter**，只需把 code 加進 `src/shared/constants/response-codes.ts`。kind 可選 `NOT_FOUND / UNAUTHORIZED / FORBIDDEN / INVALID / CONFLICT / LOCKED / INTERNAL`。
+- **Domain exception → HTTP**：domain exception 一律 `extends DomainException`（建構子傳 `ResponseCodes` 的 code + 語意 `kind`）；`GlobalExceptionFilter` 以一張 `kind → HttpStatus` 表自動映射，**新增 exception 不用改 filter**；但要動**兩個**檔案——`response-codes.ts` 加 code、`response-messages.ts` 加訊息（訊息表以 `satisfies Record<ResponseCode, …>` 約束，少一條就 typecheck 失敗）。訊息不需參數時 exception 只寫 `super(code, kind)`，基底自表中取。kind 可選 `NOT_FOUND / UNAUTHORIZED / FORBIDDEN / INVALID / CONFLICT / LOCKED / INTERNAL`。
 - **Guard 順序**：`app.module.ts` 內 `APP_GUARD` 的宣告順序 = 執行順序：ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard → JwtAuthGuard → PermissionsGuard。
 - **Controller 回傳**：原始值即可，`TransformInterceptor` 會包成 `{ success, data, timestamp }`；**不要**自行包 `{ data }`，否則前端要挖兩層。
 - **時區 / 日期**：見下方「時間處理慣例」。
@@ -153,7 +153,7 @@ apps/api/src/
 ### Swagger yaml 慣例
 
 - **分檔 + `$ref`**：`docs/swagger/openapi.yaml` 只放 `components` / `servers` / `info` 與 `paths` 索引；每個 endpoint 一個獨立 yaml。
-- **成功回應自己 inline 寫**：**不要** `$ref: SuccessResponse`。每個 endpoint 在 200 / 201 直接 inline 寫整個 `{ success, data: <具體 shape>, timestamp }`。原因：`SuccessResponse.data` 是 generic `type: object`，前端 `openapi-typescript` 推導出來只會是 `Record<string, unknown> | null`，型別失去意義。範例見 `apps/api/docs/swagger/auth/login.yaml`、`profile/get-me.yaml`。
+- **成功回應自己 inline 寫**：**不要** `$ref: SuccessResponse`。每個 endpoint 在 200 / 201 直接 inline 寫整個 `{ success, data: <具體 shape>, timestamp }`。原因：`SuccessResponse.data` 是 generic `type: object`，前端 `openapi-typescript` 推導出來只會是 `Record<string, unknown> | null`，型別失去意義。範例見 `apps/api/docs/swagger/admin/auth/login.yaml`、`admin/profile/get-me.yaml`。
 - **新增 endpoint 後**：執行 `pnpm --filter @app/api swagger:bundle` 重新打包 bundle；前端執行 `pnpm --filter @app/api-client generate` 同步型別。
 
 #### 契約同步護欄
@@ -217,7 +217,7 @@ apps/web/src/
 - **Source-first 設計**：`package.json` 的 `exports.types` / `exports.default` 直接指 `src/index.ts`。Vite / tsc 直接吃 TS，**無 dist build**。
 - **產生流程**：
   1. 後端改 controller / Swagger yaml。
-  2. `pnpm --filter @app/api swagger:bundle` 重新打包 `apps/api/docs/swagger/openapi.bundle.yaml`。
+  2. `pnpm --filter @app/api swagger:bundle` 重新打包兩份 bundle（`docs/swagger/admin/openapi.bundle.yaml` 與 `docs/swagger/front/openapi.bundle.yaml`）。
   3. `pnpm --filter @app/api-client generate` 讀 bundle 產生 `src/schema.ts`。
 - `schema.ts` **進 git**：API 變動會在 PR diff 中可見，CI 可比對是否與 bundle 同步。
 - **自動 unwrap**：`createApiQueryHooks` 內部會剝開後端的 `{ success, data, timestamp }` 外殼，page 元件直接拿 `data`。
@@ -631,7 +631,7 @@ docs/swagger/<side>/openapi.yaml                    # 自動註冊 paths
 → 自動重跑 swagger:bundle 與 api-client generate
 ```
 
-**產出物零手改即通過 `typecheck` / `lint` / 20 條架構守則**（唯一例外是 Prisma model 尚未建立造成的型別錯誤）。
+**產出物零手改即通過 `typecheck` / `lint` / 全部架構守則**（唯一例外是 Prisma model 尚未建立造成的型別錯誤）。
 
 你要手動完成的：
 
@@ -689,7 +689,7 @@ docs/swagger/<side>/openapi.yaml                    # 自動註冊 paths
 - `DB_TEST_DATABASE` 必須含 `test`，否則 e2e 的 globalSetup 守門會中止（防誤連 dev / prod）。
 - `git commit --no-verify` 可繞過 husky pre-commit，但繞不過 CI —— 這是把關的最後一道。
 - **覆蓋率門檻只有 `test:cov` 會執行**（`test` 不帶 coverage，供開發時快速回饋）。兩個 workspace 都設有門檻：api 70/60/70/70、web 75/75/60/75；新增設有門檻的 workspace 時**必須提供 `test:cov`**，否則會被 `pnpm -r test:cov` 靜默略過。
-- `apps/api` 的 `test:cov` 刻意串接架構測試（`jest --coverage && jest --config test/jest.arch.config.js`）—— 只寫 `jest --coverage` 會讓 CI 換用 `test:cov` 後靜默漏掉 20 條架構規則。
+- `apps/api` 的 `test:cov` 刻意串接架構測試（`jest --coverage && jest --config test/jest.arch.config.js`）—— 只寫 `jest --coverage` 會讓 CI 換用 `test:cov` 後靜默漏掉整組架構守則。
 
 > **不使用 GitLab CI 的專案**：上表「對應本機指令」欄即為等價檢查，請在自己的 CI 平台上照樣執行；否則所有架構守則與測試都只在開發者本機生效。
 
