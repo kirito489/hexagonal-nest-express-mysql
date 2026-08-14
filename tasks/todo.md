@@ -6,7 +6,7 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 
 ## 進行中
 
-- [ ] **refactor-response-message-catalog** — 錯誤碼與訊息分離（`response-messages.ts`，完整性由 `satisfies Record<ResponseCode, …>` 型別保證）、修掉 domain 層 4 處 `throw new Error`（改 400）、新增 `of()` / `trusted()` 兩條 value object 路徑。**三塊實作完成、驗證鏈全綠，待封存（`/opsx:archive`）**。
+_(目前無)_
 
 ## 待處理
 
@@ -36,6 +36,11 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 ---
 
 ## 完成項目
+
+### 2026-08-14
+
+- [x] **add-engineering-guardrails** — 把 CLAUDE.md 的 Hard Rules 變成會失敗的檢查。借鏡 `cga-laravel-backend` 的 `tests/Architecture/` 與 `tests/Feature/Api/Traits/`。產出：`test/architecture/` 6 條規則（各自帶「掃描數 > 0」自我檢查 + 豁免過期檢查）、eslint `no-restricted-imports` 分層邊界、`test/helpers/assertions.ts`（e2e 共用斷言 + `describeUnauthorized` 產生器）。導入過程抓出四個真問題：domain 層 4 處 `throw new Error` 讓無效輸入回 500、`ALLOW_PROD_SEED` 未進 envSchema、e2e 有 29 個錯誤碼從未被斷言、eslint 邊界規則因 flat config「後蓋前」而有一半失效。e2e 121 → 138。
+- [x] **refactor-response-message-catalog** — 錯誤訊息集中到 `response-messages.ts`（24 條），完整性由 `satisfies Record<ResponseCode, …>` 型別保證（新增 code 不補訊息 → typecheck 失敗）；`DomainException` 建構子重載讓靜態訊息自動查表、動態訊息型別強制傳入。domain 驗證失敗由 500 改為 400，並新增 `of()` / `trusted()` 雙路徑（`reconstitute` 走 trusted，避免 DB 資料損毀誤報成客戶端錯誤）。23 個 exception 訊息逐字未變（機器比對確認）。單元測試 222 → 234，架構規則 13 → 15。
 
 ### 2026-07-14
 
