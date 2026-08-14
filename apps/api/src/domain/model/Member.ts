@@ -1,5 +1,6 @@
 import { Email } from '../value-object/Email';
 import { MemberId } from '../value-object/MemberId';
+import { InvalidMemberNameException } from '../exception/InvalidMemberNameException';
 
 export class Member {
   private constructor(
@@ -23,7 +24,7 @@ export class Member {
     status = true,
   ): Member {
     if (!member || member.trim().length === 0) {
-      throw new Error('名稱不可為空');
+      throw new InvalidMemberNameException();
     }
     return new Member(
       MemberId.generate(),
@@ -50,8 +51,8 @@ export class Member {
     tokenVersion = 0,
   ): Member {
     return new Member(
-      MemberId.of(id),
-      Email.of(email),
+      MemberId.trusted(id),
+      Email.trusted(email),
       member,
       password,
       roleId,
@@ -65,7 +66,7 @@ export class Member {
 
   updateProfile(member: string, roleId: string): void {
     if (!member || member.trim().length === 0) {
-      throw new Error('名稱不可為空');
+      throw new InvalidMemberNameException();
     }
     this._member = member.trim();
     this._roleId = roleId;

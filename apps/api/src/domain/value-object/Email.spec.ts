@@ -1,4 +1,5 @@
 import { Email } from './Email';
+import { InvalidEmailException } from '../exception/InvalidEmailException';
 
 describe('Email', () => {
   it('有效 email → 建立成功', () => {
@@ -9,13 +10,25 @@ describe('Email', () => {
     expect(Email.of('user@domain.org').toString()).toBe('user@domain.org');
   });
 
-  it('無效 email → 拋出 Error，訊息不含原始值', () => {
-    expect(() => Email.of('not-an-email')).toThrow('Invalid email format');
+  it('無效 email → 拋出 InvalidEmailException，訊息不含原始值', () => {
+    expect(() => Email.of('not-an-email')).toThrow(InvalidEmailException);
+    expect(() => Email.of('not-an-email')).toThrow('Email 格式不正確');
     expect(() => Email.of('not-an-email')).not.toThrow('not-an-email');
   });
 
-  it('空字串 → 拋出 Error', () => {
-    expect(() => Email.of('')).toThrow('Invalid email format');
+  it('無效 email → kind 為 INVALID（對應 400 而非 500）', () => {
+    expect(() => Email.of('bad')).toThrow(
+      expect.objectContaining({ kind: 'INVALID' }),
+    );
+  });
+
+  it('trusted() → 不驗證格式，供 DB 還原使用', () => {
+    expect(() => Email.trusted('not-an-email')).not.toThrow();
+    expect(Email.trusted('not-an-email').toString()).toBe('not-an-email');
+  });
+
+  it('空字串 → 拋出 InvalidEmailException', () => {
+    expect(() => Email.of('')).toThrow(InvalidEmailException);
   });
 
   it('equals() → 相同 email 回傳 true', () => {

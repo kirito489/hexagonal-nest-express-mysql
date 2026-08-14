@@ -2,10 +2,10 @@ import { DomainException } from './DomainException';
 import { ResponseCodes } from '../../shared/constants/response-codes';
 
 /**
- * 帳號已停用
+ * 帳號 ID 格式不合法
  */
-export class AccountDisabledException extends DomainException {
+export class InvalidMemberIdException extends DomainException {
   constructor() {
-    super(ResponseCodes.ACCOUNT_DISABLED, 'FORBIDDEN');
+    super(ResponseCodes.INVALID_MEMBER_ID, 'INVALID');
   }
 }

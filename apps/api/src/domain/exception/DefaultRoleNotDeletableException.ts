@@ -3,10 +3,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class DefaultRoleNotDeletableException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.DEFAULT_ROLE_NOT_DELETABLE,
-      'INVALID',
-      '預設角色不可刪除',
-    );
+    super(ResponseCodes.DEFAULT_ROLE_NOT_DELETABLE, 'INVALID');
   }
 }

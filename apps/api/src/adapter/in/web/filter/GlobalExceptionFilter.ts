@@ -20,6 +20,7 @@ import {
   DomainExceptionKind,
 } from '../../../../domain/exception/DomainException';
 import { ResponseCodes } from '../../../../shared/constants/response-codes';
+import { ResponseMessages } from '../../../../shared/constants/response-messages';
 
 export interface ApiErrorResponse {
   success: false;
@@ -128,7 +129,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // 3. 未預期錯誤：500
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Internal server error',
+      message: ResponseMessages.INTERNAL_SERVER_ERROR,
       code: ResponseCodes.INTERNAL_SERVER_ERROR,
     };
   }

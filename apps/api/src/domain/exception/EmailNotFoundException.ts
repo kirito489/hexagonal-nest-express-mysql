@@ -3,10 +3,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class EmailNotFoundException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.EMAIL_NOT_FOUND,
-      'NOT_FOUND',
-      '找不到該 email 對應的帳號',
-    );
+    super(ResponseCodes.EMAIL_NOT_FOUND, 'NOT_FOUND');
   }
 }

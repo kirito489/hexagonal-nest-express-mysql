@@ -6,9 +6,17 @@ _跨 session 追蹤的待辦與跨模組事項。進行中 →  待處理（依�
 
 ## 進行中
 
-_(目前無)_
+- [ ] **refactor-response-message-catalog** — 錯誤碼與訊息分離（`response-messages.ts`，完整性由 `satisfies Record<ResponseCode, …>` 型別保證）、修掉 domain 層 4 處 `throw new Error`（改 400）、新增 `of()` / `trusted()` 兩條 value object 路徑。**三塊實作完成、驗證鏈全綠，待封存（`/opsx:archive`）**。
 
 ## 待處理
+
+### 工程護欄（架構測試導入時發現）
+
+- [ ] **`Member.spec.ts` 裡有一個 `describe('Email')` 與 `Email.spec.ts` 重複** — 既有的組織遺留（非本次改動引入），Email 的測試散在兩個檔案。清理時把 `Member.spec.ts` 第 10 行起的 Email describe 併入 `Email.spec.ts`。
+- [ ] **`ALLOW_PROD_SEED` 未進 `envSchema`** — `seeds/` 在用但沒宣告於 `apps/api/src/infrastructure/validate-env.ts`，靜默為 `undefined`；而它控制的是「能不能在正式環境跑 seed」。目前列於架構測試 `allowlist.ts` 的 `TEMPORARY`，補進 `envSchema` 後須同步移除該筆豁免。
+- [ ] **e2e 出現過一次無法重現的失敗（待觀察）** — `2026-08-14` 在 `pnpm test` 緊接 `pnpm test:e2e` 的組合中出現 `1 failed / 137 passed`，之後單獨連跑 3 次與組合連跑 2 次皆 138 全綠，**未能重現、也未取得失敗測試名稱**（當時輸出被 grep 過濾）。所有 spec 共用同一測試庫且 `--runInBand`，懷疑是連續執行下的資源競爭。下次若再出現，先用 `pnpm --filter @app/api test:e2e 2>&1 | tee` 保留完整輸出再查。
+
+
 
 ### 安全強化（專案審查延伸）
 

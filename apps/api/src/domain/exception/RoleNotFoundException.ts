@@ -3,6 +3,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class RoleNotFoundException extends DomainException {
   constructor() {
-    super(ResponseCodes.ROLE_NOT_FOUND, 'NOT_FOUND', '角色不存在');
+    super(ResponseCodes.ROLE_NOT_FOUND, 'NOT_FOUND');
   }
 }

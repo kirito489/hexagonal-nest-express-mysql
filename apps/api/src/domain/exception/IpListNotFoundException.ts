@@ -3,6 +3,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class IpListNotFoundException extends DomainException {
   constructor() {
-    super(ResponseCodes.IP_LIST_NOT_FOUND, 'NOT_FOUND', '找不到該 IP 名單紀錄');
+    super(ResponseCodes.IP_LIST_NOT_FOUND, 'NOT_FOUND');
   }
 }

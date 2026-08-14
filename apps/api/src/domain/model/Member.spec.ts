@@ -1,4 +1,5 @@
 import { Member } from './Member';
+import { InvalidMemberNameException } from '../exception/InvalidMemberNameException';
 import { Email } from '../value-object/Email';
 
 const TEST_UUID_1 = '00000000-0000-0000-0000-000000000001';
@@ -75,7 +76,10 @@ describe('Member', () => {
       expect(member.isDefault).toBe(false);
     });
 
-    it('無效 UUID 格式 → 拋出錯誤', () => {
+    // reconstitute 走 MemberId.trusted / Email.trusted：DB 的值在寫入時已驗證，
+    // 還原路徑重跑驗證會把「資料損毀」誤報成 400（客戶端輸入錯誤）。
+    // 新輸入的格式驗證由 MemberId.of / Email.of 負責，見 MemberId.spec.ts。
+    it('無效 UUID 格式 → 不重複驗證，直接還原', () => {
       expect(() =>
         Member.reconstitute(
           'not-a-uuid',
@@ -87,7 +91,7 @@ describe('Member', () => {
           false,
           new Date(),
         ),
-      ).toThrow('無效的 MemberId 格式');
+      ).not.toThrow();
     });
   });
 
@@ -125,6 +129,33 @@ describe('Member', () => {
       expect(member.status).toBe(false);
       member.activate();
       expect(member.status).toBe(true);
+    });
+  });
+
+  describe('名稱驗證', () => {
+    it('create 空白名稱 → 拋出 InvalidMemberNameException', () => {
+      expect(() =>
+        Member.create(Email.of('u@e.com'), '   ', 'hash', ROLE_UUID_1),
+      ).toThrow(InvalidMemberNameException);
+    });
+
+    it('updateProfile 空名稱 → 拋出 InvalidMemberNameException', () => {
+      const member = Member.create(
+        Email.of('u@e.com'),
+        'Name',
+        'hash',
+        ROLE_UUID_1,
+      );
+
+      expect(() => member.updateProfile('', ROLE_UUID_1)).toThrow(
+        InvalidMemberNameException,
+      );
+    });
+
+    it('名稱驗證失敗的 kind 為 INVALID（對應 400 而非 500）', () => {
+      expect(() =>
+        Member.create(Email.of('u@e.com'), '', 'hash', ROLE_UUID_1),
+      ).toThrow(expect.objectContaining({ kind: 'INVALID' }));
     });
   });
 });

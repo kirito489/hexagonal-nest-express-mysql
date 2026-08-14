@@ -75,6 +75,12 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 ## Domain Exception / GlobalExceptionFilter
 
+- **型別能保證的完整性，不要退回用測試檢查**：錯誤碼與訊息表的對應用 `as const satisfies Record<ResponseCode, string | ((...args: never[]) => string)>` 約束——新增 code 卻忘了補訊息，`pnpm typecheck` 當場失敗（`TS1360: is missing the following properties`），回饋在編輯器裡即時出現，不必等跑測試。作法：訊息表用 `satisfies`（不要用型別註記，否則動態訊息的參數型別會被抹成 `never[]`）；「靜態 / 動態」的分類也從表推導成 `StaticResponseCode`，不要手工維護第二份清單。架構測試只做型別擋不住的部分（例如「有沒有人繞過常數寫字面值」）。
+
+- **建構子重載可以把「哪些情況必須傳參數」寫進型別**：`DomainException` 兩個重載——`(code: StaticResponseCode, kind)` 與 `(code: ResponseCode, kind, message: string)`——讓靜態訊息的子類只傳兩個參數（基底自表中取），需要參數的訊息漏傳時直接編譯失敗（`TS2345: not assignable to 'StaticResponseCode'`），不會出現「函式被當成訊息字串」的執行期怪象。作法：實作簽名的 fallback 分支雖不可達也別留空字串，取 code 本身較安全；重載寫完務必用探針驗證「該擋的真的擋、該過的真的過」。
+
+- **value object 要分「驗證新輸入」與「還原已持久化資料」兩條路徑**：`of()` 驗證並拋 `INVALID`（400），`trusted()` 不驗證、供 `reconstitute` 使用。若還原路徑也跑驗證，DB 資料損毀會被回報成 400（客戶端輸入錯誤），但客戶端根本沒做錯——那是 500 的情境。作法：`Member.reconstitute` 一律走 `trusted()`；改動這類設計時記得既有測試可能正在保護舊行為（本專案就有一支「reconstitute 無效 UUID → 拋錯」需要改寫為「不重複驗證」）。
+
 - **domain exception 一律 `extends DomainException(code, kind)`，filter 靠 `kind → status` 自動映射，新增例外不用改 filter**：每個 domain exception：(1) `src/domain/exception/` 檔 `extends DomainException`，`super(ResponseCodes.XXX, '<kind>', message)`；(2) code 加進 `src/shared/constants/response-codes.ts`；(3) 選 kind（`NOT_FOUND/UNAUTHORIZED/FORBIDDEN/INVALID/CONFLICT/LOCKED/INTERNAL`），`GlobalExceptionFilter` 的 `KIND_TO_STATUS` 表自動給 HTTP status——**不再需要在 filter 加 instanceof / map**（舊做法：filter 維護一張隨例外數膨脹的 `DOMAIN_EXCEPTION_MAP`，已廢除）。Repository 層不要讓 Prisma 原生錯誤（P2025 等）冒泡到 service，轉成明確的 domain exception。
 
 ## 測試
@@ -104,6 +110,12 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 - **真 DB e2e 過 `@Roles(SUPERADMIN)` gate：JWT payload 不含 roleCode，靠 seed 的 role.roleCode + JwtAuthGuard 每次查 DB 補上**：`JwtPayload` 輕量只存 `sub`，`request.member.roleCode` 是 `JwtAuthGuard` 每個 request 呼叫 `loadMemberContext(sub)` 從 DB 撈的。所以 SecurityController 這種 `@Roles(SUPERADMIN)` 端點，seed admin 時必須把 role 的 `roleCode` 設成 `'SUPERADMIN'`（`APPLICATION_ADMIN_ROLE_ENABLED` 預設 `'true'`，e2e 未覆寫故 RolesGuard 生效）。作法：`seedMember` / `seedRole` 開 `roleCode?` 參數傳進 `prisma.role.create`；roleName（顯示名「管理者」）與 roleCode（權限碼 `SUPERADMIN`）是兩回事，gate 比對的是後者。
 
 - **Redis 仍 mock 時，限流 429 與黑名單在真 DB e2e 中不會誤觸**：throttle 計數走 `redis.throttleIncrement`（mock 回 `1`）、token 黑名單走 `redis.isTokenBlacklisted`（mock 回 `false`），故轉真 DB 後 KGIE 那條「ThrottlerGuard 429 要關 env」的坑在本專案自動迴避，唯一要主動測 429 的 case 才 `mockResolvedValue(1_000_000)`。也因全域 guard（APP_GUARD）此路徑不需 `.overrideGuard`。
+
+- **靜態掃描型的架構測試必須自帶「掃描數 > 0」與「豁免過期」兩道自我檢查**：這類測試有兩種假綠——(1) 目錄改名或命名慣例不同導致掃到 0 個檔案，測試回報「無違規」；(2) 違規修掉後豁免忘了刪，白名單單向膨脹成無人維護的例外清冊。本專案實例：controller 命名是 `XxxController.ts`（PascalCase）而非 `xxx.controller.ts`，照後者寫 glob 會掃到 0 個檔案且全綠。作法：每條規則加 `expect(files.length).toBeGreaterThan(0)`；每筆豁免都驗證它在原始碼中確實仍存在；新增規則後一律「插違規探針 → 親眼看它紅 → 移除探針 → 確認還原乾淨（`git diff` 應為空）」，沒看過紅的架構測試等於沒證明任何事。
+
+- **以「引號 + 中文字元」偵測硬編文案，會被 TSDoc 的 markdown 反引號誤判**：`/['"\`][^'"\`]*[一-鿿]/` 掃 exception 檔時，註解裡的 `` `code` 與語意 `kind` `` 這種寫法會被當成字串字面值，導致 4 處假陽性。作法：比對前先跳過註解行（`/^\s*(\/\/|\/\*|\*)/`）；更廣義地說，任何「掃原始碼字串字面值」的規則都要先剝註解，別假設註解裡不會出現引號。
+
+- **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔就能判定的 import 邊界交給 eslint（快、IDE 即時、可 autofix 提示）；跨檔語意（錯誤碼有沒有註冊、有沒有死碼、env 有沒有進 schema）交給架構測試。另外「用到不存在的常數」不必寫檢查——TypeScript 已免費保證，架構測試只該做型別擋不住的部分（例如繞過常數直接寫字面值）。
 
 ## NestJS build
 
@@ -223,6 +235,8 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 - **type-checked lint 對「ORM 邊界 / jest mock / seed 腳本」的 `no-unsafe-*` 是雜訊,分區關掉、核心層維持嚴格**：Prisma 查詢結果、mapper、jest mock 回傳天生 `any`,全開 `no-unsafe-*` 會爆數百個假訊號淹沒真發現(本專案 524→9)。作法:`eslint.config.mjs` 對 `src/adapter/out/persistence/**`、`seeds/**`+`scripts/**`、`**/*.spec.ts`(另加 `unbound-method`)關掉 no-unsafe-* 家族;application/domain/infrastructure 維持全嚴格,真發現(floating-promise 等)才浮得出來。
 
 - **Prettier 全 repo 統一一份根 `.prettierrc`(`semi:true` + `singleQuote:true` + `trailingComma:all`)**：前後端同一套;前端原為 Vite 無分號,已 reformat 加回分號對齊(一次性 ~107 檔),後端 0 churn(根設定與 api 既有風格一致,`eslint-plugin-prettier` 走 walk-up 解析同一份根設定)。`format`/`format:check` 放**根**(`prettier --write/--check .`)並從 repo root 跑——因為 **`.prettierignore` 相對「執行目錄(CWD)」解析**(不像 `.prettierrc` 逐檔就近),放根 + 根執行才吃得到。根 ignore 必排除:手寫繁中文件(`**/*.md`,否則 openspec / README / CLAUDE 被 reflow)、工具生成檔(`packages/api-client/src/schema.ts`、swagger bundle)、`prisma/migrations`、build / lockfile。shadcn `components/ui` 也一併吃根設定(引號等),格式不另設特例(eslint 的 `components/ui` 特例只關 lint 規則、與格式無關)。formatOnSave 需 `.vscode/settings.json` 對 `[typescriptreact]`/`[javascriptreact]` 也設 prettier formatter(前端多為 .tsx)。
+
+- **flat config 中同名規則是「後蓋前」而非合併 patterns**：`no-restricted-imports` 若拆成多個區塊各給一組 `patterns`，同時匹配多個區塊的檔案**只吃最後一個區塊**，先前的整包被覆蓋（不是 patterns 相加）。症狀極隱蔽：admin 目錄下的 controller 該同時受「不得碰持久層」與「不得相依 front」約束，實測只有後者會紅、前者靜默失效，lint 仍然全綠。作法：重疊的檔案範圍必須各自列出**完整**限制——用 `ignores` 把區塊切成互不重疊，重疊者（如 `src/adapter/in/**/admin/**/*Controller.ts`）一次列齊所有 pattern；另外用 `@typescript-eslint/no-restricted-imports` 而非 base 版，才會涵蓋 `import type`。每加一條邊界規則都要用探針檔實測「該擋的每一種都真的擋」，不要假設會合併。
 
 ## 可觀測性 / Sentry & metrics
 

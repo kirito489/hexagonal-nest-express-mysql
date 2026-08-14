@@ -7,10 +7,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
  */
 export class PasswordChangeRequiredException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.PASSWORD_CHANGE_REQUIRED,
-      'FORBIDDEN',
-      '密碼已過期，請更換密碼後再繼續操作',
-    );
+    super(ResponseCodes.PASSWORD_CHANGE_REQUIRED, 'FORBIDDEN');
   }
 }

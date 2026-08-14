@@ -8,10 +8,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
  */
 export class InvalidRefreshTokenException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.INVALID_REFRESH_TOKEN,
-      'UNAUTHORIZED',
-      '無效的 Refresh Token，請重新登入',
-    );
+    super(ResponseCodes.INVALID_REFRESH_TOKEN, 'UNAUTHORIZED');
   }
 }

@@ -3,10 +3,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
 
 export class DefaultMemberNotEditableException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.DEFAULT_MEMBER_NOT_EDITABLE,
-      'CONFLICT',
-      '預設帳號不可編輯',
-    );
+    super(ResponseCodes.DEFAULT_MEMBER_NOT_EDITABLE, 'CONFLICT');
   }
 }

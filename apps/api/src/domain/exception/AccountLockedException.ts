@@ -6,10 +6,6 @@ import { ResponseCodes } from '../../shared/constants/response-codes';
  */
 export class AccountLockedException extends DomainException {
   constructor() {
-    super(
-      ResponseCodes.ACCOUNT_LOCKED,
-      'LOCKED',
-      '帳號已被鎖定，請聯繫管理員解鎖',
-    );
+    super(ResponseCodes.ACCOUNT_LOCKED, 'LOCKED');
   }
 }
