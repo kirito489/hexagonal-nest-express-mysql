@@ -3,6 +3,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
 import { resetDb, seedMember } from './helpers/db';
+import { expectApiError, expectUnauthorized } from './helpers/assertions';
+import { ResponseCodes } from '../src/shared/constants/response-codes';
 
 // 走真 test DB:login 相關 case seed 真會員;黑名單 / throttle 仍走 Redis mock。
 const TEST_EMAIL = 'test@example.com';
@@ -91,13 +93,13 @@ describe('Auth E2E', () => {
 
     it('使用者不存在 → 401', async () => {
       const res = await login(app, 'nobody@example.com', 'any');
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('密碼錯誤 → 401', async () => {
       await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
       const res = await login(app, TEST_EMAIL, 'wrong-password');
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('帳號停用 → 403 ACCOUNT_DISABLED', async () => {
@@ -107,8 +109,7 @@ describe('Auth E2E', () => {
         status: false,
       });
       const res = await login(app);
-      expect(res.status).toBe(403);
-      expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
+      expectApiError(res, 403, ResponseCodes.ACCOUNT_DISABLED);
     });
   });
 
@@ -117,7 +118,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer()).get(
         '/api/admin/members?email=test@example.com',
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
   });
 
@@ -126,7 +127,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer()).post(
         '/api/admin/auth/logout',
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('完整流程：login → logout → 204 + token 進黑名單', async () => {
@@ -185,8 +186,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer())
         .post('/api/admin/auth/refresh')
         .send({ refreshToken: 'not-a-valid-jwt' });
-      expect(res.status).toBe(401);
-      expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
+      expectApiError(res, 401, ResponseCodes.INVALID_REFRESH_TOKEN);
     });
 
     it('以 access token 呼叫 → 401 INVALID_REFRESH_TOKEN', async () => {
@@ -199,8 +199,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer())
         .post('/api/admin/auth/refresh')
         .send({ refreshToken: accessToken });
-      expect(res.status).toBe(401);
-      expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
+      expectApiError(res, 401, ResponseCodes.INVALID_REFRESH_TOKEN);
     });
 
     it('refresh token 在黑名單 → 401 INVALID_REFRESH_TOKEN', async () => {
@@ -215,8 +214,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer())
         .post('/api/admin/auth/refresh')
         .send({ refreshToken });
-      expect(res.status).toBe(401);
-      expect((res.body as { code: string }).code).toBe('INVALID_REFRESH_TOKEN');
+      expectApiError(res, 401, ResponseCodes.INVALID_REFRESH_TOKEN);
     });
 
     it('帳號停用 → 403 ACCOUNT_DISABLED', async () => {
@@ -238,8 +236,7 @@ describe('Auth E2E', () => {
       const res = await request(app.getHttpServer())
         .post('/api/admin/auth/refresh')
         .send({ refreshToken });
-      expect(res.status).toBe(403);
-      expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
+      expectApiError(res, 403, ResponseCodes.ACCOUNT_DISABLED);
     });
   });
 

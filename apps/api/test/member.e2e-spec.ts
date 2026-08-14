@@ -3,6 +3,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
 import { resetDb, seedMember, seedRole } from './helpers/db';
+import {
+  expectApiError,
+  expectUnauthorized,
+  expectForbidden,
+} from './helpers/assertions';
+import { ResponseCodes } from '../src/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個帶 ACCOUNT:VIEW/EDIT 的 admin 並登入；
 // 無權限測試另 seed 空權限會員；目標會員以 prisma 直接建，斷言查真 DB。
@@ -103,7 +109,7 @@ describe('Member E2E', () => {
   describe('GET /api/admin/members', () => {
     it('無 JWT → 401', async () => {
       const res = await request(app.getHttpServer()).get('/api/admin/members');
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('有 JWT + VIEW → 200 + 列表含目標', async () => {
@@ -119,7 +125,7 @@ describe('Member E2E', () => {
     it('無 ACCOUNT:VIEW 權限 → 403', async () => {
       const token = await loginNoPerm();
       const res = await get('/api/admin/members', () => token);
-      expect(res.status).toBe(403);
+      expectForbidden(res);
     });
 
     it('status=true → 只回啟用會員', async () => {
@@ -163,7 +169,7 @@ describe('Member E2E', () => {
       const res = await request(app.getHttpServer()).get(
         '/api/admin/members/role/options',
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('預設分頁 → 200 + { list, meta }', async () => {
@@ -223,7 +229,7 @@ describe('Member E2E', () => {
     it('無 VIEW 權限 → 403', async () => {
       const token = await loginNoPerm();
       const res = await get('/api/admin/members/role/options', () => token);
-      expect(res.status).toBe(403);
+      expectForbidden(res);
     });
   });
 
@@ -232,7 +238,7 @@ describe('Member E2E', () => {
       const res = await request(app.getHttpServer()).get(
         `/api/admin/members/role/options/${roleId}`,
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('找到啟用角色 → 200 + { id, name, isAssignable }', async () => {
@@ -248,8 +254,7 @@ describe('Member E2E', () => {
 
     it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
       const res = await get(`/api/admin/members/role/options/${MISSING_ID}`);
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.ROLE_NOT_FOUND);
     });
 
     it('無 VIEW 權限 → 403', async () => {
@@ -258,7 +263,7 @@ describe('Member E2E', () => {
         `/api/admin/members/role/options/${roleId}`,
         () => token,
       );
-      expect(res.status).toBe(403);
+      expectForbidden(res);
     });
   });
 
@@ -272,7 +277,7 @@ describe('Member E2E', () => {
           password: 'StrongPass123!',
           roleId,
         });
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('有 JWT + EDIT，有效資料 → 201 且落庫', async () => {
@@ -297,7 +302,7 @@ describe('Member E2E', () => {
         password: 'StrongPass123!',
         roleId,
       });
-      expect(res.status).toBe(409);
+      expectApiError(res, 409, ResponseCodes.EMAIL_ALREADY_EXISTS);
     });
 
     it('無效 email → 400', async () => {
@@ -322,7 +327,7 @@ describe('Member E2E', () => {
         },
         () => token,
       );
-      expect(res.status).toBe(403);
+      expectForbidden(res);
     });
   });
 
@@ -331,7 +336,7 @@ describe('Member E2E', () => {
       const res = await request(app.getHttpServer()).get(
         `/api/admin/members/${MISSING_ID}`,
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('member 存在 → 200', async () => {
@@ -345,7 +350,7 @@ describe('Member E2E', () => {
 
     it('member 不存在 → 404', async () => {
       const res = await get(`/api/admin/members/${MISSING_ID}`);
-      expect(res.status).toBe(404);
+      expectApiError(res, 404, ResponseCodes.MEMBER_NOT_FOUND);
     });
   });
 
@@ -354,7 +359,7 @@ describe('Member E2E', () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/admin/members/${MISSING_ID}`)
         .send({ status: true });
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('有 JWT + EDIT，有效資料 → 204 且落庫', async () => {
@@ -379,7 +384,7 @@ describe('Member E2E', () => {
         roleId,
         status: true,
       });
-      expect(res.status).toBe(404);
+      expectApiError(res, 404, ResponseCodes.MEMBER_NOT_FOUND);
     });
 
     it('預設帳號不可編輯 → 409 DEFAULT_MEMBER_NOT_EDITABLE', async () => {
@@ -390,10 +395,7 @@ describe('Member E2E', () => {
         roleId,
         status: true,
       });
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe(
-        'DEFAULT_MEMBER_NOT_EDITABLE',
-      );
+      expectApiError(res, 409, ResponseCodes.DEFAULT_MEMBER_NOT_EDITABLE);
     });
 
     it('成功後清除 MemberContext 快取', async () => {
@@ -417,8 +419,7 @@ describe('Member E2E', () => {
         roleId,
         status: false,
       });
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe('CANNOT_DISABLE_SELF');
+      expectApiError(res, 409, ResponseCodes.CANNOT_DISABLE_SELF);
     });
 
     it('partial body 只送 { status } → 204 且落庫', async () => {
@@ -449,8 +450,7 @@ describe('Member E2E', () => {
         data: { status: false },
       });
       const res = await get('/api/admin/members');
-      expect(res.status).toBe(403);
-      expect((res.body as { code: string }).code).toBe('ACCOUNT_DISABLED');
+      expectApiError(res, 403, ResponseCodes.ACCOUNT_DISABLED);
     });
   });
 
@@ -459,7 +459,7 @@ describe('Member E2E', () => {
       const res = await request(app.getHttpServer()).delete(
         `/api/admin/members/${MISSING_ID}`,
       );
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('有 JWT + EDIT → 204 且軟刪', async () => {
@@ -474,17 +474,13 @@ describe('Member E2E', () => {
 
     it('刪除自己 → 409 CANNOT_DELETE_SELF', async () => {
       const res = await del(`/api/admin/members/${adminId}`);
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe('CANNOT_DELETE_SELF');
+      expectApiError(res, 409, ResponseCodes.CANNOT_DELETE_SELF);
     });
 
     it('預設帳號不可刪除 → 409 DEFAULT_MEMBER_NOT_DELETABLE', async () => {
       const target = await createTargetMember({ isDefault: true });
       const res = await del(`/api/admin/members/${target.id}`);
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe(
-        'DEFAULT_MEMBER_NOT_DELETABLE',
-      );
+      expectApiError(res, 409, ResponseCodes.DEFAULT_MEMBER_NOT_DELETABLE);
     });
   });
 });

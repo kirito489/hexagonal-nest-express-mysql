@@ -3,6 +3,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
 import { resetDb, seedMember, seedRole } from './helpers/db';
+import {
+  expectApiError,
+  expectUnauthorized,
+  describeUnauthorized,
+} from './helpers/assertions';
+import { ResponseCodes } from '../src/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個帶 BACKEND:ROLE:VIEW/EDIT 的 admin 並登入取 token；
 // 目標角色以 seedRole 建，斷言查真 DB。列表含 admin 自身的角色，故用「包含」語意。
@@ -68,6 +74,15 @@ describe('Role E2E', () => {
     token = (res.body as { data: { accessToken: string } }).data.accessToken;
   });
 
+  // 未授權存取:guard 在查資料前就擋下,故 :id 用固定 uuid 即可
+  describe('未授權存取', () => {
+    describeUnauthorized(() => app, 'get', '/api/admin/roles/permissions');
+    describeUnauthorized(() => app, 'get', `/api/admin/roles/${MISSING_ID}`);
+    describeUnauthorized(() => app, 'post', '/api/admin/roles');
+    describeUnauthorized(() => app, 'patch', `/api/admin/roles/${MISSING_ID}`);
+    describeUnauthorized(() => app, 'delete', `/api/admin/roles/${MISSING_ID}`);
+  });
+
   describe('GET /api/admin/roles', () => {
     it('回傳角色列表 → 200（含目標角色）', async () => {
       await seedRole(prisma, { name: '管理者' });
@@ -83,7 +98,7 @@ describe('Role E2E', () => {
 
     it('無 token → 401', async () => {
       const res = await request(app.getHttpServer()).get('/api/admin/roles');
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
 
     it('status=true → 只回啟用角色', async () => {
@@ -161,8 +176,7 @@ describe('Role E2E', () => {
         permissionCodes: [],
       });
 
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe('DUPLICATE_ROLE_NAME');
+      expectApiError(res, 409, ResponseCodes.DUPLICATE_ROLE_NAME);
     });
 
     it('EDIT 缺少對應 VIEW → 400 INVALID_PERMISSION_COMBINATION', async () => {
@@ -171,10 +185,7 @@ describe('Role E2E', () => {
         permissionCodes: ['BACKEND:ROLE:EDIT'],
       });
 
-      expect(res.status).toBe(400);
-      expect((res.body as { code: string }).code).toBe(
-        'INVALID_PERMISSION_COMBINATION',
-      );
+      expectApiError(res, 400, ResponseCodes.INVALID_PERMISSION_COMBINATION);
     });
   });
 
@@ -198,8 +209,7 @@ describe('Role E2E', () => {
 
     it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
       const res = await get(`/api/admin/roles/${MISSING_ID}`);
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.ROLE_NOT_FOUND);
     });
   });
 
@@ -225,10 +235,7 @@ describe('Role E2E', () => {
         permissionCodes: [],
       });
 
-      expect(res.status).toBe(400);
-      expect((res.body as { code: string }).code).toBe(
-        'DEFAULT_ROLE_NOT_EDITABLE',
-      );
+      expectApiError(res, 400, ResponseCodes.DEFAULT_ROLE_NOT_EDITABLE);
     });
 
     it('角色不存在 → 404 ROLE_NOT_FOUND', async () => {
@@ -237,8 +244,7 @@ describe('Role E2E', () => {
         permissionCodes: [],
       });
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('ROLE_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.ROLE_NOT_FOUND);
     });
 
     it('僅送 status → 204 且僅 status 落庫', async () => {
@@ -278,10 +284,7 @@ describe('Role E2E', () => {
 
       const res = await patch(`/api/admin/roles/${id}`, { status: false });
 
-      expect(res.status).toBe(400);
-      expect((res.body as { code: string }).code).toBe(
-        'DEFAULT_ROLE_NOT_EDITABLE',
-      );
+      expectApiError(res, 400, ResponseCodes.DEFAULT_ROLE_NOT_EDITABLE);
     });
   });
 
@@ -312,10 +315,7 @@ describe('Role E2E', () => {
 
       const res = await del(`/api/admin/roles/${id}`);
 
-      expect(res.status).toBe(400);
-      expect((res.body as { code: string }).code).toBe(
-        'DEFAULT_ROLE_NOT_DELETABLE',
-      );
+      expectApiError(res, 400, ResponseCodes.DEFAULT_ROLE_NOT_DELETABLE);
     });
 
     it('角色仍有成員 → 409 ROLE_HAS_MEMBERS', async () => {
@@ -333,8 +333,7 @@ describe('Role E2E', () => {
 
       const res = await del(`/api/admin/roles/${roleId}`);
 
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe('ROLE_HAS_MEMBERS');
+      expectApiError(res, 409, ResponseCodes.ROLE_HAS_MEMBERS);
     });
   });
 });

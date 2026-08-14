@@ -3,6 +3,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
 import { resetDb, seedMember } from './helpers/db';
+import {
+  expectApiError,
+  expectUnauthorized,
+  describeUnauthorized,
+} from './helpers/assertions';
+import { ResponseCodes } from '../src/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個 roleCode=SUPERADMIN 的 admin 並登入取 token
 //（security 走 RolesGuard + @Roles(SUPERADMIN)，flag 預設開啟,roleCode 由 JwtAuthGuard 每次查 DB 補上）。
@@ -66,6 +72,48 @@ describe('Security E2E', () => {
 
   // ── IP 白名單 ──────────────────────────────
 
+  // 未授權存取:guard 在查資料前就擋下,故 :id 用固定 uuid 即可
+  describe('未授權存取', () => {
+    describeUnauthorized(() => app, 'post', '/api/admin/security/ip-whitelist');
+    describeUnauthorized(
+      () => app,
+      'get',
+      `/api/admin/security/ip-whitelist/${MISSING_ID}`,
+    );
+    describeUnauthorized(
+      () => app,
+      'patch',
+      `/api/admin/security/ip-whitelist/${MISSING_ID}`,
+    );
+    describeUnauthorized(
+      () => app,
+      'delete',
+      `/api/admin/security/ip-whitelist/${MISSING_ID}`,
+    );
+    describeUnauthorized(() => app, 'get', '/api/admin/security/ip-blacklist');
+    describeUnauthorized(() => app, 'post', '/api/admin/security/ip-blacklist');
+    describeUnauthorized(
+      () => app,
+      'get',
+      `/api/admin/security/ip-blacklist/${MISSING_ID}`,
+    );
+    describeUnauthorized(
+      () => app,
+      'patch',
+      `/api/admin/security/ip-blacklist/${MISSING_ID}`,
+    );
+    describeUnauthorized(
+      () => app,
+      'delete',
+      `/api/admin/security/ip-blacklist/${MISSING_ID}`,
+    );
+    describeUnauthorized(
+      () => app,
+      'post',
+      '/api/admin/security/unlock-account',
+    );
+  });
+
   describe('GET /api/admin/security/ip-whitelist', () => {
     it('Admin JWT → 200 + { list, meta }', async () => {
       await prisma.ipWhitelistRecord.create({
@@ -107,7 +155,7 @@ describe('Security E2E', () => {
         '/api/admin/security/ip-whitelist',
       );
 
-      expect(res.status).toBe(401);
+      expectUnauthorized(res);
     });
   });
 
@@ -151,8 +199,7 @@ describe('Security E2E', () => {
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
       const res = await get(`/api/admin/security/ip-whitelist/${MISSING_ID}`);
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.IP_LIST_NOT_FOUND);
     });
   });
 
@@ -179,8 +226,7 @@ describe('Security E2E', () => {
         },
       );
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.IP_LIST_NOT_FOUND);
     });
   });
 
@@ -257,8 +303,7 @@ describe('Security E2E', () => {
     it('找不到紀錄 → 404 IP_LIST_NOT_FOUND', async () => {
       const res = await get(`/api/admin/security/ip-blacklist/${MISSING_ID}`);
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.IP_LIST_NOT_FOUND);
     });
   });
 
@@ -285,8 +330,7 @@ describe('Security E2E', () => {
         },
       );
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('IP_LIST_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.IP_LIST_NOT_FOUND);
     });
   });
 
@@ -344,8 +388,7 @@ describe('Security E2E', () => {
         email: 'unknown@test.com',
       });
 
-      expect(res.status).toBe(404);
-      expect((res.body as { code: string }).code).toBe('EMAIL_NOT_FOUND');
+      expectApiError(res, 404, ResponseCodes.EMAIL_NOT_FOUND);
     });
 
     it('帳號未鎖 → 409 ACCOUNT_NOT_LOCKED', async () => {
@@ -354,8 +397,7 @@ describe('Security E2E', () => {
         email: ADMIN_EMAIL,
       });
 
-      expect(res.status).toBe(409);
-      expect((res.body as { code: string }).code).toBe('ACCOUNT_NOT_LOCKED');
+      expectApiError(res, 409, ResponseCodes.ACCOUNT_NOT_LOCKED);
     });
 
     it('缺少 email → 400', async () => {

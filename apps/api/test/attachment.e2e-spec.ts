@@ -5,6 +5,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from './test-app';
 import { resetDb, seedMember } from './helpers/db';
+import {
+  expectUnauthorized,
+  expectApiError,
+  describeUnauthorized,
+} from './helpers/assertions';
+import { ResponseCodes } from '../src/shared/constants/response-codes';
 
 // 走真 test DB + local storage driver（LOCAL_MEDIA_ROOT 指向 tmp，見 setup-env.e2e）。
 const ADMIN_EMAIL = 'admin@test.com';
@@ -44,6 +50,16 @@ describe('Attachment E2E', () => {
       .post('/api/admin/auth/login')
       .send({ email: ADMIN_EMAIL, password: PASSWORD });
     token = (res.body as { data: { accessToken: string } }).data.accessToken;
+  });
+
+  // 未授權存取:guard 在查資料前就擋下,故 :id 用固定 uuid 即可
+  describe('未授權存取', () => {
+    describeUnauthorized(() => app, 'post', '/api/admin/attachments');
+    describeUnauthorized(
+      () => app,
+      'delete',
+      `/api/admin/attachments/${MISSING_ID}`,
+    );
   });
 
   it('上傳合法 PNG → 201 + { id, url }，落庫 + 本機寫檔 + 檔名 latin1→utf8', async () => {
@@ -100,7 +116,7 @@ describe('Attachment E2E', () => {
       .field('relatedId', 'm-1')
       .attach('file', PNG, { filename: 'a.png', contentType: 'image/png' });
 
-    expect(res.status).toBe(401);
+    expectUnauthorized(res);
   });
 
   it('DELETE 存在 → 204 且紀錄刪除', async () => {
@@ -125,6 +141,6 @@ describe('Attachment E2E', () => {
       .delete(`/api/admin/attachments/${MISSING_ID}`)
       .set('Authorization', `Bearer ${token}`);
 
-    expect(res.status).toBe(404);
+    expectApiError(res, 404, ResponseCodes.ATTACHMENT_NOT_FOUND);
   });
 });
