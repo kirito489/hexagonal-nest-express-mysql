@@ -13,7 +13,7 @@ _(目前無)_
 ### 工程護欄（架構測試導入時發現）
 
 - [ ] **`Member.spec.ts` 裡有一個 `describe('Email')` 與 `Email.spec.ts` 重複** — 既有的組織遺留（非本次改動引入），Email 的測試散在兩個檔案。清理時把 `Member.spec.ts` 第 10 行起的 Email describe 併入 `Email.spec.ts`。
-- [ ] **`ALLOW_PROD_SEED` 未進 `envSchema`** — `seeds/` 在用但沒宣告於 `apps/api/src/infrastructure/validate-env.ts`，靜默為 `undefined`；而它控制的是「能不能在正式環境跑 seed」。目前列於架構測試 `allowlist.ts` 的 `TEMPORARY`，補進 `envSchema` 後須同步移除該筆豁免。
+- [ ] **`.env.example` 補 `ALLOW_PROD_SEED`** — `envSchema` 已補宣告（2026-08-14），但 `.env.example` 尚未加上該項；此檔在 AI 的權限設定中被拒絕存取，需由開發者手動加一行 `ALLOW_PROD_SEED=`（註明僅正式環境用）。
 - [ ] **e2e 出現過一次無法重現的失敗（待觀察）** — `2026-08-14` 在 `pnpm test` 緊接 `pnpm test:e2e` 的組合中出現 `1 failed / 137 passed`，之後單獨連跑 3 次與組合連跑 2 次皆 138 全綠，**未能重現、也未取得失敗測試名稱**（當時輸出被 grep 過濾）。所有 spec 共用同一測試庫且 `--runInBand`，懷疑是連續執行下的資源競爭。下次若再出現，先用 `pnpm --filter @app/api test:e2e 2>&1 | tee` 保留完整輸出再查。
 
 
@@ -39,6 +39,8 @@ _(目前無)_
 
 ### 2026-08-14
 
+- [x] **add-swagger-sync-guardrail** — API 契約三段轉換（controller → 來源 yaml → bundle → api-client）的同步護欄。路由層級由 `swagger-sync.spec.ts` 守（毫秒，跟著 `pnpm test`），內容層級由 `swagger:check` 守（數秒，產物寫入 tmpdir 不污染工作目錄）。互補性經實證：改 yaml 的 summary（路由不變）→ `swagger:check` 紅、架構測試綠。`js-yaml` 提升為直接 devDependency —— regex 解析 OpenAPI 會被多行 `description:` 區塊誤導。架構規則 15 → 20。
+- [x] **`ALLOW_PROD_SEED` 補進 `envSchema`** — 移除架構測試對應的 env 豁免。（`.env.example` 待手動補，見待處理）
 - [x] **add-engineering-guardrails** — 把 CLAUDE.md 的 Hard Rules 變成會失敗的檢查。借鏡 `cga-laravel-backend` 的 `tests/Architecture/` 與 `tests/Feature/Api/Traits/`。產出：`test/architecture/` 6 條規則（各自帶「掃描數 > 0」自我檢查 + 豁免過期檢查）、eslint `no-restricted-imports` 分層邊界、`test/helpers/assertions.ts`（e2e 共用斷言 + `describeUnauthorized` 產生器）。導入過程抓出四個真問題：domain 層 4 處 `throw new Error` 讓無效輸入回 500、`ALLOW_PROD_SEED` 未進 envSchema、e2e 有 29 個錯誤碼從未被斷言、eslint 邊界規則因 flat config「後蓋前」而有一半失效。e2e 121 → 138。
 - [x] **refactor-response-message-catalog** — 錯誤訊息集中到 `response-messages.ts`（24 條），完整性由 `satisfies Record<ResponseCode, …>` 型別保證（新增 code 不補訊息 → typecheck 失敗）；`DomainException` 建構子重載讓靜態訊息自動查表、動態訊息型別強制傳入。domain 驗證失敗由 500 改為 400，並新增 `of()` / `trusted()` 雙路徑（`reconstitute` 走 trusted，避免 DB 資料損毀誤報成客戶端錯誤）。23 個 exception 訊息逐字未變（機器比對確認）。單元測試 222 → 234，架構規則 13 → 15。
 
