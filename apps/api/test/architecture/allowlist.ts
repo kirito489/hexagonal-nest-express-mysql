@@ -69,19 +69,28 @@ export const NATIVE_ERROR_EXEMPTIONS: Exemption[] = [
 /**
  * 未宣告於 `envSchema` 的環境變數豁免。
  *
- * 目前唯一一筆是真違規（控制正式環境能否跑 seed，靜默為 undefined 風險不小），
- * 補進 envSchema 後即可移除本筆。
+ * 目前為空：原本唯一一筆 `ALLOW_PROD_SEED` 已補進 envSchema。
  */
-export const TEMPORARY_ENV: TemporaryExemption[] = [
-  {
-    file: 'scripts/seed-runner.ts',
-    snippet: 'ALLOW_PROD_SEED',
-    reason: '控制正式環境能否執行 seed，未宣告於 envSchema 會靜默為 undefined',
-    owner: 'tasks/todo.md（工程護欄段）',
-  },
-];
+export const TEMPORARY_ENV: TemporaryExemption[] = [];
 
 /** 豁免的環境變數名稱 */
 export const ENV_EXEMPT_NAMES: string[] = TEMPORARY_ENV.map(
   (item) => item.snippet,
 );
+
+/**
+ * 刻意不納入 swagger 文件的路由。
+ *
+ * 格式為 `METHOD /path`（path 已正規化，`:param` 寫成 `{param}`）。
+ * 這裡的豁免同樣受過期檢查約束：路由若已從 controller 移除，測試會要求清掉這筆。
+ */
+export const SWAGGER_EXEMPT_ROUTES: Array<{ route: string; reason: string }> = [
+  {
+    route: 'GET /api/health',
+    reason: '監控與存活探測用途，不屬對外 API 契約',
+  },
+  {
+    route: 'GET /api/health/ready',
+    reason: '就緒探測用途，不屬對外 API 契約',
+  },
+];

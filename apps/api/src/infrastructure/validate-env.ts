@@ -225,6 +225,9 @@ const envSchema = z.object({
   // ─── Seed 預設帳號 ───
   ADMIN_DEFAULT_EMAIL: z.string().default('admin@test.com'),
   ADMIN_DEFAULT_PASSWORD: z.string().default('Admin1234!'),
+  // seed-runner 的生產環境擋關：僅在 NODE_ENV=production 時有意義，
+  // 語意是「有設值即放行」（`ALLOW_PROD_SEED=1`），故不轉成 boolean
+  ALLOW_PROD_SEED: z.string().optional(),
 
   //應用時區 ───
   APP_TIMEZONE: z
