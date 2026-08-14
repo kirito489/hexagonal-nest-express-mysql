@@ -12,6 +12,8 @@ _(目前無)_
 
 ### 工程護欄（架構測試導入時發現）
 
+- [ ] **剩餘 77 個傳遞依賴漏洞（已知狀態）** — `2026-08-14` 已把能直接控制的修完（overrides 機制修復 + js-yaml / vite / nodemailer 升級，85 → 77）。剩下的皆深埋在 `prisma` / `@nestjs/terminus` 等上游相依樹中（含 2 個 critical：`shell-quote`、`websocket-driver`），**刻意不加 override 強制提版**——相容風險大於收益，模板穩定性優先。追蹤方式：定期 `pnpm audit`，待上游更新後再跑一次升級；若某個漏洞出現實際可利用的攻擊面，再單獨評估 override。
+
 - [ ] **首次 CI pipeline 需人工觀察** `add-ci-quality-gate` — CI 設定的正確性**無法在本機完全驗證**（YAML 結構、各 job 的 script 內容、e2e 的環境變數供應方式皆已本機驗證，但 runner 行為、cache 命中、service container 啟動時序只能在實際 pipeline 上確認）。首次推送後請檢查：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) `e2e-test` 的 MySQL 等待迴圈是否足夠（目前 30 次 × 2 秒）；(3) pipeline 總時長是否可接受，過慢可考慮把 `e2e-test` 限縮為只在 MR 跑。
 
 - [ ] **`.env.example` 補 `ALLOW_PROD_SEED`** — `envSchema` 已補宣告（2026-08-14），但 `.env.example` 尚未加上該項；此檔在 AI 的權限設定中被拒絕存取，需由開發者手動加一行 `ALLOW_PROD_SEED=`（註明僅正式環境用）。
@@ -36,6 +38,8 @@ _(目前無)_
 ## 完成項目
 
 ### 2026-08-14
+
+- [x] **fix-security-dependencies** — `pnpm audit` 85 個漏洞。修復 overrides 機制（原宣告在 `apps/api/package.json` **雙重無效**：pnpm 只讀 root、且 10+ 起改讀 `pnpm-workspace.yaml`，三條 override 長期完全沒生效）+ 升級三個直接依賴（js-yaml 4.1.1→4.3.1、vite 8.0.13→8.2.1、nodemailer 8.0.7→9.0.5 major）。**85 → 77**，驗證鏈全綠。剩餘皆深層傳遞依賴，刻意不強制提版（見待處理）。
 
 - [x] **`Member.spec.ts` 的重複 `describe('Email')` 已清理** — 三個 Email 測試中有兩個與 `Email.spec.ts` 重複（建立成功 / equals），直接刪除；第三個的三種邊界格式（`@example.com` / `user@` / `user@@example.com`）為 `Email.spec.ts` 所無，以 `it.each` 搬過去保留覆蓋。測試數不變（234），Member.spec.ts 現在只剩 `describe('Member')`。
 - [x] **fix-gen-module-compliance** — 修復本輪護欄造成的回歸：`gen:module` 產出的模組原本 typecheck 失敗（字面值 code 不是 `ResponseCode`）+ 3 條架構規則紅 + 9 個 lint 錯誤。產生器改為引用 `ResponseCodes`、自動注入錯誤碼與訊息（冪等）、產出 swagger yaml 骨架並自動重跑 bundle / generate。**產出物零手改即通過 typecheck / lint / 20 條架構守則**（admin 與 front 兩側皆實測）。順帶修掉 `project.md` 模組範本中過時的「GlobalExceptionFilter 新增例外對應」。

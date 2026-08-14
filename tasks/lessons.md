@@ -240,6 +240,10 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 ## Monorepo / pnpm
 
+- **pnpm 10+ 的 `overrides` 必須寫在 `pnpm-workspace.yaml`，寫在 `package.json` 會被靜默忽略**：本專案原本宣告在 `apps/api/package.json`（雙重錯誤：pnpm 只讀 root、且 10+ 起改讀 workspace 檔），三條 override 長期完全沒生效——`@hono/node-server` 宣告 `>=1.19.13` 但實際裝 1.19.11、`@tootallnate/once` 宣告 3.0.1 但實際裝 2.0.1。**沒有任何警告**。作法：(1) overrides 一律寫 `pnpm-workspace.yaml`；(2) 改完檢查 `pnpm-lock.yaml` 開頭是否出現 `overrides:` 區塊（這是 pnpm 有讀到的證據）；(3) 再以 `pnpm why <pkg>` 或 `ls node_modules/.pnpm` 確認實際版本。
+
+- **override 的 range 用 `^` 不要用 `>=`**：`>=1.19.15` 沒有上界，pnpm 會直接解析到最新的 major（實測 `@hono/node-server` 跳到 2.1.0），可能與上游期望的 API 不相容。要修安全漏洞時用 `^1.19.15` 鎖在同一 major 內。
+
 - **pnpm 11 預設不執行套件的 build scripts，需在 `pnpm-workspace.yaml` 的 `allowBuilds` 段明確核准**：Prisma、bcrypt、@nestjs/core、@firebase/util、protobufjs 等有 postinstall/install script 的套件首次 `pnpm install` 會被擋下並警告 `[ERR_PNPM_IGNORED_BUILDS]`。解法：把每個套件設成 `true`（信任）或 `false`（明確拒絕，如 telemetry-only 的 `@scarf/scarf`）。新加套件遇到此警告時更新 `allowBuilds` 即可。
 
 - **Monorepo 下 Prisma client 落在 pnpm 虛擬 store**：執行 `pnpm db:generate` 後 client 生成在 `node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client`（不是傳統的 `node_modules/@prisma/client`）。`apps/api/package.json` 的 `postinstall` symlink 仍有效，TypeScript 也能解析。重點：搬完 monorepo 後**必須先跑一次 `pnpm db:generate`** 再 typecheck，否則所有 Prisma model 型別找不到，會誤導以為是 strict mode 的問題。

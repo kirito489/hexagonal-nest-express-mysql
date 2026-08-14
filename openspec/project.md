@@ -31,6 +31,7 @@ hexagonal-nest-express-mysql/
 ```
 
 - 套件管理：**pnpm 11+**，corepack 透過 `packageManager` 欄位鎖版本。
+- **依賴版本覆寫（overrides）一律寫在 `pnpm-workspace.yaml`**：pnpm 10+ 起 `overrides` / `allowBuilds` 等設定從 `package.json` 的 `pnpm` 欄位搬到本檔，寫錯位置會被**靜默忽略、不會有任何警告**（本專案原本宣告在 `apps/api/package.json`，長期完全沒生效）。改動後務必驗證：`pnpm-lock.yaml` 開頭應出現 `overrides:` 區塊，並以 `pnpm why <pkg>` 確認實際安裝版本。range 用 `^` 而非 `>=` —— 後者沒有上界，pnpm 會拉到 major 新版（實測 `@hono/node-server` 從 1.19.x 直接跳到 2.1.0）。
 - workspace 之間互引用使用 `workspace:*` 協定。
 - 各 workspace 命名統一 `@app/*` scope（fork 後可整批替換）。
 - `apps/web` 透過 Vite proxy（`/api` → `http://localhost:3000`）與後端通訊；`@app/api-client` 採 **source-first**（exports 直接指 `src/index.ts`，由 Vite / tsc 直接吃 TS，**無 dist build 階段**）。
