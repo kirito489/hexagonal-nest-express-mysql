@@ -656,6 +656,31 @@ const meta = buildPaginationMeta(page, limit, totalCount);
 
 ---
 
+## CI（GitLab）
+
+`.gitlab-ci.yml` 的 stages：`prepare → quality → optimize → cleanup → pr_agent`。
+
+| Job | Stage | 做什麼 | 對應本機指令 |
+| --- | --- | --- | --- |
+| `npm-install` | prepare | `pnpm install --frozen-lockfile` | `pnpm install` |
+| `quality-check` | quality | 型別 / lint / 單元測試 + **覆蓋率門檻** + 架構守則 | `pnpm typecheck && pnpm lint && pnpm test:cov` |
+| `e2e-test` | quality | 對 `mysql:9` service container 跑完整 e2e | `pnpm --filter @app/api test:e2e` |
+| `prepare-production` | optimize | Prisma generate + build（**需 `quality-check` 通過**） | `pnpm build` |
+
+要點：
+
+- **兩個品質 job 在 Merge Request 就觸發**（不像 `prepare-production` 只認分支推送）—— MR 正是最該擋下問題的時機。
+- `quality-check` 與 `e2e-test` 同 stage 平行執行；前者不需外部服務，多數問題數十秒內回報。
+- e2e 的 DB 連線走 **job variables**，不在 CI 偽造 `.env`：`applyE2EDbEnv()` 以 dotenv 載入 `.env`，而 **dotenv 不覆寫既有 `process.env`**，因此 CI 供應的變數優先生效。
+- `DB_TEST_DATABASE` 必須含 `test`，否則 e2e 的 globalSetup 守門會中止（防誤連 dev / prod）。
+- `git commit --no-verify` 可繞過 husky pre-commit，但繞不過 CI —— 這是把關的最後一道。
+- **覆蓋率門檻只有 `test:cov` 會執行**（`test` 不帶 coverage，供開發時快速回饋）。兩個 workspace 都設有門檻：api 70/60/70/70、web 75/75/60/75；新增設有門檻的 workspace 時**必須提供 `test:cov`**，否則會被 `pnpm -r test:cov` 靜默略過。
+- `apps/api` 的 `test:cov` 刻意串接架構測試（`jest --coverage && jest --config test/jest.arch.config.js`）—— 只寫 `jest --coverage` 會讓 CI 換用 `test:cov` 後靜默漏掉 20 條架構規則。
+
+> **不使用 GitLab CI 的專案**：上表「對應本機指令」欄即為等價檢查，請在自己的 CI 平台上照樣執行；否則所有架構守則與測試都只在開發者本機生效。
+
+---
+
 ## 完整指令參考
 
 套件管理：**pnpm 11+**（root 透過 `packageManager` 欄位 + corepack 自動鎖版本）。

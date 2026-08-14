@@ -81,8 +81,35 @@ variables:
       fi
     fi
 
+# 等待 MySQL service 就緒：GitLab Runner 只確保 container 啟動，
+# MySQL 初始化期間 port 可能已開但尚不接受連線
+.wait_for_mysql_script: &wait_for_mysql_script
+  - |
+    node -e "
+    const net = require('net');
+    const attempt = (left) => new Promise((resolve, reject) => {
+      const socket = net.connect(Number(process.env.DB_PORT), process.env.DB_HOST);
+      socket.on('connect', () => { socket.end(); resolve(); });
+      socket.on('error', () => {
+        if (left <= 0) return reject(new Error('MySQL 在時限內未就緒'));
+        setTimeout(() => attempt(left - 1).then(resolve, reject), 2000);
+      });
+    });
+    attempt(30).then(
+      () => console.log('MySQL 就緒'),
+      (err) => { console.error(err.message); process.exit(1); },
+    );
+    "
+
+# 品質關卡與建置共用的 rules：MR 與 develop / master 推送都要跑。
+# 刻意不沿用 prepare-production 只認 \$CI_COMMIT_BRANCH 的寫法——那會讓 MR 階段幾乎不檢查。
+.quality_rules: &quality_rules
+  - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+  - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "master"
+
 stages:
   - prepare
+  - quality
   - optimize
   - cleanup
   - pr_agent
@@ -100,6 +127,64 @@ npm-install:
     - npm i -g pnpm@11.0.8
   script:
     - pnpm install --frozen-lockfile
+
+# 品質關卡：型別 / lint / 單元測試 + 20 條架構守則。
+# 不需外部服務，多數問題在此於數十秒內回報，開發者不必等 e2e 的 MySQL 起來。
+quality-check:
+  stage: quality
+  image: ${NODE_DOCKER_IMAGE}
+  variables:
+    HUSKY: '0'
+  cache:
+    - *package_cache
+    - *build_artifacts_cache
+  before_script:
+    - npm i -g pnpm@11.0.8
+    # typecheck / lint 的 pre script 會跑 db:generate，需 .env 組 DATABASE_URL
+    #（generate 不連線，空 .env 亦可）
+    - *copy_env_script
+  script:
+    - pnpm typecheck
+    - pnpm lint
+    # test:cov = 單元測試 + 覆蓋率門檻 + 架構守則（兩個 workspace 皆有門檻，
+    # 用 test 會讓門檻靜默不執行）
+    - pnpm test:cov
+  needs:
+    - npm-install
+  rules: *quality_rules
+
+# E2E：對真實 MySQL 跑完整 API 流程（Redis 於測試中 mock）。
+# 連線設定走 job variables——applyE2EDbEnv 以 dotenv 載入 .env，而 dotenv 不覆寫
+# 既有 process.env，故此處供應即可，不需在 CI 偽造一份 .env。
+e2e-test:
+  stage: quality
+  image: ${NODE_DOCKER_IMAGE}
+  services:
+    - name: mysql:9
+      alias: mysql
+  variables:
+    HUSKY: '0'
+    MYSQL_ROOT_PASSWORD: 'ci-e2e-root'
+    DB_HOST: 'mysql'
+    DB_PORT: '3306'
+    DB_USERNAME: 'root'
+    DB_PASSWORD: 'ci-e2e-root'
+    DB_DATABASE: 'hexagonal_e2e_test'
+    # 庫名必須含 "test"，否則 e2e 的 globalSetup 守門會中止（防誤連 dev / prod）
+    DB_TEST_DATABASE: 'hexagonal_e2e_test'
+  cache:
+    - *package_cache
+    - *build_artifacts_cache
+  before_script:
+    - npm i -g pnpm@11.0.8
+    - *wait_for_mysql_script
+  script:
+    # pnpm install 的 postinstall 只建 symlink,client 仍需自行 generate
+    - pnpm --filter @app/api db:generate
+    - pnpm --filter @app/api test:e2e
+  needs:
+    - npm-install
+  rules: *quality_rules
 
 # 建置 TypeScript + Prisma generate（pnpm 一併 build api + web）
 prepare-production:
@@ -119,7 +204,10 @@ prepare-production:
     # root build：先 build api（含 prisma generate）再 build web，產出 apps/api/dist 與 apps/web/dist
     - pnpm build
   needs:
+    # 品質未過就不浪費資源建置；e2e 不列入 needs，避免較慢的 e2e 阻塞產出
+    #（e2e 失敗仍會使整體 pipeline 失敗）
     - npm-install
+    - quality-check
   rules:
     - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "master"
 

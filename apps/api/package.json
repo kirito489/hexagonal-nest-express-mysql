@@ -21,7 +21,7 @@
     "format": "prettier --write \"{src,scripts,seeds}/**/*.ts\"",
     "test": "jest && jest --config test/jest.arch.config.js",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --coverage && jest --config test/jest.arch.config.js",
     "test:arch": "jest --config test/jest.arch.config.js",
     "test:e2e": "jest --config test/jest.e2e.config.js --runInBand",
     "swagger:bundle": "swagger-cli bundle docs/swagger/admin/openapi.yaml -o docs/swagger/admin/openapi.bundle.yaml -t yaml && swagger-cli bundle docs/swagger/front/openapi.yaml -o docs/swagger/front/openapi.bundle.yaml -t yaml",

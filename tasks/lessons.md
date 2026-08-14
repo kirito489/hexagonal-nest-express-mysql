@@ -12,6 +12,12 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 **只增不減**；被糾正、或踩到非顯而易見的工具 / 設計坑就立即記。**依主題分組**（Prisma / JWT / NestJS…）而非日期流水——同主題聚在一起好找。
 
+## 工作流程 / 文件維護
+
+- **「設定寫了但沒有執行路徑」是本專案反覆出現的缺陷型態，加設定時要同時問「誰會執行它」**：一輪稽核就抓到四個同型問題——(1) `eslint.config.mjs` 有 `test/**` 規則區塊，但 `lint` 的 glob 是 `{src,scripts,seeds}`，該區塊從未生效；(2) PostToolUse hook 跑 `npx tsc --noEmit`，而 repo root 既無 `tsconfig.json` 也沒裝 typescript，每次只吐 npx 廣告；(3) CI 完全不跑 test / lint / typecheck，所有護欄只在本機生效；(4) 前後端都設了覆蓋率門檻，但 `pnpm test` 不帶 `--coverage`、web 甚至沒有 `test:cov`，四個門檻數字純屬裝飾。**共同特徵是「看起來有保護」——比完全沒有保護更危險**。作法：新增任何門檻 / 規則 / hook 時，明確寫出「哪個指令、哪個 job 會執行它」，並用探針驗證它真的會失敗；審查既有設定時，優先檢查執行路徑而非設定內容本身。
+
+- **功能完成當下就要回頭更新 `tasks/todo.md`，否則清單會反向誤導**：2026-08-14 稽核發現「安全強化」段落的兩條待辦（全域 JwtAuthGuard 預設拒絕、refresh token 重用連坐撤銷）其實都已實作完成，只是完成時沒回頭勾掉，導致清單失真近一個月。後果不只是不整潔——新 session 讀到會以為還沒做，可能重複實作，或誤判專案的安全現況。作法：`/opsx:archive` 或每塊實作收尾時，**先比對原始碼再更新 todo**，不要憑印象；懷疑某條待辦是否過時，直接 grep 關鍵實作（如 `APP_GUARD`、`tokenVersion`）確認，成本只有幾秒。
+
 ## Prisma / 資料庫
 
 - **修改 schema 後必須執行 `npx prisma generate`**：否則 `@prisma/client` 的 TypeScript 會找不到新 model，甚至 `PrismaClient` 型別報 "has no exported member"。
