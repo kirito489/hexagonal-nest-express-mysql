@@ -113,6 +113,8 @@ _Accumulated rules and validated decisions. Each entry records the rule, the mec
 
 - **靜態掃描型的架構測試必須自帶「掃描數 > 0」與「豁免過期」兩道自我檢查**：這類測試有兩種假綠——(1) 目錄改名或命名慣例不同導致掃到 0 個檔案，測試回報「無違規」；(2) 違規修掉後豁免忘了刪，白名單單向膨脹成無人維護的例外清冊。本專案實例：controller 命名是 `XxxController.ts`（PascalCase）而非 `xxx.controller.ts`，照後者寫 glob 會掃到 0 個檔案且全綠。作法：每條規則加 `expect(files.length).toBeGreaterThan(0)`；每筆豁免都驗證它在原始碼中確實仍存在；新增規則後一律「插違規探針 → 親眼看它紅 → 移除探針 → 確認還原乾淨（`git diff` 應為空）」，沒看過紅的架構測試等於沒證明任何事。
 
+- **OpenAPI yaml 絕不可用 regex 解析**：`docs/swagger/**/*.yaml` 有大量多行 `description: |` 區塊，區塊內的文字（含以 `/` 開頭的行、`get:` 這類字樣）會被當成 path / method 節點。第一版比對腳本因此得出「35 條路由全部不同步」的荒謬結果——**極端結果本身就是 bug 的訊號**，不要當成真發現。作法：用 `js-yaml`（已在 lockfile 中，提升為 `apps/api` 直接 devDependency）；比對路由時記得補上 `servers[0].url` 的 pathname（OpenAPI 的 `paths` 是相對 base 的），並把 NestJS 的 `:id` 正規化成 `{id}`。
+
 - **以「引號 + 中文字元」偵測硬編文案，會被 TSDoc 的 markdown 反引號誤判**：`/['"\`][^'"\`]*[一-鿿]/` 掃 exception 檔時，註解裡的 `` `code` 與語意 `kind` `` 這種寫法會被當成字串字面值，導致 4 處假陽性。作法：比對前先跳過註解行（`/^\s*(\/\/|\/\*|\*)/`）；更廣義地說，任何「掃原始碼字串字面值」的規則都要先剝註解，別假設註解裡不會出現引號。
 
 - **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔就能判定的 import 邊界交給 eslint（快、IDE 即時、可 autofix 提示）；跨檔語意（錯誤碼有沒有註冊、有沒有死碼、env 有沒有進 schema）交給架構測試。另外「用到不存在的常數」不必寫檢查——TypeScript 已免費保證，架構測試只該做型別擋不住的部分（例如繞過常數直接寫字面值）。

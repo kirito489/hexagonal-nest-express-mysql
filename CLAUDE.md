@@ -155,7 +155,7 @@ After making changes, before suggesting a commit:
 2. `pnpm lint` — fix all lint warnings / errors.
 3. `pnpm test` — ensure no regressions. If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked).
 4. `pnpm build` — run when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
-5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` + `pnpm --filter @app/api-client generate` to keep frontend types in sync.
+5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` + `pnpm --filter @app/api-client generate` to keep frontend types in sync. Verify with `pnpm --filter @app/api swagger:check` — it regenerates into a temp dir and diffs, so it never touches the working tree. (Route-level drift is already caught by `pnpm test`; `swagger:check` covers content-level drift where the path set is unchanged.)
 
 Once all pass, suggest a commit message (Traditional Chinese, conventional commits; body as bullets, one change per bullet). Do not run `git commit` yourself.
 

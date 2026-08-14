@@ -156,6 +156,27 @@ apps/api/src/
 - **成功回應自己 inline 寫**：**不要** `$ref: SuccessResponse`。每個 endpoint 在 200 / 201 直接 inline 寫整個 `{ success, data: <具體 shape>, timestamp }`。原因：`SuccessResponse.data` 是 generic `type: object`，前端 `openapi-typescript` 推導出來只會是 `Record<string, unknown> | null`，型別失去意義。範例見 `apps/api/docs/swagger/auth/login.yaml`、`profile/get-me.yaml`。
 - **新增 endpoint 後**：執行 `pnpm --filter @app/api swagger:bundle` 重新打包 bundle；前端執行 `pnpm --filter @app/api-client generate` 同步型別。
 
+#### 契約同步護欄
+
+API 契約要經過三段轉換才到前端，**只有最後一段受 TypeScript 保護**：
+
+```
+Controller 路由 → docs/swagger/*/[模組].yaml → openapi.bundle.yaml → api-client/schema.ts → 前端
+              └─ 人工同步 ─┘  └ swagger:bundle ┘   └ generate ┘      └─ TS ─┘
+```
+
+前三段任一環節漏掉都是**靜默不同步**，因此有兩層檢查（分工判準是速度）：
+
+| 檢查 | 指令 | 成本 | 抓得到 |
+| --- | --- | --- | --- |
+| 路由集合 | 跟著 `pnpm test` 自動跑 | 毫秒 | 新增 / 刪除 endpoint 沒同步 |
+| 產物內容 | `pnpm --filter @app/api swagger:check` | 數秒 | 欄位增刪、型別或描述變更 |
+
+- 路由層級由 `test/architecture/swagger-sync.spec.ts` 守住三段轉換，失敗訊息會指出該跑哪個指令。
+- `swagger:check` 把產物產生到 `os.tmpdir()` 再比對，**不會修改工作目錄任何檔案**，可安全用於 CI。
+- 刻意不列入 API 文件的端點（如 health 探測）登記在 `test/architecture/allowlist.ts` 的 `SWAGGER_EXEMPT_ROUTES`，同樣受過期檢查約束。
+- 比對時 `:id` 與 `{id}` 會正規化，**參數名稱不參與比對** —— `{id}` 與 `{memberId}` 在路由結構上等價，強制同名只會製造無意義的失敗。
+
 ---
 
 ## 前端架構（apps/web/src/）
