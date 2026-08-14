@@ -14,7 +14,6 @@ _(目前無)_
 
 - [ ] **首次 CI pipeline 需人工觀察** `add-ci-quality-gate` — CI 設定的正確性**無法在本機完全驗證**（YAML 結構、各 job 的 script 內容、e2e 的環境變數供應方式皆已本機驗證，但 runner 行為、cache 命中、service container 啟動時序只能在實際 pipeline 上確認）。首次推送後請檢查：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) `e2e-test` 的 MySQL 等待迴圈是否足夠（目前 30 次 × 2 秒）；(3) pipeline 總時長是否可接受，過慢可考慮把 `e2e-test` 限縮為只在 MR 跑。
 
-- [ ] **`Member.spec.ts` 裡有一個 `describe('Email')` 與 `Email.spec.ts` 重複** — 既有的組織遺留（非本次改動引入），Email 的測試散在兩個檔案。清理時把 `Member.spec.ts` 第 10 行起的 Email describe 併入 `Email.spec.ts`。
 - [ ] **`.env.example` 補 `ALLOW_PROD_SEED`** — `envSchema` 已補宣告（2026-08-14），但 `.env.example` 尚未加上該項；此檔在 AI 的權限設定中被拒絕存取，需由開發者手動加一行 `ALLOW_PROD_SEED=`（註明僅正式環境用）。
 - [ ] **e2e 出現過一次無法重現的失敗（待觀察）** — `2026-08-14` 在 `pnpm test` 緊接 `pnpm test:e2e` 的組合中出現 `1 failed / 137 passed`，之後單獨連跑 3 次與組合連跑 2 次皆 138 全綠，**未能重現、也未取得失敗測試名稱**（當時輸出被 grep 過濾）。所有 spec 共用同一測試庫且 `--runInBand`，懷疑是連續執行下的資源競爭。下次若再出現，先用 `pnpm --filter @app/api test:e2e 2>&1 | tee` 保留完整輸出再查。
 
@@ -38,6 +37,7 @@ _(目前無)_
 
 ### 2026-08-14
 
+- [x] **`Member.spec.ts` 的重複 `describe('Email')` 已清理** — 三個 Email 測試中有兩個與 `Email.spec.ts` 重複（建立成功 / equals），直接刪除；第三個的三種邊界格式（`@example.com` / `user@` / `user@@example.com`）為 `Email.spec.ts` 所無，以 `it.each` 搬過去保留覆蓋。測試數不變（234），Member.spec.ts 現在只剩 `describe('Member')`。
 - [x] **fix-gen-module-compliance** — 修復本輪護欄造成的回歸：`gen:module` 產出的模組原本 typecheck 失敗（字面值 code 不是 `ResponseCode`）+ 3 條架構規則紅 + 9 個 lint 錯誤。產生器改為引用 `ResponseCodes`、自動注入錯誤碼與訊息（冪等）、產出 swagger yaml 骨架並自動重跑 bundle / generate。**產出物零手改即通過 typecheck / lint / 20 條架構守則**（admin 與 front 兩側皆實測）。順帶修掉 `project.md` 模組範本中過時的「GlobalExceptionFilter 新增例外對應」。
 - [x] **enforce-quality-thresholds** — 讓四個覆蓋率門檻真的會失敗：web 新增 `test:cov`（原本連 script 都沒有）、api 的 `test:cov` 補上架構測試（否則 CI 換用後會靜默漏掉 20 條規則）、root 串接 `pnpm -r test:cov`、CI `quality-check` 改用它。另補前端分層邊界（eslint 兩條 + vitest 架構測試一條，因「routes 互不相依」靜態 glob 表達不了）。**稽核修正**：原判斷「前端護欄遠落後」不成立——實測前端覆蓋率 94%、分層 0 違規，檔案數比例會誤導（shadcn 元件與整合層不在分母內）。
 - [x] **add-ci-quality-gate** — CI 新增 `quality` stage：`quality-check`（typecheck + lint + 234 單元 + 20 架構守則）與 `e2e-test`（`mysql:9` service container 跑 138 支 e2e），**兩者於 MR 即觸發**（原本 MR 階段只跑 `pnpm install`），`prepare-production` 加 `needs: quality-check`。e2e 連線走 job variables 而非偽造 `.env`（已驗證 dotenv 不覆寫既有 `process.env`）。**注意：CI 正確性無法本機完全驗證**，首次 pipeline 需人工觀察（見待處理）。

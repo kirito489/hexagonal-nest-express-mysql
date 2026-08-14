@@ -16,6 +16,13 @@ describe('Email', () => {
     expect(() => Email.of('not-an-email')).not.toThrow('not-an-email');
   });
 
+  it.each(['@example.com', 'user@', 'user@@example.com'])(
+    '無效格式 %s → 拋出 InvalidEmailException',
+    (invalid) => {
+      expect(() => Email.of(invalid)).toThrow(InvalidEmailException);
+    },
+  );
+
   it('無效 email → kind 為 INVALID（對應 400 而非 500）', () => {
     expect(() => Email.of('bad')).toThrow(
       expect.objectContaining({ kind: 'INVALID' }),

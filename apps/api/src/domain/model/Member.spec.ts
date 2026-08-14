@@ -7,29 +7,6 @@ const TEST_UUID_2 = '00000000-0000-0000-0000-000000000002';
 const ROLE_UUID_1 = '00000000-0000-0000-0000-000000000010';
 const ROLE_UUID_2 = '00000000-0000-0000-0000-000000000020';
 
-describe('Email', () => {
-  it('有效 email 建立成功', () => {
-    expect(() => Email.of('user@example.com')).not.toThrow();
-    expect(Email.of('user@example.com').toString()).toBe('user@example.com');
-  });
-
-  it('無效 email 拋出錯誤', () => {
-    expect(() => Email.of('not-an-email')).toThrow();
-    expect(() => Email.of('@example.com')).toThrow();
-    expect(() => Email.of('user@')).toThrow();
-    expect(() => Email.of('user@@example.com')).toThrow();
-    expect(() => Email.of('')).toThrow();
-  });
-
-  it('equals 比較值', () => {
-    const a = Email.of('user@example.com');
-    const b = Email.of('user@example.com');
-    const c = Email.of('other@example.com');
-    expect(a.equals(b)).toBe(true);
-    expect(a.equals(c)).toBe(false);
-  });
-});
-
 describe('Member', () => {
   describe('create', () => {
     it('建立新成員，自動產生 id', () => {
