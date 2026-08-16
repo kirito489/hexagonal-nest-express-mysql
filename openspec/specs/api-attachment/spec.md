@@ -8,7 +8,7 @@
 放進由自己網域提供的路徑，任何一處把關失守都可能變成 stored XSS 或內容嗅探攻擊，
 因此白名單、副檔名推導與大小上限都寫成規範性要求，而非實作細節。
 
-儲存後端（local / s3）的切換與靜態服務見 `openspec/project.md` 的「檔案儲存與上傳安全」。
+儲存後端（local / s3）的切換與靜態服務見 `openspec/project/backend-utilities.md` 的「檔案儲存與上傳安全」。
 
 ## Requirements
 

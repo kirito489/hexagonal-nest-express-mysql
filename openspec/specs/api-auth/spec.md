@@ -9,7 +9,7 @@
 憑證的入口。也因此這裡的失敗回應設計以**不洩漏帳號是否存在**為第一原則：
 忘記密碼一律回相同結果，登入失敗不區分「帳號不存在」與「密碼錯誤」。
 
-Token 儲存位置、CORS 與前端的換發流程見 `openspec/project.md` 的「認證流程」；
+Token 儲存位置、CORS 與前端的換發流程見 `openspec/project/backend-runtime.md` 的「認證流程」；
 錯誤回應的通用形狀見 `platform-api-error-response`。
 
 ## Requirements

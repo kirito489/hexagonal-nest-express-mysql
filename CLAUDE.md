@@ -35,7 +35,7 @@ At the start of every new session:
 > catches it). The `自律` ones are where your attention actually matters.
 
 - 🚫 **Never let a controller touch Prisma / a repository directly** — always go through `Facade → UseCase / Service → Port` (hexagonal layering). 〔**lint + 測試**〕
-- 🚫 **Never hand-scaffold a feature module or misplace the front/back split** — the codebase has two API sides: 後台 `admin/` (`/api/admin/*`) and 前台 `front/` (`/api/front/*`). The **in-side 5 layers** (controller / facade / service / port-in / module) live under `<side>/`; **out-side** (persistence / port-out), **domain**, and cross-cutting (guard / filter / interceptor / decorator) are **shared — never under a side**. Scaffold new modules with `pnpm --filter @app/api gen:module <name> [--admin|--front]` (defaults to admin); front module classes get a `Front` prefix. The generator also injects the error code + message, writes swagger yaml stubs, registers them in `openapi.yaml`, and re-runs bundle/generate — **its output passes typecheck / lint / all guardrails with zero hand edits**. If you ever change a domain base class, shared constant, or layering rule, re-run the generator on a throwaway name and verify it still comes out green. Swagger/api-client is admin-only (`/api/admin/docs`); front has its own doc (`/api/front/docs`), see `openspec/project.md`. 〔**測試**〕
+- 🚫 **Never hand-scaffold a feature module or misplace the front/back split** — the codebase has two API sides: 後台 `admin/` (`/api/admin/*`) and 前台 `front/` (`/api/front/*`). The **in-side 5 layers** (controller / facade / service / port-in / module) live under `<side>/`; **out-side** (persistence / port-out), **domain**, and cross-cutting (guard / filter / interceptor / decorator) are **shared — never under a side**. Scaffold new modules with `pnpm --filter @app/api gen:module <name> [--admin|--front]` (defaults to admin); front module classes get a `Front` prefix. The generator also injects the error code + message, writes swagger yaml stubs, registers them in `openapi.yaml`, and re-runs bundle/generate — **its output passes typecheck / lint / all guardrails with zero hand edits**. If you ever change a domain base class, shared constant, or layering rule, re-run the generator on a throwaway name and verify it still comes out green. Swagger/api-client is admin-only (`/api/admin/docs`); front has its own doc (`/api/front/docs`), see `openspec/project/backend-architecture.md`. 〔**測試**〕
 - 🚫 **Never `throw new Error('...')`** — use a domain exception (a subclass of `DomainException` passing a `ResponseCodes` code + a semantic `kind`) or a NestJS `HttpException`. The filter maps `kind → HTTP status` automatically, so you do **not** touch `GlobalExceptionFilter` when adding an exception. Adding a code means editing **two** files: `shared/constants/response-codes.ts` and `shared/constants/response-messages.ts` — the message table is `satisfies Record<ResponseCode, …>`, so a missing message fails typecheck immediately. 〔**測試**〕
 - 🚫 **Never inline a user-facing message inside an exception** — messages live only in `response-messages.ts`. Static messages take `super(code, kind)` (two args, the base looks it up); parameterised ones take `super(code, kind, ResponseMessages.X(arg))`. A constructor overload makes the parameterised case a **compile error** if you forget the message, and an architecture test rejects Chinese string literals under `domain/exception/`. 〔**型別 + 測試**〕
 - 🚫 **Never validate domain input with `of()` on a DB-restore path** — value objects have two entry points: `of()` validates and throws `INVALID` (→ 400) for user input; `trusted()` skips validation for `reconstitute()`. Re-validating on restore reports data corruption as a client input error. 〔**自律**〕
@@ -68,6 +68,7 @@ This project has explicit per-file language rules:
 | `CLAUDE.md` (this file)       | **English**              |
 | `README.md`                   | Traditional Chinese      |
 | `openspec/project.md`         | Traditional Chinese      |
+| `openspec/project/**/*.md`    | Traditional Chinese      |
 | `openspec/changes/**/*.md`    | Traditional Chinese      |
 | `openspec/specs/**/*.md`      | Traditional Chinese      |
 | `openspec/schemas/**`         | Traditional Chinese（`##` 結構標題除外，見下） |
@@ -117,7 +118,7 @@ Three layers work together:
 
 - Use `openspec-propose` → generates `proposal.md`, `specs/`, `tasks.md` in the change folder.
 - **Changes must be created with `--schema spec-driven-custom`.** The project's format rules live in `openspec/schemas/spec-driven-custom/` and reach you through `openspec instructions`; `openspec config` is global-scope only, so a missing flag silently falls back to the built-in schema and every rule below stops applying. `openspec-schema.spec.ts` fails if the flag or the schema goes missing.
-- Capability names carry a mandatory prefix that dictates how the spec is written: `api-` (backend endpoint contract, admin by default), `api-front-`, `ui-`, `platform-`. Full table in `openspec/project.md` → 「OpenSpec 慣例」.
+- Capability names carry a mandatory prefix that dictates how the spec is written: `api-` (backend endpoint contract, admin by default), `api-front-`, `ui-`, `platform-`. Full table in `openspec/project/openspec-conventions.md`.
 - API changes must define request / response specs in the change's `specs/` **before any controller code** — each endpoint requirement needs **Request**, **Success Response**, and **Failure Responses** with real JSON. Two things are easy to get wrong: returning `null` omits the `data` key entirely (not `"data": null`), and `204 No Content` carries no body at all. `openspec-spec-format.spec.ts` enforces this.
 - For backend changes, `tasks.md` phases follow this order: Schema/Migration → Domain/Port → Exceptions/Filter → Services (TDD) → Out Adapter → Controller/DTO → Facade + Module → Swagger → Unit tests → E2E tests → Verification → Wrap-up.
 - The user reviews and approves before any code is written.
@@ -185,22 +186,23 @@ pnpm --filter @app/api db:generate            # run after every pnpm install, be
 pnpm --filter @app/api swagger:bundle && pnpm --filter @app/api-client generate   # after Swagger changes
 ```
 
-**Full per-workspace command reference**: see `openspec/project.md` → "完整指令參考".
+**Full per-workspace command reference**: see `openspec/project/tooling.md` → 「完整指令參考」.
 
 ---
 
 ## Architecture & Conventions
 
-See **`openspec/project.md`** for:
+`openspec/project.md` is the **index** — purpose, monorepo layout, tech stack, and a table pointing
+into `openspec/project/`. Read the index first, then open only the file you need:
 
-- Backend hexagonal layout (`adapter` / `application` / `domain` / `infrastructure`), module naming, and the `gen:module` generator.
-- Frontend directory layout, path aliases, shadcn integration, form / API conventions.
-- Swagger yaml inline-data convention (never `$ref: SuccessResponse`), plus the three-hop contract sync guardrail (controller → source yaml → bundle → api-client).
-- Architecture guardrail tests: where they live, how to add a rule, the exemption list, and the eslint-vs-test split.
-- `.agents/hooks/*.sh`: agent hook logic lives there (tool-agnostic), `.claude/settings.json` only registers it. To change hook behaviour edit the script, not the JSON. New scripts are auto-checked by `hook-scripts.spec.ts` (`bash -n` + "every registered script exists").
-- `pnpm verify:ci`: reproduce the CI e2e environment locally in a container before pushing CI changes.
-- CI job responsibilities and the local command each one maps to.
-- Auth flow, token storage, CORS, environment variables, time-handling convention, naming conventions.
-- API client design (source-first, auto-unwrap of `{ success, data, timestamp }`).
+| File | Covers |
+| --- | --- |
+| `project/backend-architecture.md` | Hexagonal layout (`adapter` / `application` / `domain` / `infrastructure`), module naming, naming conventions, time handling, Swagger yaml conventions (inline data, never `$ref: SuccessResponse`) |
+| `project/backend-runtime.md` | Auth flow, token storage, CORS, environment variables, RBAC, global middleware, API response format, feature flags, security settings |
+| `project/backend-utilities.md` | Logging, masking, Zod, date helpers, file storage, seed, System Log, pagination, the `gen:module` generator |
+| `project/frontend.md` | `apps/web` layout, shadcn integration, form / API conventions, api-client design (source-first, auto-unwrap of `{ success, data, timestamp }`) |
+| `project/testing.md` | Unit / e2e / architecture-guardrail split, where rules live, how to add one, the exemption list, coverage thresholds |
+| `project/openspec-conventions.md` | Capability naming prefixes, `api-*` request/response format, change naming, tasks.md block splitting |
+| `project/tooling.md` | `.agents/hooks/*.sh` (logic is tool-agnostic; `.claude/settings.json` only registers it — edit the script, not the JSON; `hook-scripts.spec.ts` auto-checks new ones), `pnpm verify:ci`, CI job responsibilities and their local equivalents, full command reference |
 
 Don't duplicate any of that here. When in doubt, read `openspec/project.md` first.

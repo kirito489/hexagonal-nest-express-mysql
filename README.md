@@ -78,7 +78,7 @@ pnpm --filter @app/api swagger:bundle
 pnpm --filter @app/api-client generate
 ```
 
-**完整指令參考**（含 db、shadcn、build 等）：`openspec/project.md` → 「完整指令參考」。
+**完整指令參考**（含 db、shadcn、build 等）：`openspec/project/tooling.md` → 「完整指令參考」。
 
 ## 新增功能模組
 
@@ -173,11 +173,11 @@ openssl rand -hex 32
 
 | 想知道                          | 看哪裡                                          |
 | ------------------------------- | ----------------------------------------------- |
-| 技術棧、目錄細節、慣例規則      | `openspec/project.md`                           |
-| 後端 RBAC、認證、API 回應格式   | `openspec/project.md` 之「後端架構」「認證流程」 |
-| 前端 API 呼叫、表單、shadcn     | `openspec/project.md` 之「前端架構」            |
-| 架構守則有哪些、怎麼加新規則    | `openspec/specs/platform-engineering-guardrails/spec.md`、`openspec/project.md` 之「架構守則測試」 |
-| CI 各 job 職責與對應的本機指令  | `openspec/project.md` 之「CI（GitLab）」        |
+| 技術棧、目錄細節、慣例規則      | `openspec/project.md`（索引，細節分於 `openspec/project/`） |
+| 後端 RBAC、認證、API 回應格式   | `openspec/project/backend-runtime.md`           |
+| 前端 API 呼叫、表單、shadcn     | `openspec/project/frontend.md`                  |
+| 架構守則有哪些、怎麼加新規則    | `openspec/specs/platform-engineering-guardrails/spec.md`、`openspec/project/testing.md` 之「架構守則測試」 |
+| CI 各 job 職責與對應的本機指令  | `openspec/project/tooling.md` 之「CI（GitLab）」 |
 | 已踩過的坑（非顯而易見的雷）    | `tasks/lessons.md`                              |
 | 待辦、觀察中事項、技術債        | `tasks/todo.md`                                 |
 | 開發中 / 已封存的 change        | `openspec/changes/`、`openspec/changes/archive/` |
