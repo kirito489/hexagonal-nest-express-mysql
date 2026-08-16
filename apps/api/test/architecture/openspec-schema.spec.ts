@@ -79,7 +79,10 @@ describe('架構守則：openspec 自訂 schema 的執行路徑', () => {
         if (!entry.endsWith('.md')) continue;
 
         const body = readFileSync(join(REPO_ROOT, relative), 'utf8');
-        for (const match of body.matchAll(/openspec new change[^\n`]*/g)) {
+        // 只認真正的呼叫（後面接得出名稱），不認散文裡純提及的 `openspec new change`
+        for (const match of body.matchAll(
+          /openspec new change\s+["'<][^\n`]*/g,
+        )) {
           creations += 1;
           if (!match[0].includes(`--schema ${SCHEMA_NAME}`)) {
             missingFlag.push(`  ${relative}\n    ${match[0].trim()}`);
@@ -99,6 +102,41 @@ describe('架構守則：openspec 自訂 schema 的執行路徑', () => {
         : `以下建立 change 的指令未指定自訂 schema，用它建出來的 change 會落回內建 schema：\n${missingFlag.join(
             '\n',
           )}\n應為 \`openspec new change "<name>" --schema ${SCHEMA_NAME}\``,
+    ).toBe('');
+  });
+
+  it('opsx 指令必須是轉呼叫 skill 的薄殼，不得再抄一份流程', () => {
+    const commandsDir = join(REPO_ROOT, '.claude', 'commands', 'opsx');
+    const commands = existsSync(commandsDir)
+      ? readdirSync(commandsDir).filter((f) => f.endsWith('.md'))
+      : [];
+
+    expect(commands.length).toBeGreaterThan(0);
+
+    // 薄殼合理上限：frontmatter + 轉呼叫說明 + 為何要薄的理由，40 行綽綽有餘。
+    // 超過就代表流程又被抄回來了——四支曾經漂到與 skill 差 20～143 行，
+    // 導致 skill 補上 --schema 後 /opsx:propose 仍在用內建 schema。
+    const MAX_LINES = 40;
+    const fat: string[] = [];
+
+    for (const file of commands) {
+      const body = readFileSync(join(commandsDir, file), 'utf8');
+      const lines = body.split('\n').length;
+      const delegates = /Skill tool|skills\/[\w-]+\/SKILL\.md/.test(body);
+
+      if (lines > MAX_LINES || !delegates) {
+        fat.push(
+          `  .claude/commands/opsx/${file}（${lines} 行，${delegates ? '有' : '未'}轉呼叫 skill）`,
+        );
+      }
+    }
+
+    expect(
+      fat.length === 0
+        ? ''
+        : `以下 opsx 指令不再是薄殼：\n${fat.join(
+            '\n',
+          )}\n流程只能有一份真相，寫在 .claude/skills/<name>/SKILL.md；指令檔只負責轉呼叫（上限 ${MAX_LINES} 行）`,
     ).toBe('');
   });
 
