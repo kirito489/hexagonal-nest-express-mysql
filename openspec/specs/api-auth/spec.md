@@ -232,9 +232,12 @@ MUST 套用與忘記密碼相同的節流（每來源每分鐘 3 次）。
 
 **Failure Responses**：
 
-- `400`：`newPassword` 未通過密碼複雜度檢核，或欄位缺漏
-- `401`：Token 無效或已過期
+- `400`、`code: "BAD_REQUEST"`：Token 無效或已過期（`BadRequestException`），
+  或 `newPassword` 未通過密碼複雜度檢核，或欄位缺漏
 - `429`：超過節流上限
+
+Token 無效與欄位驗證失敗**刻意共用 `400`**：重設連結是否有效不該由狀態碼區分，
+否則就成了「這枚 Token 存不存在」的探測管道。
 
 #### Scenario: 重設成功
 
@@ -244,7 +247,7 @@ MUST 套用與忘記密碼相同的節流（每來源每分鐘 3 次）。
 #### Scenario: Token 單次使用
 
 - **WHEN** 以同一枚 Token 連續重設兩次
-- **THEN** 第一次回 `204`，第二次 MUST 回 `401`
+- **THEN** 第一次回 `204`，第二次 MUST 回 `400`、`code: "BAD_REQUEST"`
 
 #### Scenario: 新密碼不符複雜度
 

@@ -309,32 +309,15 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description 請求已接受 */
-                200: {
+                /**
+                 * @description 請求已接受（無回應內容）。信箱是否存在皆回相同結果，
+                 *     提示文案由前端固定呈現——後端不回任何足以區分的內容。
+                 */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content: {
-                        /**
-                         * @example {
-                         *       "success": true,
-                         *       "data": {
-                         *         "message": "若此信箱已註冊，您將收到密碼重設信件"
-                         *       },
-                         *       "timestamp": "2024-01-01T00:00:00.000Z"
-                         *     }
-                         */
-                        "application/json": {
-                            /** @example true */
-                            success: boolean;
-                            data: {
-                                /** @description 顯示給使用者的提示訊息 */
-                                message: string;
-                            };
-                            /** Format: date-time */
-                            timestamp: string;
-                        };
-                    };
+                    content?: never;
                 };
                 400: components["responses"]["BadRequest"];
                 500: components["responses"]["InternalServerError"];
@@ -384,36 +367,18 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description 密碼重設成功 */
-                200: {
+                /** @description 密碼重設成功（無回應內容） */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content: {
-                        /**
-                         * @example {
-                         *       "success": true,
-                         *       "data": {
-                         *         "message": "密碼已成功重設"
-                         *       },
-                         *       "timestamp": "2024-01-01T00:00:00.000Z"
-                         *     }
-                         */
-                        "application/json": {
-                            /** @example true */
-                            success: boolean;
-                            data: {
-                                /** @description 顯示給使用者的提示訊息 */
-                                message: string;
-                            };
-                            /** Format: date-time */
-                            timestamp: string;
-                        };
-                    };
+                    content?: never;
                 };
-                400: components["responses"]["BadRequest"];
-                /** @description Token 無效或已過期 */
-                401: {
+                /**
+                 * @description Token 無效或已過期，或新密碼未通過複雜度檢核、欄位缺漏。
+                 *     Token 是否有效刻意不以狀態碼區分，避免成為「這枚 Token 存不存在」的探測管道。
+                 */
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -421,8 +386,8 @@ export interface paths {
                         /**
                          * @example {
                          *       "success": false,
-                         *       "message": "密碼重設連結無效或已過期",
-                         *       "code": "INVALID_RESET_TOKEN",
+                         *       "message": "重設密碼連結無效或已過期",
+                         *       "code": "BAD_REQUEST",
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
                          */

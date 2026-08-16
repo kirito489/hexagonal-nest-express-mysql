@@ -115,6 +115,102 @@ export const routesFromGeneratedSchema = (
   return routes;
 };
 
+/** `@HttpCode(HttpStatus.X)` 用得到的常數名 → 數值 */
+const HTTP_STATUS_VALUE: Record<string, number> = {
+  OK: 200,
+  CREATED: 201,
+  ACCEPTED: 202,
+  NO_CONTENT: 204,
+};
+
+/** NestJS 未指定 `@HttpCode` 時的預設成功狀態：POST 為 201，其餘為 200 */
+const defaultSuccessStatus = (method: string): number =>
+  method === 'POST' ? 201 : 200;
+
+/**
+ * 從 controller 原始碼取出每條路由的成功狀態碼。
+ *
+ * `@HttpCode` 一定寫在它所屬的路由裝飾器之後、下一個路由裝飾器之前，
+ * 因此以「兩個路由裝飾器之間」為搜尋窗即可正確配對。
+ *
+ * @returns 路由 → 成功狀態碼
+ */
+export const successStatusFromControllers = (): Map<Route, number> => {
+  const files = collectSourceFiles(['src/adapter/in/web'], {
+    exclude: ['.spec.ts'],
+  }).filter((file) => file.endsWith('Controller.ts'));
+
+  const result = new Map<Route, number>();
+
+  for (const file of files) {
+    const source = readSource(file);
+    const controllerBase = /@Controller\('([^']*)'\)/.exec(source)?.[1] ?? '';
+
+    const matches = [
+      ...source.matchAll(/@(Get|Post|Patch|Put|Delete)\(\s*'?([^')]*)'?\s*\)/g),
+    ];
+
+    matches.forEach((match, index) => {
+      const method = match[1].toUpperCase();
+      const sub = match[2].replace(/'/g, '').trim();
+      const path = normalizePath(
+        `/api/${[controllerBase, sub].filter(Boolean).join('/')}`,
+      ).replace(/:(\w+)/g, '{$1}');
+
+      const windowEnd = matches[index + 1]?.index ?? source.length;
+      const window = source.slice(match.index ?? 0, windowEnd);
+      const httpCode = /@HttpCode\(\s*HttpStatus\.(\w+)\s*\)/.exec(window)?.[1];
+
+      result.set(
+        `${method} ${path}`,
+        (httpCode ? HTTP_STATUS_VALUE[httpCode] : undefined) ??
+          defaultSuccessStatus(method),
+      );
+    });
+  }
+
+  return result;
+};
+
+/**
+ * 從 OpenAPI yaml 取出每條路由記載的 2xx 狀態碼
+ * @param file - 相對 apps/api 的 yaml 路徑
+ * @returns 路由 → 該路由記載的所有 2xx 狀態碼
+ */
+export const successStatusFromOpenApi = (
+  file: string,
+): Map<Route, number[]> => {
+  const parsed = parseOpenApi(file);
+  const base = serverBaseOf(file);
+  const result = new Map<Route, number[]>();
+
+  for (const [path, operations] of Object.entries(parsed.paths ?? {})) {
+    for (const [method, operation] of Object.entries(operations)) {
+      if (!HTTP_METHODS.includes(method as (typeof HTTP_METHODS)[number])) {
+        continue;
+      }
+      const responses =
+        typeof operation === 'object' &&
+        operation !== null &&
+        'responses' in operation
+          ? operation.responses
+          : undefined;
+      if (typeof responses !== 'object' || responses === null) continue;
+
+      const success = Object.keys(responses)
+        .map(Number)
+        .filter((code) => code >= 200 && code < 300);
+
+      result.set(
+        `${method.toUpperCase()} ${normalizePath(`${base}${path}`)}`,
+        success,
+      );
+    }
+  }
+
+  return result;
+};
+
 /**
  * 比較兩組路由集合的差集，組成可讀報告
  * @param actual - 實際擁有的路由

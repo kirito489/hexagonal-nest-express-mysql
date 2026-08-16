@@ -171,9 +171,14 @@ Controller 路由 → docs/swagger/*/[模組].yaml → openapi.bundle.yaml → a
 | 檢查 | 指令 | 成本 | 抓得到 |
 | --- | --- | --- | --- |
 | 路由集合 | 跟著 `pnpm test` 自動跑 | 毫秒 | 新增 / 刪除 endpoint 沒同步 |
+| 成功狀態碼 | 跟著 `pnpm test` 自動跑 | 毫秒 | `@HttpCode` 與 yaml 記載的 2xx 不一致 |
 | 產物內容 | `pnpm --filter @app/api swagger:check` | 數秒 | 欄位增刪、型別或描述變更 |
 
 - 路由層級由 `test/architecture/swagger-sync.spec.ts` 守住三段轉換，失敗訊息會指出該跑哪個指令。
+- **狀態碼那條是補漏加的**：原本只比對「路由存不存在」，於是 `forgot-password` / `reset-password`
+  的 yaml 長期寫成 `200` + `data.message`、實作卻是 `204` 無 body，兩邊路由都在、檢查全綠，
+  錯的型別一路流到 `@app/api-client`。護欄只驗「存在」不驗「內容」時，內容漂移可以躲很久。
+  該規則讀 bundle 而非來源 yaml——來源每條路由都是 `$ref`，`responses` 不在檔內。
 - `swagger:check` 把產物產生到 `os.tmpdir()` 再比對，**不會修改工作目錄任何檔案**，可安全用於 CI。
 - 刻意不列入 API 文件的端點（如 health 探測）登記在 `test/architecture/allowlist.ts` 的 `SWAGGER_EXEMPT_ROUTES`，同樣受過期檢查約束。
 - 比對時 `:id` 與 `{id}` 會正規化，**參數名稱不參與比對** —— `{id}` 與 `{memberId}` 在路由結構上等價，強制同名只會製造無意義的失敗。
