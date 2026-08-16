@@ -25,15 +25,15 @@
     "test:arch": "jest --config test/jest.arch.config.js",
     "test:e2e": "jest --config test/jest.e2e.config.js --runInBand",
     "swagger:bundle": "swagger-cli bundle docs/swagger/admin/openapi.yaml -o docs/swagger/admin/openapi.bundle.yaml -t yaml && swagger-cli bundle docs/swagger/front/openapi.yaml -o docs/swagger/front/openapi.bundle.yaml -t yaml",
-    "swagger:check": "ts-node -P tsconfig.scripts.json scripts/check-swagger-sync.ts",
-    "db:seed": "ts-node -P tsconfig.scripts.json scripts/seed-runner.ts",
-    "db:create": "ts-node scripts/create-database.ts",
-    "db:drop": "ts-node scripts/drop-database.ts",
-    "db:migrate": "ts-node scripts/prisma-env.ts prisma migrate dev",
-    "db:migrate:deploy": "ts-node scripts/prisma-env.ts prisma migrate deploy",
-    "db:generate": "ts-node scripts/prisma-env.ts prisma generate --no-hints",
-    "db:studio": "ts-node scripts/prisma-env.ts prisma studio",
-    "gen:module": "ts-node scripts/gen-module.ts",
+    "swagger:check": "ts-node -r tsconfig-paths/register -P tsconfig.scripts.json scripts/check-swagger-sync.ts",
+    "db:seed": "ts-node -r tsconfig-paths/register -P tsconfig.scripts.json scripts/seed-runner.ts",
+    "db:create": "ts-node -r tsconfig-paths/register scripts/create-database.ts",
+    "db:drop": "ts-node -r tsconfig-paths/register scripts/drop-database.ts",
+    "db:migrate": "ts-node -r tsconfig-paths/register scripts/prisma-env.ts prisma migrate dev",
+    "db:migrate:deploy": "ts-node -r tsconfig-paths/register scripts/prisma-env.ts prisma migrate deploy",
+    "db:generate": "ts-node -r tsconfig-paths/register scripts/prisma-env.ts prisma generate --no-hints",
+    "db:studio": "ts-node -r tsconfig-paths/register scripts/prisma-env.ts prisma studio",
+    "gen:module": "ts-node -r tsconfig-paths/register scripts/gen-module.ts",
     "postinstall": "cd node_modules/@prisma/client && ln -sf ../../.prisma .prisma"
   },
   "dependencies": {
@@ -152,6 +152,9 @@
       }
     },
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@app/(.*)$": "<rootDir>/$1"
+    }
   }
 }

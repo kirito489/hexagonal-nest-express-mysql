@@ -16,6 +16,8 @@
  */
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
+  // ts-jest 不讀 tsconfig 的 paths，須自行對應（本設定的 rootDir 是 apps/api，故要補 src/）
+  moduleNameMapper: { '^@app/(.*)$': '<rootDir>/src/$1' },
   rootDir: '..',
   testRegex: 'test/architecture/.*\\.spec\\.ts$',
   transform: { '^.+\\.(t|j)s$': 'ts-jest' },

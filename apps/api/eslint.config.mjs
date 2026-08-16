@@ -60,6 +60,31 @@ export default defineConfig([
   },
   // 家規最後套:蓋回 recommendedTypeChecked 重新開成 error 的 no-explicit-any 等
   houseRules,
+  // 深層相對路徑一律改走 @app/* alias。
+  //
+  // 刻意用**基礎** no-restricted-imports 而非 @typescript-eslint/ 版：後者已被下方五個
+  // 分層邊界區塊使用，flat config 中同名規則是「後蓋前、不合併 patterns」，
+  // 疊上去會把那五個區塊的限制洗掉。不同規則名才能安全共存。
+  //
+  // 門檻設在 4 層：2～3 層多半是同模組內的鄰近檔案，相對路徑反而比 alias 好讀；
+  // 4 層以上已經跨越分層邊界，看不出指向哪裡。
+  {
+    files: ['src/**/*.ts', 'test/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../../../../*'],
+              message:
+                '4 層以上的相對路徑請改用 @app/*（對應 apps/api/src/）。nest build 會在編譯時改寫成相對路徑，dist 不受影響。',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Prisma 持久層是 ORM 邊界:查詢結果 / mapper 天生 any,關掉 no-unsafe-* 家族
   {
     files: ['src/adapter/out/persistence/**/*.ts'],
