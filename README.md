@@ -109,7 +109,7 @@ pnpm --filter @app/api gen:module <name> --front    # 前台模組 → /api/fron
 | 覆蓋率門檻 | api 70/60/70/70、web 75/75/60/75 | `pnpm test:cov` |
 | GitLab CI | 上述全部 + e2e（MySQL service container） | Merge Request 與 develop / master 推送 |
 
-`git commit --no-verify` 繞得過 husky，繞不過 CI。規則細節見 `openspec/specs/engineering-guardrails/spec.md`。
+`git commit --no-verify` 繞得過 husky，繞不過 CI。規則細節見 `openspec/specs/platform-engineering-guardrails/spec.md`。
 
 ## 單一埠部署（選用）
 
@@ -166,7 +166,7 @@ openssl rand -hex 32
 | 登入回 `pool timeout: failed to retrieve a connection`           | Docker MySQL 剛啟動還沒完全 ready，等 10 秒重試                                                  |
 | 後端啟動印 `[FCM] / [S3] 憑證未設定`                             | 未設定的選填功能 debug 訊息，可忽略；正式要用再填 `FCM_*` / `AWS_*` 環境變數                       |
 | e2e 報 `DB_TEST_DATABASE … 名稱須含 "test"`                      | 守門機制生效中。在 `.env` 設一個含 `test` 的測試庫名（如 `myapp_test`），庫不存在會自動建           |
-| 架構守則測試失敗                                                  | 訊息會直接指出違規的 `檔案:行號` 與修正方式。規則清單見 `openspec/specs/engineering-guardrails/spec.md` |
+| 架構守則測試失敗                                                  | 訊息會直接指出違規的 `檔案:行號` 與修正方式。規則清單見 `openspec/specs/platform-engineering-guardrails/spec.md` |
 | swagger 相關的架構測試紅                                          | controller 與 yaml 不同步。補 `docs/swagger/<side>/` 的 yaml 後跑 `swagger:bundle` + api-client `generate` |
 
 ## 想看更多
@@ -176,7 +176,7 @@ openssl rand -hex 32
 | 技術棧、目錄細節、慣例規則      | `openspec/project.md`                           |
 | 後端 RBAC、認證、API 回應格式   | `openspec/project.md` 之「後端架構」「認證流程」 |
 | 前端 API 呼叫、表單、shadcn     | `openspec/project.md` 之「前端架構」            |
-| 架構守則有哪些、怎麼加新規則    | `openspec/specs/engineering-guardrails/spec.md`、`openspec/project.md` 之「架構守則測試」 |
+| 架構守則有哪些、怎麼加新規則    | `openspec/specs/platform-engineering-guardrails/spec.md`、`openspec/project.md` 之「架構守則測試」 |
 | CI 各 job 職責與對應的本機指令  | `openspec/project.md` 之「CI（GitLab）」        |
 | 已踩過的坑（非顯而易見的雷）    | `tasks/lessons.md`                              |
 | 待辦、觀察中事項、技術債        | `tasks/todo.md`                                 |

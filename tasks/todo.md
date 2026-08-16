@@ -56,7 +56,7 @@
 - **`pnpm verify:ci` 本機重現 CI**：compose 起 MySQL 9（healthcheck + tmpfs），實測 144 tests / 62 秒。順帶確認 GitLab services 不支援 compose 的 healthcheck 語法，CI 端的手動等待迴圈是必要的。
 - **`AGENTS.md` symlink + Hard Rules 標註強制方式**：標註後浮現一個事實——**12 條 Hard Rules 只有 5 條有機器守，7 條純靠自律**。
 
-架構規則 20 → 24，master spec 的 engineering-guardrails 16 → 19 條。
+架構規則 20 → 24，master spec 的 platform-engineering-guardrails 16 → 19 條。
 
 
 ### 2026-08-14 — 工程護欄體系：把 Hard Rules 變成會失敗的檢查

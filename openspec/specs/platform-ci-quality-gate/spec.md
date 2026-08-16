@@ -1,4 +1,4 @@
-# ci-quality-gate Specification
+# platform-ci-quality-gate Specification
 
 ## Purpose
 

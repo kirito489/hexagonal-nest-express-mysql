@@ -1,4 +1,4 @@
-# frontend-admin Specification
+# platform-frontend-conventions Specification
 
 ## Purpose
 

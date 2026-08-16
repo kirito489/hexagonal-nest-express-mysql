@@ -1,4 +1,4 @@
-# engineering-guardrails Specification
+# platform-engineering-guardrails Specification
 
 ## Purpose
 

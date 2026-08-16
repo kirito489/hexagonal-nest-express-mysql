@@ -1,4 +1,4 @@
-# api-error-response Specification
+# platform-api-error-response Specification
 
 ## Purpose
 

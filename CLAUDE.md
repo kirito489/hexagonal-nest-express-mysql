@@ -69,12 +69,15 @@ This project has explicit per-file language rules:
 | `README.md`                   | Traditional Chinese      |
 | `openspec/project.md`         | Traditional Chinese      |
 | `openspec/changes/**/*.md`    | Traditional Chinese      |
+| `openspec/specs/**/*.md`      | Traditional Chinese      |
+| `openspec/schemas/**`         | Traditional Chinese（`##` 結構標題除外，見下） |
 | `tasks/lessons.md`, `todo.md` | Traditional Chinese      |
 | Code comments (all files)     | Traditional Chinese only |
 | Frontend UI strings           | Traditional Chinese only |
 
 - **Never use Japanese** in any artifact (overrides the bilingual default in the global CLAUDE.md).
 - **Never write code comments in English or bilingual** — Traditional Chinese only.
+- **The `##` headings in openspec artifacts stay English** — `## Why`, `## What Changes`, `## Capabilities`, `## Impact`, `## Context`, `## Decisions`, `## ADDED Requirements`, `### Requirement:`, `#### Scenario:` and friends are parsed by the openspec CLI, and `## Capabilities` in particular is the contract between the proposal and specs phases. Translating them breaks parsing silently. Everything under those headings is Traditional Chinese.
 
 ---
 
@@ -113,7 +116,9 @@ Three layers work together:
 ### Phase 2 — Specify
 
 - Use `openspec-propose` → generates `proposal.md`, `specs/`, `tasks.md` in the change folder.
-- API changes must define request / response specs (the unified wrapper / code / status for success + each failure response) in the change's `specs/` before any controller code.
+- **Changes must be created with `--schema spec-driven-custom`.** The project's format rules live in `openspec/schemas/spec-driven-custom/` and reach you through `openspec instructions`; `openspec config` is global-scope only, so a missing flag silently falls back to the built-in schema and every rule below stops applying. `openspec-schema.spec.ts` fails if the flag or the schema goes missing.
+- Capability names carry a mandatory prefix that dictates how the spec is written: `api-` (backend endpoint contract, admin by default), `api-front-`, `ui-`, `platform-`. Full table in `openspec/project.md` → 「OpenSpec 慣例」.
+- API changes must define request / response specs in the change's `specs/` **before any controller code** — each endpoint requirement needs **Request**, **Success Response**, and **Failure Responses** with real JSON. Two things are easy to get wrong: returning `null` omits the `data` key entirely (not `"data": null`), and `204 No Content` carries no body at all. `openspec-spec-format.spec.ts` enforces this.
 - For backend changes, `tasks.md` phases follow this order: Schema/Migration → Domain/Port → Exceptions/Filter → Services (TDD) → Out Adapter → Controller/DTO → Facade + Module → Swagger → Unit tests → E2E tests → Verification → Wrap-up.
 - The user reviews and approves before any code is written.
 

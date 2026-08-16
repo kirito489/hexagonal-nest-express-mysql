@@ -1,4 +1,4 @@
-# api-client-generation Specification
+# platform-api-client-generation Specification
 
 ## Purpose
 TBD - created by archiving change setup-monorepo-frontend. Update Purpose after archive.

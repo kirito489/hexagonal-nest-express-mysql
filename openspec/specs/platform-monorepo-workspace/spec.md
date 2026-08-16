@@ -1,4 +1,4 @@
-# monorepo-workspace Specification
+# platform-monorepo-workspace Specification
 
 ## Purpose
 TBD - created by archiving change setup-monorepo-frontend. Update Purpose after archive.

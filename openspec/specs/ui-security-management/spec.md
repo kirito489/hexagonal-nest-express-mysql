@@ -1,10 +1,10 @@
-# security-ui Specification
+# ui-security-management Specification
 
 ## Purpose
 
 定義後台「安全」前端 UI 行為：`/security/ip-whitelist` 與 `/security/ip-blacklist`
 兩個列表頁面，未來新增的安全相關前端模組（如帳號鎖定管理）也歸入此 capability。
-對應後端 `security-management` capability，前端落地於 `apps/web/src/routes/security/`，
+對應後端 `api-security-management` capability，前端落地於 `apps/web/src/routes/security/`，
 與 sidebar「安全」group 對接（`requiredRoleCode: 'SUPERADMIN'` 過濾）。
 
 ## Requirements

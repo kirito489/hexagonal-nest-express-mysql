@@ -1,10 +1,10 @@
-# member-management-ui Specification
+# ui-member-management Specification
 
 ## Purpose
 
 定義後台「會員管理」前端 UI 行為：`/members` 路由、列表（DataTable + 分頁 + 搜尋 +
 URL state 同步）、新增 / 編輯共用 Dialog、即時切換啟用狀態（optimistic）、刪除確認。
-對應後端 `member-management` capability，前端落地於 `apps/web/src/routes/members/`。
+對應後端 `api-member-management` capability，前端落地於 `apps/web/src/routes/members/`。
 
 ## Requirements
 ### Requirement: 會員列表頁路由與導航

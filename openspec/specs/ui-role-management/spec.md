@@ -1,10 +1,10 @@
-# role-management-ui Specification
+# ui-role-management Specification
 
 ## Purpose
 
 定義後台「角色管理」前端 UI 行為：`/roles` 路由、列表（DataTable + 分頁 + 搜尋 +
 URL state 同步）、新增 / 編輯共用 Dialog、權限分組多選（含「EDIT 蘊含 VIEW」互動限制）、
-即時切換啟用狀態（optimistic）、刪除確認。對應後端 `role-management` capability，前端
+即時切換啟用狀態（optimistic）、刪除確認。對應後端 `api-role-management` capability，前端
 落地於 `apps/web/src/routes/roles/`。
 
 ## Requirements
