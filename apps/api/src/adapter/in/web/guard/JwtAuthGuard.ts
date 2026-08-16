@@ -25,6 +25,7 @@ import {
 import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 import { JwtPayload } from '@app/application/port/jwt-payload';
 import { getEnv } from '@app/infrastructure/validate-env';
+import { addMonths } from '@app/infrastructure/date';
 import {
   MemberContext,
   MemberContextSchema,
@@ -101,17 +102,17 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
 
     const cached = await this.memberContextCache.getByMemberId(payload.sub);
     if (cached) {
-      const parsed = MemberContextSchema.safeParse(JSON.parse(cached));
-      if (parsed.success) {
-        if (!parsed.data.status) throw new AccountDisabledException();
-        this.assertTokenVersion(payload, parsed.data.tokenVersion);
-        request.member = parsed.data;
-        this.checkPasswordExpiry(parsed.data);
+      const context = this.parseCachedContext(cached);
+      if (context) {
+        if (!context.status) throw new AccountDisabledException();
+        this.assertTokenVersion(payload, context.tokenVersion);
+        request.member = context;
+        this.checkPasswordExpiry(context);
         return true;
       }
-      // 快取格式不符（可能為 schema 變更後的舊快取），fallback 到 DB 查詢並覆寫快取
+      // 快取格式不符或內容損毀，fallback 到 DB 查詢並覆寫快取
       this.logger.warn(
-        '[JwtAuthGuard] MemberContext 快取格式不符，fallback 到 DB 查詢',
+        '[JwtAuthGuard] MemberContext 快取無法解析，fallback 到 DB 查詢',
       );
     }
 
@@ -158,6 +159,25 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
     return true;
   }
 
+  /**
+   * 解析快取的 MemberContext，無法使用時一律回 null 交由呼叫端走 DB fallback。
+   *
+   * `safeParse` 只保護 schema 不符，不保護 JSON 語法錯誤——快取若因截斷或編碼問題
+   * 不是合法 JSON，`JSON.parse` 會直接拋出並逃出 guard，兜成 500。而這是全域 guard，
+   * 代表**所有已登入請求同時 500**，卻正好發生在 fallback 最該生效的時候。
+   *
+   * @param cached - 快取中的原始字串
+   * @returns 可用的 MemberContext；語法錯誤或格式不符時為 null
+   */
+  private parseCachedContext(cached: string): MemberContext | null {
+    try {
+      const parsed = MemberContextSchema.safeParse(JSON.parse(cached));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** token 版本比對：payload 帶的版本與 DB 現值不符 → 已被連坐撤銷，拒絕 */
   private assertTokenVersion(
     payload: JwtPayload,
@@ -179,9 +199,9 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       throw new PasswordChangeRequiredException();
     }
 
-    const lastChange = new Date(member.lastPasswordChange);
-    const expiryDate = new Date(lastChange);
-    expiryDate.setMonth(expiryDate.getMonth() + period);
+    // 用 addMonths 而非 setMonth：後者遇月底天數不足會往後溢位
+    //（8/31 加 6 個月得到 3/3 而非 2/28），到期日會晚 1～3 天
+    const expiryDate = addMonths(new Date(member.lastPasswordChange), period);
 
     if (new Date() > expiryDate) {
       throw new PasswordChangeRequiredException();

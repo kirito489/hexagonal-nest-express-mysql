@@ -150,6 +150,31 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
+  /**
+   * 日誌保留排程。**預設啟用**——system_logs 在 API log 開啟時每個請求寫一筆
+   * 且完整存 request/response 的 Text 欄位，沒有保留策略會無界成長，
+   * 而這兩張表目前只寫不讀。關掉前請確認你有別的清理機制。
+   */
+  LOG_PURGE_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** 日誌保留天數，早於此天數的 system_logs / auth_logs 會被刪除 */
+  LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  /** 清理排程的 cron 表達式（秒 分 時 日 月 週），預設每日 03:00 */
+  LOG_PURGE_CRON: z.string().default('0 0 3 * * *'),
+
+  /**
+   * Redis 不可用時的節流策略。預設 `false` = fail-closed（拒絕請求，回 429）。
+   *
+   * 設為 `true` 換取可用性，但要清楚代價：Redis 一掛，全站速率限制同時歸零，
+   * 包含登入與 forgot-password——暴力破解防護會在最需要的時刻消失。
+   */
+  THROTTLE_FAIL_OPEN: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+
   // ─── 可觀測性（Observability，皆預設關閉） ───
   APPLICATION_SENTRY_ENABLED: z
     .string()

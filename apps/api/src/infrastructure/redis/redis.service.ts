@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { getEnv } from '../validate-env';
 
 @Injectable()
@@ -144,9 +144,37 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async addToBlacklist(token: string, ttlSeconds: number): Promise<void> {
+  /**
+   * 將 token 加入黑名單，值存入「進黑名單的原因」。
+   *
+   * 原因是必要的：`refresh 輪替後的舊 token 又被使用` 是遭竊訊號、要撤銷全部 session，
+   * 而 `使用者登出的 token 又被使用` 只是併發請求撞上登出，只該拒絕本次。
+   * 兩者若不分，正常登出會連坐踢掉使用者所有裝置。
+   *
+   * @param token - 要加入黑名單的 token
+   * @param ttlSeconds - 存活秒數，配合 JWT 剩餘效期
+   * @param reason - 進黑名單的原因
+   */
+  async addToBlacklist(
+    token: string,
+    ttlSeconds: number,
+    reason: string,
+  ): Promise<void> {
     const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
-    await this.set(`${this._keyPrefix}blacklist:${hash}`, '1', ttlSeconds);
+    await this.set(`${this._keyPrefix}blacklist:${hash}`, reason, ttlSeconds);
+  }
+
+  /**
+   * 取出 token 進黑名單的原因
+   * @param token - 要查詢的 token
+   * @returns 原因字串；不在黑名單時為 null
+   */
+  async getBlacklistReason(token: string): Promise<string | null> {
+    if (!this.client?.isOpen) {
+      throw new ServiceUnavailableException('認證服務暫時不可用，請稍後再試');
+    }
+    const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
+    return this.get(`${this._keyPrefix}blacklist:${hash}`);
   }
 
   /**
@@ -166,12 +194,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   /**
    * 原子性滑動視窗計數（Lua Script via EVAL）。
    * 用於 ThrottlerStorage，避免 GET+SET 競態條件。
-   * Redis 不可用時回傳 0（靜默降級，不節流）。
+   *
+   * **Redis 不可用時預設 fail-closed**（回極大值 → `isBlocked` 為真 → 429）。
+   * 回 `0` 等於告訴 ThrottlerGuard「這個來源本視窗一次都沒請求過」，全站速率限制
+   * 同時歸零，包含登入與 forgot-password——暴力破解防護在最需要的時候消失。
+   * 要換成可用性優先就設 `THROTTLE_FAIL_OPEN=true`，代價是知情的。
    */
   async throttleIncrement(key: string, ttlMs: number): Promise<number> {
     if (!this.client?.isOpen) {
-      this.logger.warn('[Throttle] Redis 不可用，節流保護暫時停用');
-      return 0;
+      if (getEnv().THROTTLE_FAIL_OPEN) {
+        // 「防護關閉」不是 warn 等級的事件，但這是部署方明示選擇的行為
+        this.logger.error('[Throttle] Redis 不可用，依設定放行（保護已停用）');
+        return 0;
+      }
+      this.logger.error('[Throttle] Redis 不可用，改採保守策略拒絕請求');
+      return Number.MAX_SAFE_INTEGER;
     }
     const now = Date.now();
     const script = [
@@ -179,13 +216,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       'local now = tonumber(ARGV[1])',
       'local window = tonumber(ARGV[2])',
       'redis.call("ZREMRANGEBYSCORE", key, "-inf", now - window)',
-      'redis.call("ZADD", key, now, tostring(now))',
+      // member 必須唯一：ZADD 對既有 member 只更新 score、不新增元素，
+      // 用時間戳當 member 會讓同毫秒抵達的請求全部併成一筆，計數系統性低估
+      'redis.call("ZADD", key, now, ARGV[3])',
       'redis.call("PEXPIRE", key, window)',
       'return redis.call("ZCARD", key)',
     ].join('\n');
     const count = await this.client.eval(script, {
       keys: [key],
-      arguments: [String(now), String(ttlMs)],
+      arguments: [String(now), String(ttlMs), `${now}-${randomUUID()}`],
     });
     return Number(count);
   }

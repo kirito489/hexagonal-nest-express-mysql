@@ -37,6 +37,9 @@ describe('Auth E2E', () => {
     jest.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.isTokenBlacklisted.mockResolvedValue(false);
+    // clearAllMocks 只清呼叫紀錄不清實作，各 mock 的預設回傳都要在此重設，
+    // 否則單一測試設的 mockResolvedValue 會洩漏到後續測試
+    mockRedis.getBlacklistReason.mockResolvedValue(null);
     mockRedis.throttleIncrement.mockResolvedValue(1);
     await resetDb(prisma);
   });
@@ -147,10 +150,12 @@ describe('Auth E2E', () => {
       expect(mockRedis.addToBlacklist).toHaveBeenCalledWith(
         accessToken,
         expect.any(Number),
+        'logout',
       );
       expect(mockRedis.addToBlacklist).toHaveBeenCalledWith(
         refreshToken,
         expect.any(Number),
+        'logout',
       );
     });
   });
@@ -202,14 +207,14 @@ describe('Auth E2E', () => {
       expectApiError(res, 401, ResponseCodes.INVALID_REFRESH_TOKEN);
     });
 
-    it('refresh token 在黑名單 → 401 INVALID_REFRESH_TOKEN', async () => {
+    it('輪替後的 refresh 被重用 → 401 INVALID_REFRESH_TOKEN', async () => {
       await seedMember(prisma, { email: TEST_EMAIL, password: TEST_PASSWORD });
       const loginRes = await login(app);
       const { refreshToken } = (
         loginRes.body as { data: { refreshToken: string } }
       ).data;
 
-      mockRedis.isTokenBlacklisted.mockResolvedValue(true);
+      mockRedis.getBlacklistReason.mockResolvedValue('rotated');
 
       const res = await request(app.getHttpServer())
         .post('/api/admin/auth/refresh')

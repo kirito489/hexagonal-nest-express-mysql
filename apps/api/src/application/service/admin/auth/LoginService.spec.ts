@@ -14,7 +14,11 @@ import { SessionActivityPort } from '../../../port/out/auth/SessionActivityPort'
 import { Member } from '@app/domain/model/Member';
 import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 
-jest.mock('bcrypt', () => ({ compare: jest.fn() }));
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+  // 帳號不存在時用來抹平時間差的假 hash
+  hashSync: jest.fn().mockReturnValue('$2b$04$dummy'),
+}));
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({
@@ -186,6 +190,20 @@ describe('LoginService', () => {
     await expect(
       makeService().execute({ email: 'no@test.com', password: 'pw' }),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  // 少了這一步，「帳號不存在」會比「密碼錯誤」快約一個 bcrypt 的時間（rounds=12 下約 100ms），
+  // 訊息雖然統一，回應時間仍足以用來列舉帳號
+  it('會員不存在 → 仍執行一次 bcrypt 比對以抹平時間差', async () => {
+    (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(null);
+    const compare = jest.mocked(bcrypt.compare);
+    compare.mockClear();
+
+    await expect(
+      makeService().execute({ email: 'no@test.com', password: 'pw' }),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(compare).toHaveBeenCalledTimes(1);
   });
 
   it('密碼錯誤 → 拋出 UnauthorizedException', async () => {

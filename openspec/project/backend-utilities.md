@@ -113,6 +113,28 @@ export default async function seed(prisma: PrismaClient): Promise<void> {
 
 成功路徑由 `LoggingInterceptor` 處理，錯誤路徑由 `GlobalExceptionFilter` 處理，共用 `system-log-helper.ts` 的 `buildSystemLogData()`。
 
+#### 日誌保留策略（預設啟用）
+
+`system_logs` 與 `auth_logs` 目前**只寫不讀**——整個 `src/` 只有 `create`，沒有任何查詢。
+而 `system_logs` 在 `APPLICATION_API_LOG_ENABLED=true` 時**每個 API 請求寫一筆**，
+且完整存 request / response 的 `@db.Text`。它會是資料庫成長最快的物件。
+
+因此 `LogRetentionScheduler` **預設啟用**，每日清掉超過保留天數的紀錄：
+
+| 環境變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `LOG_PURGE_ENABLED` | `true` | 關掉前請確認有別的清理機制，否則兩張表無界成長 |
+| `LOG_RETENTION_DAYS` | `90` | 早於此天數的紀錄會被刪除 |
+| `LOG_PURGE_CRON` | `0 0 3 * * *` | 每日 03:00（秒 分 時 日 月 週） |
+
+預設開而非預設關，是因為兩種失效的代價不對稱：沒有保留策略會讓資料庫無界成長，
+而「刪掉 90 天前、沒有任何功能在讀的日誌」幾乎沒有損失。日誌 flag 全關時，
+排程每天只是跑一次空的 `deleteMany`。
+
+**若之後要補稽核查詢端點**，兩張表已有 `createdAt` / `email` / `memberId` 複合索引
+（`20260816200000_add_log_indexes`），不必再補。測試環境於 `setup-env*.ts`
+強制關閉此排程——cron job 會留下 open handle。
+
 ### 分頁
 
 `apps/api/src/infrastructure/pagination.ts`：

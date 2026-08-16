@@ -33,6 +33,8 @@ import { IpBlacklistGuard } from './adapter/in/web/guard/IpBlacklistGuard';
 import { IpWhitelistGuard } from './adapter/in/web/guard/IpWhitelistGuard';
 import { SessionIdleGuard } from './adapter/in/web/guard/SessionIdleGuard';
 import { JwtAuthGuard } from './adapter/in/web/guard/JwtAuthGuard';
+import { RolesGuard } from './adapter/in/web/guard/RolesGuard';
+import { PermissionsGuard } from './adapter/in/web/guard/PermissionsGuard';
 import { HealthModule } from './modules/health.module';
 import { SchedulerModule } from './modules/scheduler.module';
 import { SentryModule } from '@sentry/nestjs/setup';
@@ -70,11 +72,20 @@ const resolveWebStaticRoot = (): string | null => {
             genReqId: () => randomUUID(),
             level: env.LOG_LEVEL,
             name: env.SERVICE_NAME,
+            // 縱深防禦：serializers.req 目前只留 id/method/url，body 本來就不會進 log。
+            // 但只要有人為了除錯還原 serializer，這份清單就是唯一的防線——
+            // pino 的 redact 不支援子字串比對，只能逐一列舉（與 sanitize.ts 的策略不同）。
             redact: {
               paths: [
                 'req.headers.authorization',
+                'req.headers.cookie',
                 'req.body.password',
+                'req.body.newPassword',
+                'req.body.oldPassword',
+                'req.body.confirmPassword',
                 'req.body.token',
+                'req.body.refreshToken',
+                'req.body.accessToken',
               ],
               censor: '[REDACTED]',
             },
@@ -213,6 +224,12 @@ const resolveWebStaticRoot = (): string | null => {
     // 全域認證：排在 SessionIdleGuard 前（SessionIdle 依賴 request.member）。
     // 公開路由用 @Public() 跳過；預設拒絕，避免新 controller 漏掛認證即裸奔。
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // 全域授權：與認證比照辦理。兩者都是「沒有對應裝飾器就放行」，全域化與逐一
+    // @UseGuards 行為完全等價，但消滅了「漏掛 = 沉默的授權繞過」這整類 bug——
+    // 漏掛時裝飾器會變成純註解，端點對任何已登入者開放，沒有錯誤訊息、測試照樣綠。
+    // 必須排在 JwtAuthGuard 之後：兩者都依賴它填入的 request.member。
+    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: SessionIdleGuard },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },

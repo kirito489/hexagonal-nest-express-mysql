@@ -56,7 +56,11 @@ describe('LogoutService', () => {
     await makeService().execute({ accessToken: 'acc' });
 
     expect(mockTokenBlacklist.addToBlacklist).toHaveBeenCalledTimes(1);
-    expect(mockTokenBlacklist.addToBlacklist).toHaveBeenCalledWith('acc', 7200);
+    expect(mockTokenBlacklist.addToBlacklist).toHaveBeenCalledWith(
+      'acc',
+      7200,
+      'logout',
+    );
     expect(mockClearContext.clearMemberContext).toHaveBeenCalledWith(
       'member-1',
     );

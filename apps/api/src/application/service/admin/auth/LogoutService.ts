@@ -48,7 +48,11 @@ export class LogoutService implements LogoutUseCase {
     if (accessPayload) {
       const ttl = this.computeTtl(accessPayload, env.ACCESS_TOKEN_EXPIRES_IN);
       if (ttl > 0) {
-        await this.tokenBlacklist.addToBlacklist(command.accessToken, ttl);
+        await this.tokenBlacklist.addToBlacklist(
+          command.accessToken,
+          ttl,
+          'logout',
+        );
       }
       await this.clearMemberContext.clearMemberContext(accessPayload.sub);
 
@@ -66,7 +70,11 @@ export class LogoutService implements LogoutUseCase {
           env.REFRESH_TOKEN_EXPIRES_IN,
         );
         if (ttl > 0) {
-          await this.tokenBlacklist.addToBlacklist(command.refreshToken, ttl);
+          await this.tokenBlacklist.addToBlacklist(
+            command.refreshToken,
+            ttl,
+            'logout',
+          );
         }
       } else {
         this.logger.debug('Refresh token 驗證失敗（略過）');

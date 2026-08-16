@@ -28,3 +28,6 @@ process.env.WEB_STATIC_ROOT = join(tmpdir(), 'hexagonal-web-dist-e2e');
 // 附件上傳 e2e：local driver 落地目錄指到 tmp，避免寫檔汙染專案
 process.env.STORAGE_DRIVER = 'local';
 process.env.LOCAL_MEDIA_ROOT = join(tmpdir(), 'hexagonal-media-e2e');
+// 日誌保留排程預設啟用，測試環境關掉：cron job 會留下 open handle，
+// 且 e2e 的 beforeEach 本來就會 resetDb，不需要也不該讓排程去動測試資料
+process.env.LOG_PURGE_ENABLED = 'false';

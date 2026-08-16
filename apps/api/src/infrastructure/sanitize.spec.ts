@@ -40,6 +40,49 @@ describe('sanitize', () => {
     expect(parsed.apiKey).toBe('[REDACTED]');
   });
 
+  // 曾經漏遮：SENSITIVE_KEYS 用精確比對時，reset-password 的 newPassword
+  // 會以明文寫進 system_logs.request。改成子字串比對後，整類變形一次收斂。
+  it.each([
+    'newPassword',
+    'oldPassword',
+    'confirmPassword',
+    'passwordConfirmation',
+    'user_password',
+    'current-password',
+  ])('遮蔽 password 的變形欄位：%s', (key) => {
+    const parsed: unknown = JSON.parse(sanitize({ [key]: 'MyS3cret!' }));
+    expect((parsed as Record<string, unknown>)[key]).toBe('[REDACTED]');
+  });
+
+  it.each([
+    'accessToken',
+    'refresh_token',
+    'idToken',
+    'api-key',
+    'privateKey',
+    'clientSecret',
+    'credentials',
+  ])('遮蔽 token / 金鑰類的變形欄位：%s', (key) => {
+    const parsed: unknown = JSON.parse(sanitize({ [key]: 'value' }));
+    expect((parsed as Record<string, unknown>)[key]).toBe('[REDACTED]');
+  });
+
+  it('不誤遮非敏感欄位', () => {
+    const parsed: unknown = JSON.parse(
+      sanitize({
+        email: 'a@b.c',
+        member: '王小明',
+        roleId: 'r1',
+        status: true,
+      }),
+    );
+    const obj = parsed as Record<string, unknown>;
+    expect(obj.email).toBe('a@b.c');
+    expect(obj.member).toBe('王小明');
+    expect(obj.roleId).toBe('r1');
+    expect(obj.status).toBe(true);
+  });
+
   it('將 base64 圖片資料替換為標記', () => {
     const parsed = JSON.parse(
       sanitize({ avatar: 'data:image/png;base64,abc==' }),

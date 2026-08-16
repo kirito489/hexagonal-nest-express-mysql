@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ExampleScheduler } from '../adapter/in/scheduler/ExampleScheduler';
+import { LogRetentionScheduler } from '../adapter/in/scheduler/LogRetentionScheduler';
+import { PurgeLogsService } from '../application/service/shared/PurgeLogsService';
+import { PrismaLogPurgeRepository } from '../adapter/out/persistence/PrismaLogPurgeRepository';
+import { PURGE_LOGS_PORT } from '../application/port/out/shared/PurgeLogsPort';
 
 /**
  * 排程模組：集中宣告以 @nestjs/schedule 動態 cron 為基礎的排程器。
@@ -8,6 +12,15 @@ import { ExampleScheduler } from '../adapter/in/scheduler/ExampleScheduler';
  * 新增排程：仿照 ExampleScheduler 建立排程器，再加進此 providers 即可。
  */
 @Module({
-  providers: [ExampleScheduler],
+  providers: [
+    ExampleScheduler,
+    LogRetentionScheduler,
+    PurgeLogsService,
+    PrismaLogPurgeRepository,
+    {
+      provide: PURGE_LOGS_PORT,
+      useExisting: PrismaLogPurgeRepository,
+    },
+  ],
 })
 export class SchedulerModule {}

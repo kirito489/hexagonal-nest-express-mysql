@@ -46,6 +46,7 @@ describe('RefreshTokenService', () => {
     blacklist = {
       isBlacklisted: jest.fn().mockResolvedValue(false),
       addToBlacklist: jest.fn().mockResolvedValue(undefined),
+      getBlacklistReason: jest.fn().mockResolvedValue(null),
     };
     loadMemberContext = {
       loadMemberContext: jest.fn().mockResolvedValue(makeContext()),
@@ -83,14 +84,15 @@ describe('RefreshTokenService', () => {
     expect(blacklist.addToBlacklist).toHaveBeenCalledWith(
       'old-refresh',
       expect.any(Number),
+      'rotated',
     );
     const [, ttl] = blacklist.addToBlacklist.mock.calls[0];
     expect(ttl).toBeGreaterThan(0);
     expect(ttl).toBeLessThanOrEqual(3600);
   });
 
-  it('舊 refresh 已在黑名單（重用）→ Invalid + 連坐撤銷該使用者所有 session', async () => {
-    blacklist.isBlacklisted.mockResolvedValueOnce(true);
+  it('輪替後的舊 refresh 被重用 → Invalid + 連坐撤銷該使用者所有 session', async () => {
+    blacklist.getBlacklistReason.mockResolvedValueOnce('rotated');
     jwt.verify.mockReturnValue({ sub: MEMBER_UUID, type: 'refresh' });
 
     await expect(
@@ -101,6 +103,19 @@ describe('RefreshTokenService', () => {
       MEMBER_UUID,
     );
     expect(blacklist.addToBlacklist).not.toHaveBeenCalled();
+  });
+
+  // 前端共用 refreshPromise 時，背景請求的 401 會撞上登出流程——那是正常操作。
+  // 若與「輪替後重用」一視同仁，使用者在筆電按登出會連手機一起被踢。
+  it('登出的 refresh 被重用 → 只拒絕本次，不得撤銷其他 session', async () => {
+    blacklist.getBlacklistReason.mockResolvedValueOnce('logout');
+    jwt.verify.mockReturnValue({ sub: MEMBER_UUID, type: 'refresh' });
+
+    await expect(
+      service.execute({ refreshToken: 'logged-out' }),
+    ).rejects.toBeInstanceOf(InvalidRefreshTokenException);
+    expect(saveMember.incrementTokenVersion).not.toHaveBeenCalled();
+    expect(clearMemberContext.clearMemberContext).not.toHaveBeenCalled();
   });
 
   it('payload.tokenVersion 與現值不符 → InvalidRefreshTokenException', async () => {

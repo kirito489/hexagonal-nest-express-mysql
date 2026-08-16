@@ -49,6 +49,21 @@ import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { JwtPayload } from '../../../port/jwt-payload';
 import { getEnv } from '@app/infrastructure/validate-env';
 
+/**
+ * 抹平時間差用的假 hash（首次使用時計算一次後快取）。
+ *
+ * cost 必須與 `BCRYPT_ROUNDS` 一致，否則比對耗時對不上、時間差依然存在——
+ * 這正是這個防護唯一會失效的方式。不在模組載入時算，是因為那早於 dotenv。
+ */
+let cachedDummyHash: string | null = null;
+const dummyHash = (): string => {
+  cachedDummyHash ??= bcrypt.hashSync(
+    'timing-equalizer',
+    getEnv().BCRYPT_ROUNDS,
+  );
+  return cachedDummyHash;
+};
+
 @Injectable()
 export class LoginService implements LoginUseCase {
   private readonly logger = new Logger(LoginService.name);
@@ -105,6 +120,10 @@ export class LoginService implements LoginUseCase {
 
     const member = await this.loadMember.loadMemberByEmail(email);
     if (!member) {
+      // 帳號不存在時仍跑一次 bcrypt，抹平與「帳號存在但密碼錯」的回應時間差。
+      // 訊息已統一為「帳號或密碼錯誤」，但少了這一步，兩條路徑的耗時差距
+      // 在 BCRYPT_ROUNDS=12 下約 100ms，穩定可測，足以用來列舉帳號。
+      await bcrypt.compare(password, dummyHash());
       await this.handleLoginFailure(email, ip, userAgent, '帳號不存在');
       throw new UnauthorizedException('帳號或密碼錯誤');
     }

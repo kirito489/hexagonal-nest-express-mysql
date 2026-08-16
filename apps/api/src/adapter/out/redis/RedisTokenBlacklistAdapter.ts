@@ -1,6 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { RedisService } from '../../../infrastructure/redis/redis.service';
-import { TokenBlacklistPort } from '../../../application/port/out/auth/TokenBlacklistPort';
+import {
+  TokenBlacklistPort,
+  type BlacklistReason,
+} from '../../../application/port/out/auth/TokenBlacklistPort';
 import { ClearMemberContextPort } from '../../../application/port/out/member/ClearMemberContextPort';
 import { buildMemberContextKey } from '../../../infrastructure/redis/cache-keys';
 import { getEnv } from '../../../infrastructure/validate-env';
@@ -21,12 +24,22 @@ export class RedisTokenBlacklistAdapter
     this.keyPrefix = getEnv().REDIS_KEY_PREFIX;
   }
 
-  addToBlacklist(token: string, ttlSeconds: number): Promise<void> {
-    return this.redis.addToBlacklist(token, ttlSeconds);
+  addToBlacklist(
+    token: string,
+    ttlSeconds: number,
+    reason: BlacklistReason,
+  ): Promise<void> {
+    return this.redis.addToBlacklist(token, ttlSeconds, reason);
   }
 
   isBlacklisted(token: string): Promise<boolean> {
     return this.redis.isTokenBlacklisted(token);
+  }
+
+  async getBlacklistReason(token: string): Promise<BlacklistReason | null> {
+    const stored = await this.redis.getBlacklistReason(token);
+    // 舊格式紀錄（值為 '1'）落在這裡回 null，呼叫端會當成「非遭竊」處理
+    return stored === 'rotated' || stored === 'logout' ? stored : null;
   }
 
   async clearMemberContext(memberId: string): Promise<void> {

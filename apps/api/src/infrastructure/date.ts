@@ -27,6 +27,20 @@ export const formatDate = (d: Date | string | null): string => {
 };
 
 /**
+ * 加上月數，目標月份天數不足時夾到當月最後一天。
+ *
+ * 不要用原生 `setMonth`：它遇到天數不足會往後溢位——1/31 加一個月得到 3/2 或 3/1，
+ * 而不是 2/28。用在「密碼到期日」這類計算上，會讓月底建立的資料到期日晚幾天。
+ * dayjs 的 `add` 本身就會夾取，此處包一層是為了讓呼叫端不必知道這個差異。
+ *
+ * @param base - 基準時間點
+ * @param months - 要加的月數
+ * @returns 加上月數後的時間點
+ */
+export const addMonths = (base: Date | string, months: number): Date =>
+  dayjs(base).add(months, 'month').toDate();
+
+/**
  * 把年 / 月 / 日組成中文日期字串（純數字組裝，不涉時區轉換）。
  * @returns 例：`2026年01月05日`
  */

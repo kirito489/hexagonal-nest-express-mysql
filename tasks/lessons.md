@@ -162,13 +162,15 @@ export {};
 
 **已知盲區**：靜態掃描看不到**套件動態註冊的路由**（如 `/api/metrics` 由條件註冊的 `PrometheusModule` 提供、沒有 controller 檔）。所以「架構測試會抓出所有未寫文件的路由」這個預期並不成立。
 
+- **掃字元的規則會掃到自己**：禁用某組字元的守則，其定義檔必然寫著那些字元，掃自己一定紅。把規則檔自身排除並在註解寫明理由（不是豁免，是自我指涉）。同理，review 報告會逐字引用問題碼，`pr/` 之類的目錄也該排除。
 - **掃描原始碼的規則要先剝註解**：以「引號 + 中文字元」偵測硬編文案時，TSDoc 裡的 markdown 反引號（`` `code` `` 後接中文）會被當成字串字面值，一次誤判 4 處。**OpenAPI yaml 更是完全不能用 regex 解析**——多行 `description: |` 區塊裡的文字會被當成 path / method 節點，曾得出「35 條路由全部不同步」的荒謬結果（**極端結果本身就是 bug 的訊號**）。yaml 一律用 `js-yaml`。
 - **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔即可判定的 import 邊界交給 eslint（快、IDE 即時）；跨檔語意（錯誤碼註冊、死碼、env 宣告）交給架構測試。**型別能保證的完整性兩者都不用寫**（如「用到不存在的常數」TypeScript 已免費擋掉）。
 - **寫 spec 前先 Read 受測檔的真實簽章，不要憑模式猜**：常見誤判——`execute({ id })` 其實是 `execute(id)`、repo 回 `{ list, meta }` 其實是 `{ data, total }`（轉換在 service）、建構子參數順序。動筆前先讀「受測 class + 它呼叫的 port interface + in-port Command 型別」三者。同理，Guard 邏輯或 Port 介面變更後，既有 spec 的 mock payload / mock 物件要同步更新，否則錯誤訊息會誤導排查方向。
-- **`jest.clearAllMocks()` 不清 mock implementation**：`mockImplementation(() => { throw … })` 設的錯誤會洩漏到後續測試。一次性行為用 `mockImplementationOnce` / `mockResolvedValueOnce`，或改用 `mockReset()`。
+- **`jest.clearAllMocks()` 不清 mock implementation**：`mockImplementation(() => { throw … })` 設的錯誤會洩漏到後續測試。一次性行為用 `mockImplementationOnce` / `mockResolvedValueOnce`，或改用 `mockReset()`。因此 spec 的 `beforeEach` 常有一份「逐一重設各 mock 預設回傳」的清單——**新增 mock 方法時務必同步加進去**，否則某支測試設的 `mockResolvedValue` 會洩漏到下一支。實例：`getBlacklistReason` 漏加，一支測試設的 `'rotated'` 讓後面的「帳號停用 → 403」變成 401，錯誤訊息完全指不到原因。
 - **`mockResolvedValueOnce` 佇列沒被消費完也會洩漏**：`clearAllMocks()` 不清 once 佇列。改了 SUT 的查詢方法（`findUnique` → `findFirst`）後，原本餵的 once 值變孤兒，會被「下一個剛好呼叫該方法的測試」吃掉，症狀是莫名 500 或狀態碼錯亂。改查詢方法時全文搜尋相關的 `*Once` 確認都會被消費。
 - **mock 斷言的 spec 轉真 DB 後會變短也變真**：`toHaveBeenCalledWith(...)` → 先 seed、呼叫 API、再查庫驗證**落庫值**；「更新不存在 → P2025 → 404」不必手動 `setPrototypeOf` 偽造錯誤，真庫直接 PATCH 一個不存在的 UUID 即可。每個 spec `beforeEach` 先 `resetDb`（依 FK 序）再 seed，序列執行避免 race。
 - **Zod v4 的 `z.string().uuid()` 嚴格檢查 RFC 4122**：測試 fixture 用 `00000000-0000-0000-0000-000000000001` 這種會被拒（version nibble 不合法），要用 `…-4000-8000-…` 這類合法值。
+- **往 port 加方法時，e2e 的假實作要一起補**：新增 `TokenBlacklistPort.getBlacklistReason` 後，單元測試（自帶 mock）與 `typecheck`（介面有宣告）全綠，但 `createMockRedis` 少了那個方法，e2e 一跑就 500。**只有 e2e 跑真的 DI 容器，這類「介面對了但假實作沒跟上」只有它抓得到**——改動 port 之後別跳過 e2e。
 - **e2e 跑完 Jest worker 卡住 → `forceExit: true`**：Nest app 關閉後仍有 handle 未釋放（Redis mock、Prisma 連線池）。
 - **Redis 仍 mock 時，限流與黑名單在真 DB e2e 中不會誤觸**：`throttleIncrement` 回固定值，序列連跑不會累計到 429；改成真 Redis 時要重新評估。
 

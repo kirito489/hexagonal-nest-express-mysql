@@ -62,9 +62,15 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     const { refreshToken } = command;
     const env = getEnv();
 
-    if (await this.tokenBlacklist.isBlacklisted(refreshToken)) {
-      // 重用偵測：已輪替的 refresh 又被使用 → 疑似遭竊，撤銷該使用者所有 session
-      await this.revokeAllSessions(refreshToken, env.REFRESH_SECRET);
+    const blacklistReason =
+      await this.tokenBlacklist.getBlacklistReason(refreshToken);
+    if (blacklistReason) {
+      // 只有「輪替後的舊 token 又被拿來用」才是遭竊訊號。
+      // 登出的 token 被重用多半是前端共用 refreshPromise 時，背景請求的 401
+      // 撞上登出流程——那是正常操作，連坐撤銷會讓使用者在其他裝置一起被踢。
+      if (blacklistReason === 'rotated') {
+        await this.revokeAllSessions(refreshToken, env.REFRESH_SECRET);
+      }
       throw new InvalidRefreshTokenException();
     }
 
@@ -108,7 +114,11 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     // 攻擊者偷到 refresh 但比使用者晚一步 → 進到這個 if 時舊 token 已 blacklisted → 攔下
     const remainingTtl = this.computeRemainingTtl(payload.exp);
     if (remainingTtl > 0) {
-      await this.tokenBlacklist.addToBlacklist(refreshToken, remainingTtl);
+      await this.tokenBlacklist.addToBlacklist(
+        refreshToken,
+        remainingTtl,
+        'rotated',
+      );
     }
 
     await this.logAuth(context, payload.sub, command);

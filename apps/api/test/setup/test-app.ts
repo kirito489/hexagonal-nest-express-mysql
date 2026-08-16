@@ -36,6 +36,7 @@ export const createMockRedis = () => ({
   del: jest.fn().mockResolvedValue(undefined),
   addToBlacklist: jest.fn().mockResolvedValue(undefined),
   isTokenBlacklisted: jest.fn().mockResolvedValue(false),
+  getBlacklistReason: jest.fn().mockResolvedValue(null),
   throttleIncrement: jest.fn().mockResolvedValue(1),
   increment: jest.fn().mockResolvedValue(1),
 });

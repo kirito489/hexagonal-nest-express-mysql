@@ -35,6 +35,22 @@
 
 ## 已完成
 
+### 2026-08-16 — 專案審查 12 項問題修復（review report 追蹤）
+
+依 `pr/2026-08-16-18-30-project-review.md` 分四批處理，每批附帶對應守則——**報告自己的結論是「高槓桿投資不是修這 12 個問題，而是把其中 3 個變成守則」**，實作時把這點放大成每批都做。
+
+** `newPassword` 明文寫進 system_logs**：`sanitize` 的敏感鍵是精確清單，`password` 有、`newPassword` 沒有。改成子字串比對一次收斂整類變形。查詢參數維持精確比對——子字串會讓 `key` 吃掉 `keyword`、`name` 吃掉所有過濾條件，而 URL 不帶憑證，過度遮蔽只損失除錯價值。
+
+** 安全與正確性四項**：黑名單值改存原因（`rotated` / `logout`），重用偵測只對前者連坐撤銷——原本正常登出併發請求會踢掉使用者所有裝置；節流改預設 fail-closed 並加 `THROTTLE_FAIL_OPEN` 開關；ZADD member 改唯一值（原本用時間戳當 member，同毫秒請求併成一筆導致計數系統性低估）；`JwtAuthGuard` 的快取解析包 try/catch（`safeParse` 不保護 JSON 語法錯誤，壞快取會讓全域 guard 拋出、所有已登入請求同時 500）。
+
+** 授權 guard 全域化**：`RolesGuard` / `PermissionsGuard` 升為 `APP_GUARD`。兩者本來就「無裝飾器即放行」，全域化行為等價但消滅「漏掛 = 沉默授權繞過」整類 bug。已用探針證明：拿掉 controller 的 `@UseGuards` 後 e2e 仍全過，代表全域註冊確實在執行授權。
+
+** 日誌表**：補 7 個索引（migration `20260816200000_add_log_indexes`，已於 2026-08-16 執行）+ `LogRetentionScheduler` 保留排程。**排程預設開啟**而非報告建議的「文件寫明開啟 flag 前要先做保留策略」——後者把責任推給讀文件的人，而這是模板。兩種失效的代價不對稱：沒有保留策略會無界成長，多刪沒人讀的 90 天前日誌幾乎無損失。
+
+** 清理**：PermissionsGuard 註解的日文新字體改為「權」；密碼到期改用新增的 `addMonths`（`setMonth` 遇月底溢位，1/31 加 1 月得到 3/2）；登入時帳號不存在仍跑一次 bcrypt 抹平時間差；`frontend.md` 記錄 localStorage token × 無 CSP 的取捨。`LoginService` 依報告建議不拆。
+
+**護欄 11 支/32 項 → 18 支/58 項**，本輪新增：sanitize 覆蓋、全域 guard 註冊與順序、繁體中文掃描。
+
 ### 2026-08-16 — openspec 慣例整頓與 path alias 導入
 
 **openspec 格式與命名**：fork 出專案本地 schema（`openspec/schemas/spec-driven-custom/`），把 spec / tasks 的格式規範放進 `instruction`，由 `openspec instructions` 直接餵給 AI，而不是寫在文件裡等自律。能力名稱定為 `api-` / `ui-` / `platform-` 三類前綴，13 支 spec 依此改名（`frontend-admin` → `platform-frontend-conventions`，因原名對不上內容；`member-role-options-api` 併入 `api-member-management`）。

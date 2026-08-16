@@ -41,6 +41,7 @@ const mockJwt = {
 const mockTokenBlacklist: jest.Mocked<TokenBlacklistPort> = {
   addToBlacklist: jest.fn(),
   isBlacklisted: jest.fn(),
+  getBlacklistReason: jest.fn(),
 };
 
 const mockMemberContextCache: jest.Mocked<MemberContextCachePort> = {

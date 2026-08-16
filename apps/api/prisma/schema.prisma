@@ -21,6 +21,10 @@ model SystemLogRecord {
   responseTime DateTime @map("response_time")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  // 保留排程以 createdAt 為條件批次刪除，沒有索引會全表掃描；
+  // memberId 複合索引供日後查「某帳號的操作紀錄」
+  @@index([createdAt], map: "idx_system_logs_created")
+  @@index([memberId, createdAt], map: "idx_system_logs_member_created")
   @@map("system_logs")
 }
 
@@ -45,10 +49,10 @@ model Permission {
   id             String           @id @default(uuid())
   permissionCode String           @unique @map("permission_code")
   name           String
-  platform       String           // "FRONTEND" | "BACKEND"
+  platform       String // "FRONTEND" | "BACKEND"
   module         String
   subModule      String?          @map("sub_module")
-  action         String           // "VIEW" | "EDIT" | "ACCESS"
+  action         String // "VIEW" | "EDIT" | "ACCESS"
   status         Boolean          @default(true)
   roles          RolePermission[]
   createdAt      DateTime         @default(now()) @map("created_at")
@@ -96,12 +100,16 @@ model AuthLogRecord {
   id        String   @id @default(uuid())
   memberId  String?  @map("member_id")
   email     String
-  action    String   // LOGIN_SUCCESS | LOGIN_FAILURE | LOGOUT | PASSWORD_RESET | REFRESH
+  action    String // LOGIN_SUCCESS | LOGIN_FAILURE | LOGOUT | PASSWORD_RESET | REFRESH
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
   detail    String?
   createdAt DateTime @default(now()) @map("created_at")
 
+  // email 複合索引供「某帳號的登入失敗紀錄」這類稽核查詢
+  @@index([createdAt], map: "idx_auth_logs_created")
+  @@index([email, createdAt], map: "idx_auth_logs_email_created")
+  @@index([memberId, createdAt], map: "idx_auth_logs_member_created")
   @@map("auth_logs")
 }
 
@@ -134,6 +142,9 @@ model PasswordResetTokenRecord {
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
+  // 供「重設密碼時作廢該使用者其他 token」與過期 token 清理
+  @@index([memberId], map: "idx_password_reset_member")
+  @@index([expiresAt], map: "idx_password_reset_expires")
   @@map("password_reset_tokens")
 }
 
