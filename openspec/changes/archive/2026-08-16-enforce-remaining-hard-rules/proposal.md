@@ -29,7 +29,7 @@
 
 ### Modified Capabilities
 
-- `engineering-guardrails`: 三條原本靠自律的 Hard Rule 改為機器強制。
+- `platform-engineering-guardrails`: 三條原本靠自律的 Hard Rule 改為機器強制。
 
 ## Impact
 

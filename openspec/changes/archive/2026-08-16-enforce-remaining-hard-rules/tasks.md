@@ -1,3 +1,9 @@
+> 每一塊（`##` 標題）須能獨立通過驗證鏈：
+> `pnpm typecheck && pnpm lint && pnpm test && pnpm --filter @app/api test:e2e && pnpm build && pnpm --filter @app/api swagger:check`
+> 綠燈後給 commit 指令，由使用者手動執行，再進下一塊。
+>
+> 〔檔頭補寫於 2026-08-16 的 openspec 慣例整理。驗證鏈取自本檔各塊當時實際記錄的結果，塊與任務內容維持原樣未改。〕
+
 ## 1. 三條規則
 
 - [x] 1.1 `dto-from-zod.spec.ts`：`*{Request,Query}.ts` 必須有 `z.infer`，且不得有 `export class` / `export interface`

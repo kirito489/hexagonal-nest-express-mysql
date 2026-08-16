@@ -24,11 +24,11 @@
 
 ### New Capabilities
 
-- `api-error-response`: 對外錯誤回應的組成規則 —— 錯誤碼與訊息的單一真相、訊息表的完整性保證、動態訊息的參數化方式，以及 domain 驗證失敗必須對應到正確 HTTP status。
+- `platform-api-error-response`: 對外錯誤回應的組成規則 —— 錯誤碼與訊息的單一真相、訊息表的完整性保證、動態訊息的參數化方式，以及 domain 驗證失敗必須對應到正確 HTTP status。
 
 ### Modified Capabilities
 
-- `engineering-guardrails`: 新增「exception 不得內嵌文案字面值」規則；`TEMPORARY` 豁免清單移除 domain 層 3 筆（涵蓋 4 處）`throw new Error`。
+- `platform-engineering-guardrails`: 新增「exception 不得內嵌文案字面值」規則；`TEMPORARY` 豁免清單移除 domain 層 3 筆（涵蓋 4 處）`throw new Error`。
 
 ## Impact
 

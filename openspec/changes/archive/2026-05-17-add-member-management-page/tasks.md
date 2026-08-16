@@ -1,3 +1,9 @@
+> 每一塊（`##` 標題）須能獨立通過驗證鏈：
+> `pnpm --filter @app/web build`
+> 綠燈後給 commit 指令，由使用者手動執行，再進下一塊。
+>
+> 〔檔頭補寫於 2026-08-16 的 openspec 慣例整理。驗證鏈取自本檔各塊當時實際記錄的結果，塊與任務內容維持原樣未改。〕
+
 ## 1. 前置作業
 
 - [x] 1.1 working tree 乾淨（只剩 openspec proposal untracked）

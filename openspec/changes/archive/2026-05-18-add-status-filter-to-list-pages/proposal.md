@@ -18,13 +18,13 @@
 
 ### New Capabilities
 
-- `member-management`：定義後端「會員管理」API 行為。本次首次建立此 capability，初版聚焦在 `GET /api/members` 列表 endpoint 的篩選參數，未來會員 CRUD endpoint 行為（list / get / create / update / delete / role-options 已存於 `member-role-options-api`）皆收斂於此 capability。
+- `api-member-management`：定義後端「會員管理」API 行為。本次首次建立此 capability，初版聚焦在 `GET /api/members` 列表 endpoint 的篩選參數，未來會員 CRUD endpoint 行為（list / get / create / update / delete / role-options 已存於 `api-member-management`）皆收斂於此 capability。
 
 ### Modified Capabilities
 
-- `role-management`：既有 spec 含「角色更新支援 status 切換」，新增「列表支援 status 篩選」requirement，描述 `GET /api/roles?status=` query 行為。
-- `member-management-ui`：既有「分頁與搜尋 URL state 同步」requirement 補上 `status` 欄位；對應 Scenario 加「使用者篩選停用」。
-- `role-management-ui`：同上，「分頁與搜尋 URL state 同步」requirement 補 `status` 欄位。
+- `api-role-management`：既有 spec 含「角色更新支援 status 切換」，新增「列表支援 status 篩選」requirement，描述 `GET /api/roles?status=` query 行為。
+- `ui-member-management`：既有「分頁與搜尋 URL state 同步」requirement 補上 `status` 欄位；對應 Scenario 加「使用者篩選停用」。
+- `ui-role-management`：同上，「分頁與搜尋 URL state 同步」requirement 補 `status` 欄位。
 
 ## Impact
 

@@ -17,11 +17,11 @@
 
 ### New Capabilities
 
-- `member-management-ui`：apps/web 的會員管理介面（list / search / paginate / create / edit / delete / toggle status）的功能需求與互動規格。
+- `ui-member-management`：apps/web 的會員管理介面（list / search / paginate / create / edit / delete / toggle status）的功能需求與互動規格。
 
 ### Modified Capabilities
 
-- `frontend-admin`：補充三條既有 admin SPA 的延伸要求 — URL state 同步分頁與搜尋、Sonner toast 全域回饋、Sidebar 多項目導航與權限可見性控制。
+- `platform-frontend-conventions`：補充三條既有 admin SPA 的延伸要求 — URL state 同步分頁與搜尋、Sonner toast 全域回饋、Sidebar 多項目導航與權限可見性控制。
 
 ## Impact
 

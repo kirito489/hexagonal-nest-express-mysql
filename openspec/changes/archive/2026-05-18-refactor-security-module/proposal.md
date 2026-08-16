@@ -42,18 +42,18 @@
 
 ### 治理 / 文件
 
-- **新增 capability `security-management`**：定義 IP 黑白名單 + 帳號解鎖的後端 endpoint 行為、SUPERADMIN role gate、回應 shape。
-- **MODIFIED `frontend-admin`**：既有「Sidebar 多項目導航與權限可見性」requirement 補上 group 結構、`requiredRoleCode`、footer user menu。
+- **新增 capability `api-security-management`**：定義 IP 黑白名單 + 帳號解鎖的後端 endpoint 行為、SUPERADMIN role gate、回應 shape。
+- **MODIFIED `platform-frontend-conventions`**：既有「Sidebar 多項目導航與權限可見性」requirement 補上 group 結構、`requiredRoleCode`、footer user menu。
 
 ## Capabilities
 
 ### New Capabilities
 
-- `security-management`：後端安全管理 endpoint 規格（IP 黑白名單 CRUD、帳號解鎖）。
+- `api-security-management`：後端安全管理 endpoint 規格（IP 黑白名單 CRUD、帳號解鎖）。
 
 ### Modified Capabilities
 
-- `frontend-admin`：既有 sidebar requirement 補 group、role gate、footer user menu。
+- `platform-frontend-conventions`：既有 sidebar requirement 補 group、role gate、footer user menu。
 
 ## Impact
 

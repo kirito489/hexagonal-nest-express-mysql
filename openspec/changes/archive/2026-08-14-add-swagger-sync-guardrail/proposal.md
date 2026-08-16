@@ -29,7 +29,7 @@ Controller 路由 → docs/swagger/*/[模組].yaml → openapi.bundle.yaml → a
 
 ### Modified Capabilities
 
-- `engineering-guardrails`: 新增「API 契約三段轉換必須同步」規則群。
+- `platform-engineering-guardrails`: 新增「API 契約三段轉換必須同步」規則群。
 
 ## Impact
 

@@ -1,6 +1,6 @@
 ## Context
 
-`apps/web/` 已落地 `member-management-ui`（DataTable + Dialog + URL state + Optimistic + Sonner toast + 權限可見性），所有共用機制（`components/data-table/`、`useDebouncedValue`、`useHasPermission`、`useCurrentMember`、`format-relative-time`、shadcn `dialog/alert-dialog/switch/dropdown-menu/table/sonner` 元件、`Toaster` 全域掛載）皆已可用。後端 `/api/roles*` endpoints 與 `GET /api/roles/permissions` 已通並產生 `@app/api-client` 型別。
+`apps/web/` 已落地 `ui-member-management`（DataTable + Dialog + URL state + Optimistic + Sonner toast + 權限可見性），所有共用機制（`components/data-table/`、`useDebouncedValue`、`useHasPermission`、`useCurrentMember`、`format-relative-time`、shadcn `dialog/alert-dialog/switch/dropdown-menu/table/sonner` 元件、`Toaster` 全域掛載）皆已可用。後端 `/api/roles*` endpoints 與 `GET /api/roles/permissions` 已通並產生 `@app/api-client` 型別。
 
 本次角色頁是 starter pack 第二個產品功能，主要驗證「能不能直接複製 member 模式」並補上專屬差異：
 
@@ -12,7 +12,7 @@
 
 **Goals：**
 
-- 沿用 `member-management-ui` 既有 pattern（DataTable + Dialog + URL state + Optimistic + 全頁 invalidate），不重造輪子。
+- 沿用 `ui-member-management` 既有 pattern（DataTable + Dialog + URL state + Optimistic + 全頁 invalidate），不重造輪子。
 - 引進「分組多選 checkbox」一個新表單元件，將其落地於可重用位置（`components/PermissionsField` 暫放 `routes/roles/components/` 即可；若未來其他模組要再多選類型權限可再上提）。
 - 沿用既有 `Toaster`、`useCurrentMember`、`useHasPermission`、`useDebouncedValue`、`DataTable` / `DataTablePagination`。
 - 純前端 change：所有後端 endpoint 既有，Swagger 與 `@app/api-client` 不重打。

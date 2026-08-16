@@ -24,7 +24,7 @@
 
 ### Modified Capabilities
 
-- `engineering-guardrails`: 新增「hook 邏輯必須可測」與「連動契約由 Stop hook 強制」兩條要求。
+- `platform-engineering-guardrails`: 新增「hook 邏輯必須可測」與「連動契約由 Stop hook 強制」兩條要求。
 
 ## Impact
 

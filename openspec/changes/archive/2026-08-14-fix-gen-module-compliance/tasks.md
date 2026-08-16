@@ -1,3 +1,9 @@
+> 每一塊（`##` 標題）須能獨立通過驗證鏈：
+> `pnpm typecheck && pnpm lint && pnpm test:cov && pnpm --filter @app/api swagger:check && pnpm --filter @app/api test:e2e && pnpm build`
+> 綠燈後給 commit 指令，由使用者手動執行，再進下一塊。
+>
+> 〔檔頭補寫於 2026-08-16 的 openspec 慣例整理。驗證鏈取自本檔各塊當時實際記錄的結果，塊與任務內容維持原樣未改。〕
+
 ## 1. exception 與錯誤碼注入
 
 - [x] 1.1 exception 模板改為 `import { ResponseCodes }` + `super(ResponseCodes.%NAME%_NOT_FOUND, 'NOT_FOUND')`（兩參數，靜態訊息）

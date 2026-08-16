@@ -30,8 +30,8 @@
 
 ### Modified Capabilities
 
-- `ci-quality-gate`: 品質 job 的檢查範圍加入覆蓋率門檻。
-- `engineering-guardrails`: import 邊界規則擴及前端。
+- `platform-ci-quality-gate`: 品質 job 的檢查範圍加入覆蓋率門檻。
+- `platform-engineering-guardrails`: import 邊界規則擴及前端。
 
 ## Impact
 

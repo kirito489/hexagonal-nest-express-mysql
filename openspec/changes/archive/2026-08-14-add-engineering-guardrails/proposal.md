@@ -31,7 +31,7 @@
 
 ### New Capabilities
 
-- `engineering-guardrails`: 把架構與慣例規則變成可執行檢查 —— 分層邊界、例外處理慣例、錯誤碼註冊完整性、env 宣告完整性、未授權測試覆蓋。定義每條規則的檢查方式、豁免機制與失敗訊息要求。
+- `platform-engineering-guardrails`: 把架構與慣例規則變成可執行檢查 —— 分層邊界、例外處理慣例、錯誤碼註冊完整性、env 宣告完整性、未授權測試覆蓋。定義每條規則的檢查方式、豁免機制與失敗訊息要求。
 
 ### Modified Capabilities
 

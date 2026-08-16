@@ -31,7 +31,7 @@
 
 ### Modified Capabilities
 
-- `monorepo-workspace`: 新增「pnpm overrides 只在 root 生效」的約束。
+- `platform-monorepo-workspace`: 新增「pnpm overrides 只在 root 生效」的約束。
 
 ## Impact
 

@@ -18,11 +18,11 @@
 
 ### New Capabilities
 
-- `member-role-options-api`：定義 `GET /api/members/role/options` endpoint 的請求 / 回應 contract（分頁、搜尋、isDefault 旗標、權限）。本次將首版 spec 寫入此 capability，未來該 endpoint 行為變更（如改 cursor pagination、加排序）皆在此 capability 增刪 requirement。
+- `api-member-management`：定義 `GET /api/members/role/options` endpoint 的請求 / 回應 contract（分頁、搜尋、isDefault 旗標、權限）。本次將首版 spec 寫入此 capability，未來該 endpoint 行為變更（如改 cursor pagination、加排序）皆在此 capability 增刪 requirement。
 
 ### Modified Capabilities
 
-- `member-management-ui`：修改「新增與編輯共用 Dialog」requirement — 角色欄位從 shadcn `Select`（一次性 list）改為 cmdk Combobox + `useInfiniteQuery` 無限下滑，含搜尋輸入與「編輯帶入既有角色」fallback fetch。
+- `ui-member-management`：修改「新增與編輯共用 Dialog」requirement — 角色欄位從 shadcn `Select`（一次性 list）改為 cmdk Combobox + `useInfiniteQuery` 無限下滑，含搜尋輸入與「編輯帶入既有角色」fallback fetch。
 
 ## Impact
 

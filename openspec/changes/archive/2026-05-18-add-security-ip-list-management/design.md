@@ -87,10 +87,10 @@ Security 模組剛重構完（refactor-security-module），現況：
 - 圖示用 lucide `ShieldCheck` / `ShieldBan`，與 `Shield`（角色管理）有區分但風格一致。
 - 不加帳號解鎖頁面（留下一個 change）。
 
-### D9：security-ui 新 capability
+### D9：ui-security-management 新 capability
 
-- 為什麼不放 `frontend-admin`：`frontend-admin` 是「跨模組共通的前端 convention」（toast / sidebar / URL state pattern），不適合放具體模組的頁面 spec。
-- `security-ui` 與 `role-management-ui` / `member-management-ui` 並列：個別模組的前端規格。
+- 為什麼不放 `platform-frontend-conventions`：`platform-frontend-conventions` 是「跨模組共通的前端 convention」（toast / sidebar / URL state pattern），不適合放具體模組的頁面 spec。
+- `ui-security-management` 與 `ui-role-management` / `ui-member-management` 並列：個別模組的前端規格。
 
 ### D10：security e2e 既有 case 對齊
 

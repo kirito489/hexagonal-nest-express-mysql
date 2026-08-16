@@ -1,3 +1,9 @@
+> 每一塊（`##` 標題）須能獨立通過驗證鏈：
+> `pnpm typecheck && pnpm lint && pnpm test && pnpm --filter @app/api test:e2e && pnpm build && pnpm --filter @app/api swagger:check`
+> 綠燈後給 commit 指令，由使用者手動執行，再進下一塊。
+>
+> 〔檔頭補寫於 2026-08-16 的 openspec 慣例整理。驗證鏈取自本檔各塊當時實際記錄的結果，塊與任務內容維持原樣未改。〕
+
 ## 1. 修復 overrides 機制
 
 - [x] 1.1 **實作中修正**：pnpm 10+ 起 overrides 要放 `pnpm-workspace.yaml`（先試 root `package.json` 的 `pnpm.overrides`，lockfile 沒出現 `overrides:` 區塊 → 證實無效）

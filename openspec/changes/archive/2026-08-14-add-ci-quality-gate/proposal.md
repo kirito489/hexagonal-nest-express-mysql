@@ -26,7 +26,7 @@
 
 ### New Capabilities
 
-- `ci-quality-gate`: CI 對品質檢查的執行保證——哪些檢查必須在 CI 執行、在哪個時機觸發、失敗時是否阻擋後續 stage，以及 e2e 在 CI 的資料庫隔離要求。
+- `platform-ci-quality-gate`: CI 對品質檢查的執行保證——哪些檢查必須在 CI 執行、在哪個時機觸發、失敗時是否阻擋後續 stage，以及 e2e 在 CI 的資料庫隔離要求。
 
 ## Impact
 

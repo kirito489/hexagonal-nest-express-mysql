@@ -18,9 +18,9 @@
 
 ### New Capabilities
 
-- `monorepo-workspace`：pnpm workspace 的目錄結構、scripts 命名慣例、共用 tsconfig 與依賴管理規則。
-- `frontend-admin`：admin SPA 的技術選型、路由架構、認證流程、UI 套件慣例、與後端 API 互動方式。
-- `api-client-generation`：OpenAPI bundle 產生 TypeScript client 與 React Query hooks 的流程與輸出規範。
+- `platform-monorepo-workspace`：pnpm workspace 的目錄結構、scripts 命名慣例、共用 tsconfig 與依賴管理規則。
+- `platform-frontend-conventions`：admin SPA 的技術選型、路由架構、認證流程、UI 套件慣例、與後端 API 互動方式。
+- `platform-api-client-generation`：OpenAPI bundle 產生 TypeScript client 與 React Query hooks 的流程與輸出規範。
 
 ### Modified Capabilities
 

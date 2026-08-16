@@ -1,4 +1,10 @@
-> **前置**：`add-engineering-guardrails` 需先 `/opsx:archive`，否則本 change 的 `engineering-guardrails` delta 在封存時沒有 master spec 可合併。
+> 每一塊（`##` 標題）須能獨立通過驗證鏈：
+> `pnpm typecheck && pnpm lint && pnpm test && pnpm --filter @app/api test:e2e && pnpm build`
+> 綠燈後給 commit 指令，由使用者手動執行，再進下一塊。
+>
+> 〔檔頭補寫於 2026-08-16 的 openspec 慣例整理。驗證鏈取自本檔各塊當時實際記錄的結果，塊與任務內容維持原樣未改。〕
+>
+> **前置**：`add-engineering-guardrails` 需先 `/opsx:archive`，否則本 change 的 `platform-engineering-guardrails` delta 在封存時沒有 master spec 可合併。
 
 ## 1. 訊息表與基底重載（純搬移，行為零變化）
 

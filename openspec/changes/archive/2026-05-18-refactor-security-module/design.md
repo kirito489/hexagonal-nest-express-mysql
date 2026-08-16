@@ -23,7 +23,7 @@ Sidebar 現況：扁平 NAV_ITEMS + footer 單一「登出」。未來 security 
 - 把 security 模組對齊 member / role 的 hexagonal 結構與 list / write 回應 shape。
 - list 加分頁 + IP 模糊搜尋，與其他模組 list pattern 一致。
 - unlockAccount 行為明確化：email 不存在 → 404；帳號未鎖 → 409。
-- 建立 `security-management` capability spec，未來行為變動有 master 治理。
+- 建立 `api-security-management` capability spec，未來行為變動有 master 治理。
 - Sidebar 升級為 grouped，並在 footer 加 user menu，為 SUPERADMIN-only 模組與更多分組做準備。
 
 **Non-Goals：**
@@ -127,7 +127,7 @@ type NavItem = {
 - 目前 `useCurrentMember()` 是否回 `email`？看 `apps/web/src/lib/use-current-member.ts`。若沒有，要從 `/api/auth/me` response 帶出來（後端 `getMyProfile` 應該有）。
 - 若 `member.email` 沒在 `MemberContext` type 內，補上。
 
-### D10：security-management capability spec
+### D10：api-security-management capability spec
 
 - 7 個 Requirement（每個 endpoint 一個）：
   - IP whitelist list / add / remove
@@ -154,8 +154,8 @@ type NavItem = {
 3. **Add / Remove / Unlock response shape**：controller 改回 201 + { id } / 204；e2e 對齊。
 4. **unlockAccount domain exception**：新增 2 個 exception + filter 分支 + service 內檢查；e2e 補 3 個 case（成功 / 404 / 409）。
 5. **Swagger + api-client**：7 個 yaml 對齊、重打 client。
-6. **security-management spec**：寫 master spec。
-7. **Sidebar grouped + user menu**：NAV_ITEMS 加欄位、_layout.tsx 重寫、SidebarUserMenu 元件、frontend-admin spec MODIFY。
+6. **api-security-management spec**：寫 master spec。
+7. **Sidebar grouped + user menu**：NAV_ITEMS 加欄位、_layout.tsx 重寫、SidebarUserMenu 元件、platform-frontend-conventions spec MODIFY。
 8. **驗證 + 手動測試**。
 
 回退策略：每個 phase 獨立 commit，回退 phase n 不影響 phase 1..n-1。

@@ -41,12 +41,12 @@
 
 ### Modified Capabilities
 
-- `security-management`：擴充 IP whitelist / blacklist 的 by-id endpoints（GET / PATCH）、DELETE path param 改 id、新增 `IpListNotFoundException` 規格。
-- `frontend-admin`：sidebar 多兩條「安全」group 項目（既有 sidebar requirement 不需動）；同時要把 IP 黑白名單兩個前端頁面 capability 加進來（**新增 capability** `security-ui` 處理）。
+- `api-security-management`：擴充 IP whitelist / blacklist 的 by-id endpoints（GET / PATCH）、DELETE path param 改 id、新增 `IpListNotFoundException` 規格。
+- `platform-frontend-conventions`：sidebar 多兩條「安全」group 項目（既有 sidebar requirement 不需動）；同時要把 IP 黑白名單兩個前端頁面 capability 加進來（**新增 capability** `ui-security-management` 處理）。
 
 ### New Capabilities
 
-- `security-ui`：apps/web 的「安全」相關前端 UI 規格（IP 白名單頁、IP 黑名單頁；未來帳號鎖定頁也歸這裡）。
+- `ui-security-management`：apps/web 的「安全」相關前端 UI 規格（IP 白名單頁、IP 黑名單頁；未來帳號鎖定頁也歸這裡）。
 
 ## Impact
 

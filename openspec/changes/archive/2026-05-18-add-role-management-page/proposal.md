@@ -1,6 +1,6 @@
 ## Why
 
-`apps/web/` 已透過 `member-management-ui` 跑通「DataTable + Dialog form + URL state + 權限 + Optimistic + Toast」整條鏈，但 member 頁的「角色」欄目前是只讀 select 選項，使用者無法在後台調整角色定義與權限指派。後端 `/api/roles` 一族 endpoint（list / get / create / update / delete + `GET /roles/permissions` 取所有可指派的權限）已完整可用，需要前端 UI 才能讓管理員真的維護 RBAC。角色頁也是驗證 starter pack pattern 可複製性的第二個模組。
+`apps/web/` 已透過 `ui-member-management` 跑通「DataTable + Dialog form + URL state + 權限 + Optimistic + Toast」整條鏈，但 member 頁的「角色」欄目前是只讀 select 選項，使用者無法在後台調整角色定義與權限指派。後端 `/api/roles` 一族 endpoint（list / get / create / update / delete + `GET /roles/permissions` 取所有可指派的權限）已完整可用，需要前端 UI 才能讓管理員真的維護 RBAC。角色頁也是驗證 starter pack pattern 可複製性的第二個模組。
 
 ## What Changes
 
@@ -19,12 +19,12 @@
 
 ### New Capabilities
 
-- `role-management-ui`：apps/web 的角色管理介面（list / search / paginate / create / edit / delete / toggle status / permission 多選）的功能需求與互動規格。
-- `role-management`：後端角色更新行為（`PATCH /api/roles/:id`）的需求規格，這次本提案僅描述「支援 `status` 欄位切換啟用狀態」這一點；既有 `name` / `permissionCodes` 行為已實作但尚未建立 capability spec，本次一併列入此 capability 的初版 spec。
+- `ui-role-management`：apps/web 的角色管理介面（list / search / paginate / create / edit / delete / toggle status / permission 多選）的功能需求與互動規格。
+- `api-role-management`：後端角色更新行為（`PATCH /api/roles/:id`）的需求規格，這次本提案僅描述「支援 `status` 欄位切換啟用狀態」這一點；既有 `name` / `permissionCodes` 行為已實作但尚未建立 capability spec，本次一併列入此 capability 的初版 spec。
 
 ### Modified Capabilities
 
-- `frontend-admin`：Sidebar 多 1 條導航項目（「角色管理」），延伸既有「依 `requiredPermission` 過濾可見性」的 pattern，無 spec 行為改變，僅在現有導航需求下多註一個條目；如 spec 上無需要動到的描述，視為純配置即可，不列入此處。
+- `platform-frontend-conventions`：Sidebar 多 1 條導航項目（「角色管理」），延伸既有「依 `requiredPermission` 過濾可見性」的 pattern，無 spec 行為改變，僅在現有導航需求下多註一個條目；如 spec 上無需要動到的描述，視為純配置即可，不列入此處。
 
 > 註：若 review 後判定 sidebar 多加一項屬純配置（NAV_ITEMS 陣列多一筆，無 spec-level 行為變更），可移除「Modified Capabilities」一節。本提案先列出讓 review 判定。
 

@@ -20,7 +20,7 @@
 **Non-Goals：**
 
 - 不改動 `/api/roles` 與 `/api/roles/permissions`（角色頁已分頁、權限頁不需分頁）。
-- 不重寫 `member-management-ui` 其他 Dialog 欄位（Email / 名稱 / 密碼 / 狀態 / 即時切換）。
+- 不重寫 `ui-member-management` 其他 Dialog 欄位（Email / 名稱 / 密碼 / 狀態 / 即時切換）。
 - 不引入新的全域元件抽象層；`RoleCombobox` 落地於 `routes/members/components/`，等真有第二個使用者再上提到 `components/`。
 - 不引入 virtual scroll 函式庫；單頁 20 筆 + intersection observer 已足。
 - 不導入 cursor-based pagination；offset 分頁與既有 `/api/members`、`/api/roles` 一致。

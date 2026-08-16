@@ -28,7 +28,7 @@
 
 ### Modified Capabilities
 
-- `engineering-guardrails`: 新增「產生器產出物必須通過所有既有護欄」的要求。
+- `platform-engineering-guardrails`: 新增「產生器產出物必須通過所有既有護欄」的要求。
 
 ## Impact
 
