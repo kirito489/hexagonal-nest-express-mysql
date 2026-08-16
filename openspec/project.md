@@ -423,7 +423,7 @@ if (this.featureFlags.isEnabled('accountLockEnabled')) { ... }
 
 - **帳號鎖定**：連續登入失敗達 `APPLICATION_ACCOUNT_LOCK_THRESHOLD` 次後，帳號自動鎖定（DB `lockedAt` 欄位）。失敗計數使用 Redis INCR（30 分鐘 TTL），Redis 不可用時 graceful degradation（不計數，但 DB 鎖定仍有效）。登入成功自動重置計數。
 - **IP 黑白名單**：`IpBlacklistGuard` / `IpWhitelistGuard` 全域攔截。IP 連續登入失敗達 `APPLICATION_IP_BLOCK_THRESHOLD` 次自動加入黑名單。資料表：`ip_whitelist`、`ip_blacklist`（後者含 `isAutoBlock` 標記）。
-- **密碼策略**：`PasswordPolicyService` 依角色套用不同複雜度（0–3）。複雜度 3 = 大小寫 + 數字 + 特殊符號 + 禁止 18 組常見弱密碼。ADMIN 預設 3、其他角色預設 1。
+- **密碼策略**：`PasswordPolicyService` 依角色套用不同複雜度（**0–4**，累加式）：0 只檢查長度、1 加英文字母與數字、2 加大小寫各一、3 加特殊符號、4 加禁止 18 組常見弱密碼。**系統管理員預設 4、其他角色預設 1**（`APPLICATION_SYSTEM_ADMIN_PASSWORD_COMPLEXITY` / `APPLICATION_OTHER_ADMIN_PASSWORD_COMPLEXITY`）。
 - **密碼定期更換**：`passwordChangeEnabled` + `APPLICATION_PASSWORD_CHANGE_PERIOD > 0` 時，`JwtAuthGuard` 檢查 `lastPasswordChange`；超期回 `403 { code: 'PASSWORD_CHANGE_REQUIRED' }`。
 - **閒置自動登出**：`SessionIdleGuard` 用 Redis TTL；每次認證請求刷新 TTL，超過 `APPLICATION_SESSION_IDLE_TIMEOUT` 分鐘未活動 key 自動消失，回 `401`。Redis 不可用時視為活躍。
 - **Google reCAPTCHA**：`GoogleRecaptchaAdapter` 支援 v2 / v3。非正式環境（`GOOGLE_RECAPTCHA_IS_PRODUCTION=false`）永遠通過；v3 需通過 0.5 分數門檻。啟用時登入必須附帶 `recaptchaToken`。

@@ -159,7 +159,7 @@ After making changes, before suggesting a commit:
 
 1. `pnpm typecheck` — fix all type errors across the three workspaces. If api typecheck reports "Property X does not exist on PrismaService", run `pnpm --filter @app/api db:generate` first.
 2. `pnpm lint` — fix all lint warnings / errors.
-3. `pnpm test` — unit tests **plus the architecture guardrails** (7 rule files / 20 assertions) (the `test` script chains both). If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked). Before suggesting a commit, prefer `pnpm test:cov` — that is what CI runs, and it additionally enforces the coverage thresholds (api 70/60/70/70, web 75/75/60/75).
+3. `pnpm test` — unit tests **plus the architecture guardrails** (11 rule files / 32 assertions) (the `test` script chains both). If controllers / routes changed, run `pnpm --filter @app/api test:e2e` (runs against a real `*_test` DB; needs local MySQL — Redis is mocked). Before suggesting a commit, prefer `pnpm test:cov` — that is what CI runs, and it additionally enforces the coverage thresholds (api 70/60/70/70, web 75/75/60/75).
 4. `pnpm build` — run when touching module wiring, path aliases, decorators, or build config. `nest build` / `vite build` catch path-alias resolution, decorator-metadata, and emit-stage errors that `tsc --noEmit` misses.
 5. If swagger yaml changed: `pnpm --filter @app/api swagger:bundle` + `pnpm --filter @app/api-client generate` to keep frontend types in sync. Verify with `pnpm --filter @app/api swagger:check` — it regenerates into a temp dir and diffs, so it never touches the working tree. (Route-level drift is already caught by `pnpm test`; `swagger:check` covers content-level drift where the path set is unchanged.)
 
@@ -175,7 +175,7 @@ Package manager: **pnpm 11+**. Run from repo root.
 pnpm install                                  # install all workspace deps
 pnpm dev                                      # start apps/api + apps/web in parallel (user runs this; don't run it yourself)
 pnpm typecheck && pnpm lint && pnpm test:cov  # the pre-commit chain (test:cov = tests + coverage thresholds + guardrails; CI runs this)
-pnpm --filter @app/api test:arch              # guardrails only — 7 rule files, 20 assertions, ~0.2s, no DB
+pnpm --filter @app/api test:arch              # guardrails only — 11 rule files, 32 assertions, ~0.3s, no DB
 pnpm --filter @app/api db:generate            # run after every pnpm install, before typecheck
 pnpm --filter @app/api swagger:bundle && pnpm --filter @app/api-client generate   # after Swagger changes
 ```
@@ -192,6 +192,8 @@ See **`openspec/project.md`** for:
 - Frontend directory layout, path aliases, shadcn integration, form / API conventions.
 - Swagger yaml inline-data convention (never `$ref: SuccessResponse`), plus the three-hop contract sync guardrail (controller → source yaml → bundle → api-client).
 - Architecture guardrail tests: where they live, how to add a rule, the exemption list, and the eslint-vs-test split.
+- `.agents/hooks/*.sh`: agent hook logic lives there (tool-agnostic), `.claude/settings.json` only registers it. To change hook behaviour edit the script, not the JSON. New scripts are auto-checked by `hook-scripts.spec.ts` (`bash -n` + "every registered script exists").
+- `pnpm verify:ci`: reproduce the CI e2e environment locally in a container before pushing CI changes.
 - CI job responsibilities and the local command each one maps to.
 - Auth flow, token storage, CORS, environment variables, time-handling convention, naming conventions.
 - API client design (source-first, auto-unwrap of `{ success, data, timestamp }`).

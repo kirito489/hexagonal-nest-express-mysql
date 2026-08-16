@@ -69,8 +69,9 @@ pnpm --filter @app/api test:e2e               # 改 controller / 路由時加跑
 
 # 品質檢查（CI 跑的就是這個）
 pnpm test:cov                                 # 單元測試 + 覆蓋率門檻 + 架構守則
-pnpm --filter @app/api test:arch              # 只跑架構守則（7 支規則檔 / 20 項斷言，約 0.2 秒）
+pnpm --filter @app/api test:arch              # 只跑架構守則（11 支規則檔 / 32 項斷言，約 0.3 秒）
 pnpm --filter @app/api swagger:check          # 驗證 swagger bundle 與 api-client 產物是否最新（產物寫入 tmp，不動工作目錄）
+pnpm verify:ci                                # 以容器重現 CI 的 e2e 環境跑一次（需 docker，約 60 秒）
 
 # 改後端 controller / Swagger 後同步前端型別
 pnpm --filter @app/api swagger:bundle
@@ -132,6 +133,7 @@ pnpm --filter @app/api gen:module <name> --front    # 前台模組 → /api/fron
 | `ACCESS_SECRET`   | JWT Access Token 簽名金鑰（≥ 32 字元）     |
 | `REFRESH_SECRET`  | JWT Refresh Token 簽名金鑰（≥ 32 字元）    |
 | `COOKIE_SECRET`   | Cookie 簽名金鑰（≥ 32 字元）               |
+| `AWS_MEDIA_LIBRARY_ROOT` | 檔案 URL 的公開前綴。**即使 `STORAGE_DRIVER=local` 也必填**（給佔位值即可，只有 s3 driver 會真的用到） |
 
 產生隨機 secret：
 
