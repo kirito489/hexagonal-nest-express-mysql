@@ -10,6 +10,9 @@
   },
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"pnpm --filter @app/api dev\" \"pnpm --filter @app/web dev\"",
+    "dev:db": "docker compose -f compose.dev.yml up -d --wait",
+    "dev:db:stop": "docker compose -f compose.dev.yml stop",
+    "dev:db:reset": "docker compose -f compose.dev.yml down -v",
     "build": "pnpm --filter @app/api build && pnpm --filter @app/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

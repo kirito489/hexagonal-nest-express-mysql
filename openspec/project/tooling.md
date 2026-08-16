@@ -41,6 +41,21 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 
 **本機重現 CI 的測試環境**：`pnpm verify:ci` 以 `compose.verify.yml` 起一個 MySQL 9 容器（healthcheck 等就緒、`tmpfs` 跑在記憶體）並執行 e2e，實測約 60 秒。定位是「測試環境重現」而非「pipeline 模擬」——runner 行為與 cache 命中仍只能在實際 pipeline 觀察。
 
+### 兩份 compose 的分工
+
+| 檔案 | 用途 | 資料 | 對外埠 |
+| --- | --- | --- | --- |
+| `compose.dev.yml` | 開發用 MySQL 9 + Redis 7（`pnpm dev:db`） | named volume，重啟保留 | 3316 / 6389 |
+| `compose.verify.yml` | 重現 CI e2e 環境（`pnpm verify:ci`） | `tmpfs`，跑完即消失 | 13306 |
+
+**刻意不合併成一份。** 兩者對資料的要求相反——dev 要持久、verify 要每次乾淨；
+埠也必須各自錯開，否則同時開著會撞。三個檔案（含 CI 的 service）共用 `mysql:9`
+同一條版本線，避免出現「本機過、CI 掛」。
+
+對外埠一律避開預設的 3306 / 6379：多數開發機已經有一組資料庫在跑。
+`compose.dev.yml` 的埠與密碼可用 repo 根目錄 `.env` 的 `DEV_DB_PORT` / `DEV_REDIS_PORT` /
+`DEV_DB_PASSWORD` 覆寫。
+
 要點：
 
 - **兩個品質 job 在 Merge Request 就觸發**（不像 `prepare-production` 只認分支推送）—— MR 正是最該擋下問題的時機。

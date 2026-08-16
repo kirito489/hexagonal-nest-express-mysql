@@ -82,7 +82,7 @@ pnpm --filter @app/api test:arch   # 只跑架構守則
 pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行）
 ```
 
-現有規則（14 支 / 48 項斷言）：
+現有規則（15 支 / 51 項斷言）：
 
 | 檔案 | 項 | 守住的規則 |
 | --- | --- | --- |
@@ -100,6 +100,7 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `openspec-schema.spec.ts` | 5 | 自訂 schema 存在；建立 change 一律帶 `--schema`；opsx 指令維持薄殼 |
 | `openspec-spec-format.spec.ts` | 5 | 能力命名前綴；`api-*` 的 endpoint 需求須寫請求與回應 |
 | `project-docs.spec.ts` | 4 | `project.md` 索引連結有效、無孤兒子檔、全 repo 引用有效 |
+| `compose-files.spec.ts` | 3 | 每份 compose 都有 script 會啟動；`compose.dev.yml` 的對外埠須寫進 README |
 
 **新增一條規則的作法**（三步缺一不可）：
 

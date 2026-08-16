@@ -1,0 +1,68 @@
+# =============================================================================
+# 開發環境的相依服務（MySQL + Redis）
+# -----------------------------------------------------------------------------
+# 用途：讓 clone 這個模板的人有一組可用的資料庫，不必自行安裝 MySQL / Redis。
+#
+# 與 compose.verify.yml 的差別（兩者用途不同，不要合併）：
+#   - 這裡帶 named volume 持久化：dev 資料重啟後要還在。
+#     verify 用 tmpfs 跑在記憶體——測試庫本來就該每次拋棄。
+#   - 這裡對外用非預設埠（3316 / 6389），避開機器上既有的 MySQL 3306 與 Redis 6379。
+#     多數開發機已經有一組在跑，佔用預設埠會直接起不來。
+#   - MySQL 版本對齊 CI 與 verify 的 mysql:9，讓 repo 內只有一條 MySQL 版本線；
+#     dev 與 CI 行為一致，才不會出現「本機過、CI 掛」。
+#
+# 埠對應到 .env 的設定見 README「用 Docker 起開發資料庫」。
+#
+# 用法：
+#   pnpm dev:db          啟動（等 healthcheck 通過才返回）
+#   pnpm dev:db:stop     停止，保留資料
+#   pnpm dev:db:reset    停止並刪除資料卷（重新來過）
+# =============================================================================
+name: hexagonal-nest-dev
+
+services:
+  mysql:
+    image: mysql:9
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DEV_DB_PASSWORD:-devsecret}
+      MYSQL_DATABASE: ${DEV_DB_DATABASE:-hexagonal_express_db}
+      MYSQL_ROOT_HOST: '%'
+    # e2e 的測試庫（*_test）由 globalSetup 自行建立，此處不需預先宣告
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          '127.0.0.1',
+          '-p${DEV_DB_PASSWORD:-devsecret}',
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    ports:
+      # 綁 127.0.0.1：只給本機用，不曝露到區網
+      - '127.0.0.1:${DEV_DB_PORT:-3316}:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # 開 AOF：重啟不掉 token 黑名單與快取，省得每次重登
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    ports:
+      - '127.0.0.1:${DEV_REDIS_PORT:-6389}:6379'
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mysql-data:
+  redis-data:

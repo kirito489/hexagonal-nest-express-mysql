@@ -19,8 +19,36 @@ hexagonal-nest-express-mysql/
 
 - Node.js **20+**（建議用 nvm）
 - pnpm **11+**（透過 corepack 啟用：`corepack enable`）
-- MySQL / MariaDB
-- Redis
+- MySQL / MariaDB 與 Redis —— 沒有現成的可用 `pnpm dev:db` 起容器，見下節
+
+## 用 Docker 起開發資料庫（選用）
+
+repo 附 `compose.dev.yml`，一行指令就有 MySQL 9 + Redis 7：
+
+```bash
+pnpm dev:db          # 啟動（等 healthcheck 通過才返回，約 10 秒）
+pnpm dev:db:stop     # 停止，資料保留
+pnpm dev:db:reset    # 停止並刪除資料卷（重新來過）
+```
+
+**對外埠刻意避開預設值**——多數開發機已經有 MySQL 3306 / Redis 6379 在跑，佔用會直接起不來。
+用它的話 `apps/api/.env` 要對應設成：
+
+```bash
+DB_HOST=127.0.0.1
+DB_PORT=3316          # 非預設 3306
+DB_USERNAME=root
+DB_PASSWORD=devsecret
+DB_DATABASE=hexagonal_express_db
+DB_TEST_DATABASE=hexagonal_express_test
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6389       # 非預設 6379
+```
+
+要改埠或密碼就在 repo 根目錄的 `.env` 設 `DEV_DB_PORT` / `DEV_REDIS_PORT` / `DEV_DB_PASSWORD`
+（compose 會讀，預設值即上表）。
+
+已經有自己的 MySQL / Redis 就跳過這節，直接把 `.env` 指向它們即可。
 
 ## 快速開始
 
@@ -30,7 +58,7 @@ pnpm install
 
 # 2. 設定後端環境變數（見下方「必填環境變數」）
 cp apps/api/.env.example apps/api/.env
-# 編輯 apps/api/.env
+# 編輯 apps/api/.env（沒有現成資料庫的話先跑 pnpm dev:db，並照上節填埠號）
 
 # 3. 建立資料庫 + 跑 migration + seed
 pnpm --filter @app/api db:create
