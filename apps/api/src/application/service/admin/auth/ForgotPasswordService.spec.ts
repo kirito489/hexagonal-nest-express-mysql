@@ -69,4 +69,28 @@ describe('ForgotPasswordService', () => {
       makeService().execute({ email: 'user@test.com' }),
     ).resolves.toBeUndefined();
   });
+
+  // SMTP 設定了卻連不上時會走滿 connectionTimeout（預設 10 秒）。若 execute 等它，
+  // 「帳號存在」的回應會比「不存在」慢兩個數量級，成為比狀態碼更明顯的列舉訊號。
+  it('不等待寄信完成——SMTP 卡住時 execute 仍立即返回', async () => {
+    (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+      memberStub,
+    );
+    mockResetToken.createToken.mockResolvedValue('tok');
+
+    let release!: () => void;
+    mockSendEmail.sendMail.mockReturnValue(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    const started = Date.now();
+    await makeService().execute({ email: 'user@test.com' });
+    const elapsed = Date.now() - started;
+
+    expect(mockSendEmail.sendMail).toHaveBeenCalled();
+    expect(elapsed).toBeLessThan(100);
+    release();
+  });
 });

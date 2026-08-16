@@ -217,4 +217,18 @@ if (this.featureFlags.isEnabled('accountLockEnabled')) { ... }
 - **閒置自動登出**：`SessionIdleGuard` 用 Redis TTL；每次認證請求刷新 TTL，超過 `APPLICATION_SESSION_IDLE_TIMEOUT` 分鐘未活動 key 自動消失，回 `401`。Redis 不可用時視為活躍。
 - **Google reCAPTCHA**：`GoogleRecaptchaAdapter` 支援 v2 / v3。非正式環境（`GOOGLE_RECAPTCHA_IS_PRODUCTION=false`）永遠通過；v3 需通過 0.5 分數門檻。啟用時登入必須附帶 `recaptchaToken`。
 - **登入日誌**：`LOGIN_SUCCESS` / `LOGIN_FAILURE` / `LOGOUT` / `PASSWORD_RESET` 寫入 `auth_logs`（含 IP / UA / detail）。fire-and-forget，不影響主流程。
-- **密碼重設**：`POST /api/auth/forgot-password` 不論 email 是否存在皆回成功（防列舉），token 存 `password_reset_tokens` 表；`POST /api/auth/reset-password` 驗證 → 策略檢查 → 更新 → 條件式強制登出。
+- **密碼重設**：`POST /api/admin/auth/forgot-password` 不論 email 是否存在皆回 `204`（防列舉），token 存 `password_reset_tokens` 表；`POST /api/admin/auth/reset-password` 驗證 → 策略檢查 → 更新 → 條件式強制登出。
+
+  防列舉是**全鏈路**的，不只狀態碼：帳號不存在時靜默 return 且**刻意不把 email 寫進 log**
+  （否則日誌會累積「哪些信箱未註冊」的列舉來源）；寄信失敗包 try/catch 不拋出；
+  **寄信不 await**——SMTP 設定了卻連不上會走滿 `connectionTimeout`（預設 10 秒），
+  讓「帳號存在」的回應慢兩個數量級，那是比狀態碼更明顯的訊號。另有每分鐘 3 次的節流。
+
+  **已知取捨——重設 token 走 query string**（`APP_PASSWORD_RESET_URL?token=…`）：
+  query string 會進入瀏覽器歷史、`Referer` 標頭（該頁若載入第三方資源就會外送），
+  以及反向代理 / CDN 的存取日誌。專案自己的日誌已處理（`sanitizeUrl` 的
+  `SENSITIVE_QUERY_PARAMS` 含 `token`），風險只在專案控制範圍外的設施。
+  未設 `APP_PASSWORD_RESET_URL` 時的 fallback 用的是 `#token=`（fragment），
+  fragment 不會送到伺服器也不進 `Referer`——**安全性反而優於主要分支**。
+  要收斂有兩條路：前端載入後立刻 `history.replaceState` 移除 token（成本最低），
+  或統一改用 fragment。改動會影響前端路由，目前維持現狀。

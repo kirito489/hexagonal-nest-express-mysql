@@ -133,7 +133,7 @@ pnpm --filter @app/api test:e2e               # 改 controller / 路由時加跑
 
 # 品質檢查（CI 跑的就是這個）
 pnpm test:cov                                 # 單元測試 + 覆蓋率門檻 + 架構守則
-pnpm --filter @app/api test:arch              # 只跑架構守則（19 支規則檔 / 61 項斷言，約 0.5 秒）
+pnpm --filter @app/api test:arch              # 只跑架構守則（19 支規則檔 / 68 項斷言，約 0.5 秒）
 pnpm --filter @app/api swagger:check          # 驗證 swagger bundle 與 api-client 產物是否最新（產物寫入 tmp，不動工作目錄）
 pnpm verify:ci                                # 以容器重現 CI 的 e2e 環境跑一次（需 docker，約 60 秒）
 

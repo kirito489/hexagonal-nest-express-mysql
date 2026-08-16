@@ -54,21 +54,27 @@ export class ForgotPasswordService implements ForgotPasswordUseCase {
       ? `${env.APP_PASSWORD_RESET_URL}?token=${token}`
       : `#token=${token}`;
 
-    try {
-      await this.sendEmail.sendMail({
-        to: command.email,
-        subject: '密碼重設通知',
-        html: `
+    // **不 await**：SMTP 設定了卻連不上時會走滿 connectionTimeout（預設 10 秒），
+    // 讓「帳號存在」的回應比「不存在」慢兩個數量級——那比狀態碼更明顯的列舉訊號。
+    // 回應內容與狀態碼的一致性已經處理好了，時間差是最後一處缺口。
+    // 沿用 LoginService.updateLastLoginAt 的 fire-and-forget 寫法。
+    void (async () => {
+      try {
+        await this.sendEmail.sendMail({
+          to: command.email,
+          subject: '密碼重設通知',
+          html: `
           <p>您好，</p>
           <p>我們收到您的密碼重設請求。請點擊以下連結重設密碼：</p>
           <p><a href="${resetUrl}">${resetUrl}</a></p>
           <p>此連結將在 ${env.APP_PASSWORD_RESET_TOKEN_EXPIRES_IN} 分鐘後失效。</p>
           <p>如果您沒有提出此請求，請忽略此信件。</p>
         `,
-      });
-    } catch (err) {
-      this.logger.error('密碼重設信件寄送失敗', err);
-      // 不拋出錯誤，避免暴露使用者是否存在
-    }
+        });
+      } catch (err) {
+        // 不拋出錯誤，避免暴露使用者是否存在
+        this.logger.error('密碼重設信件寄送失敗', err);
+      }
+    })();
   }
 }

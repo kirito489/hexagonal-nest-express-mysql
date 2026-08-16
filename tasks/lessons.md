@@ -87,6 +87,14 @@
 
 **How to apply**：寫守則時除了問「這條規則怎麼寫」，要多問一句「**什麼東西的缺席才是問題**」。這類 negative-space 規則的判準通常很簡單（本例：收 `@Param` 且非 `@Public` 就必須有授權裝飾器），難的是意識到要寫。新增 controller、新增需要授權的端點時，在補守則之前這是 review 必須人工確認的項目。
 
+### 2026-08-17 — 字串比對型的守則必須先去註解，否則說明文字會把規則餵飽
+
+**踩到什麼**：`authorization-coverage.spec.ts` 用 `classHeader.includes('@Roles(')` 判斷 class 有沒有授權裝飾器，而 `classHeader` 取的是 `export class` 之前的全部內容——**包含檔頭 TSDoc**。`SecurityController` 的註解寫著「刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate」，於是實測把真的 `@Roles` 裝飾器刪掉、只留註解，守則照樣 61 全綠。
+
+**Why**：靜態掃描把註解與程式碼一視同仁。而**說明某個裝飾器**的註解，恰好最常出現在「有那個裝飾器」的檔案裡——偽陰性因此特別容易發生在「本來就正確」的地方，等到有人重構移除裝飾器（先改 code、註解晚點再說）才顯形，且不會有任何徵兆。
+
+**How to apply**：任何用字串比對找裝飾器 / 關鍵字的守則，比對前一律 `stripComments`。判斷 class 層級時再進一步只取 `@Controller(` 到 `export class` 之間——那段不可能夾註解。另外兩個同批踩到的切割錯誤：(1) handler 切塊要**往前**吃掉連續的裝飾器行，否則寫在 `@Post()` 上方的 `@Public()` 會被歸給前一個 handler，造成前一支漏報、本支誤報；(2) 守則本身要有**合成輸入的自我測試**——守則出錯是靜默的，而給偽陰性的守則比沒有守則更危險，它會讓人停止人工檢查。
+
 ## Prisma / 資料庫
 
 - **軟刪除 model 的所有 read path 都要加 `deletedAt: null`**：`findUnique` 只接受 unique 欄位，要過濾軟刪得改用 `findFirst({ where: { id, deletedAt: null } })`。`count` 用於「是否還有相關紀錄」判斷時（如阻擋刪除有成員的角色）也要排除軟刪，否則永遠刪不掉。例外是「恢復」場景才用 `loadIncludingDeleted` 顯式 opt-in。

@@ -82,7 +82,7 @@ pnpm --filter @app/api test:arch   # 只跑架構守則
 pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行）
 ```
 
-現有規則（19 支 / 61 項斷言）：
+現有規則（19 支 / 68 項斷言）：
 
 | 檔案 | 項 | 守住的規則 |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `global-guards.spec.ts` | 3 | 認證與授權 guard 全域註冊，且授權排在 `JwtAuthGuard` 之後 |
 | `sanitize-coverage.spec.ts` | 2 | request DTO 中看起來敏感的欄位，實際餵進 `sanitize()` 驗證真被遮蔽 |
 | `traditional-chinese.spec.ts` | 2 | 全專案不得混入日文假名或非繁體漢字 |
-| `authorization-coverage.spec.ts` | 2 | 收 `@Param` 的 handler 必須有 `@Permissions` / `@Roles` / `@Public`——本專案第一條「檢查應存在而不存在」的規則 |
+| `authorization-coverage.spec.ts` | 9 | 收外部輸入的 handler 必須有 `@Permissions` / `@Roles` / `@Public`——本專案第一條「檢查應存在而不存在」的規則。**自帶合成輸入的自我測試**（註解冒充裝飾器、識別碼走 body、裝飾器寫在 method 上方等七個判定） |
 
 **新增一條規則的作法**（三步缺一不可）：
 

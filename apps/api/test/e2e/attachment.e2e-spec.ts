@@ -89,6 +89,22 @@ describe('Attachment E2E', () => {
     expect(existsSync(join(mediaRoot, key))).toBe(true);
   });
 
+  // 白名單放行（宣告 image/png）但內容是 HTML——**唯一能證明 magic byte 那道
+  // 檢查真的接在鏈上的案例**。少了它，把 sniffMime 整段刪掉全部測試仍會全綠。
+  it('宣告 image/png 但內容是 HTML → 400（magic byte 攔截）', async () => {
+    const res = await upload()
+      .field('folder', 'avatars')
+      .field('relatedTable', 'members')
+      .field('relatedId', 'm-1')
+      .attach('file', Buffer.from('<script>alert(1)</script>'), {
+        filename: 'evil.png',
+        contentType: 'image/png',
+      });
+
+    expectApiError(res, 400, ResponseCodes.INVALID_UPLOAD);
+    expect(await prisma.attachmentRecord.count()).toBe(0);
+  });
+
   it('不允許的 MIME（text/html）→ 400', async () => {
     const res = await upload()
       .field('folder', 'avatars')
