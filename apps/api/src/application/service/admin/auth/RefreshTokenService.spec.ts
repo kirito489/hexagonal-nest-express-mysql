@@ -118,6 +118,20 @@ describe('RefreshTokenService', () => {
     expect(clearMemberContext.clearMemberContext).not.toHaveBeenCalled();
   });
 
+  // 舊格式紀錄（改用 reason 之前寫入的值 '1'）代表「在黑名單但原因不明」。
+  // 必須拒絕本次——把它與「不在黑名單」都當成 null，會讓部署當下所有既存的
+  // 已登出 / 已輪替 refresh token 在剩餘 TTL 內（預設 7 天）全部復活。
+  it('黑名單中但原因不明 → 拒絕本次，但不連坐撤銷', async () => {
+    blacklist.getBlacklistReason.mockResolvedValueOnce('unknown');
+    jwt.verify.mockReturnValue({ sub: MEMBER_UUID, type: 'refresh' });
+
+    await expect(
+      service.execute({ refreshToken: 'legacy-format' }),
+    ).rejects.toBeInstanceOf(InvalidRefreshTokenException);
+    expect(saveMember.incrementTokenVersion).not.toHaveBeenCalled();
+    expect(clearMemberContext.clearMemberContext).not.toHaveBeenCalled();
+  });
+
   it('payload.tokenVersion 與現值不符 → InvalidRefreshTokenException', async () => {
     jwt.verify.mockReturnValue({
       sub: MEMBER_UUID,

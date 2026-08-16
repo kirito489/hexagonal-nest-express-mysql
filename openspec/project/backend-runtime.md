@@ -68,7 +68,13 @@ Seed 預設建立一個角色（`roleCode: SUPERADMIN`，`isDefault: true`）並
 
 **快取 TTL**：取 `min(JWT 剩餘效期, PERMISSION_CACHE_TTL)`，確保 Token 過期後快取同步失效。
 
-**Redis 降級**：Redis 不可用時，`JwtAuthGuard` 自動降級為每次請求直接查 DB，並在日誌中印出警告。服務不中斷，但效能下降。
+**Redis 是硬相依，不是選填**：`JwtAuthGuard` 在最前面就查 token 黑名單，而黑名單採
+**fail-closed**——無法查詢就無法確認 token 是否已被撤銷，一律回 `503`。因此 Redis 掛掉時
+**所有已認證請求都會失敗**，public 路由則因節流也是 fail-closed 而回 `429`。
+
+會降級查 DB 的只有 `MemberContext` **快取未命中**的情況，那是 Redis 正常時的路徑；
+Redis 本身不可用時根本走不到那裡。要改成可用性優先，節流有 `THROTTLE_FAIL_OPEN` 開關，
+黑名單則刻意沒有——那等於允許已撤銷的 token 通行。
 
 #### Guard 用法
 
@@ -109,7 +115,7 @@ Express 預設不採信 `X-Forwarded-For`，部署在 LB / 反向代理後 `requ
 
 | Provider          | 類別                    | 作用                                                                                                   |
 | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `APP_GUARD`       | `ThrottlerGuard`        | 速率限制（Redis 滑動視窗）；全域預設由 env 配置，各端點可用 `@Throttle()` 覆蓋；Redis 不可用時自動停用 |
+| `APP_GUARD`       | `ThrottlerGuard`        | 速率限制（Redis 滑動視窗）；全域預設由 env 配置，各端點可用 `@Throttle()` 覆蓋；Redis 不可用時**預設拒絕請求**（回 429），可用 `THROTTLE_FAIL_OPEN=true` 改為放行 |
 | `APP_GUARD`       | `IpBlacklistGuard`      | IP 黑名單檢查（FeatureFlag 控制，關閉時跳過）                                                          |
 | `APP_GUARD`       | `IpWhitelistGuard`      | IP 白名單檢查（FeatureFlag 控制，關閉時跳過）                                                          |
 | `APP_GUARD`       | `SessionIdleGuard`      | 閒置登出檢查（FeatureFlag 控制，關閉時跳過）                                                           |

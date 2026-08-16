@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { RedisService } from '../../../infrastructure/redis/redis.service';
 import {
   TokenBlacklistPort,
+  type BlacklistLookup,
   type BlacklistReason,
 } from '../../../application/port/out/auth/TokenBlacklistPort';
 import { ClearMemberContextPort } from '../../../application/port/out/member/ClearMemberContextPort';
@@ -36,10 +37,13 @@ export class RedisTokenBlacklistAdapter
     return this.redis.isTokenBlacklisted(token);
   }
 
-  async getBlacklistReason(token: string): Promise<BlacklistReason | null> {
+  async getBlacklistReason(token: string): Promise<BlacklistLookup> {
     const stored = await this.redis.getBlacklistReason(token);
-    // 舊格式紀錄（值為 '1'）落在這裡回 null，呼叫端會當成「非遭竊」處理
-    return stored === 'rotated' || stored === 'logout' ? stored : null;
+    // null 專屬於「不在黑名單」。在黑名單但值無法辨識（改用 reason 之前寫入的
+    // 舊格式 '1'）必須回 'unknown' 而非 null——回 null 會讓呼叫端當成沒進過黑名單
+    // 而放行，等於部署當下把所有既存的已登出 / 已輪替 token 全部復活。
+    if (stored === null) return null;
+    return stored === 'rotated' || stored === 'logout' ? stored : 'unknown';
   }
 
   async clearMemberContext(memberId: string): Promise<void> {

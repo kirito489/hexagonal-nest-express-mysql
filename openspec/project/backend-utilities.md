@@ -18,17 +18,25 @@
 
 每筆請求自動帶 `requestId`（`randomUUID()`），可用於跨日誌追蹤。
 
-**敏感欄位自動脫敏**：`password`、`passwordHash`、`token`、`secret`、`authorization`、`cookie`、`api_key`、`apiKey` 的值替換為 `[REDACTED]`。
+**敏感欄位自動脫敏**：`app.module.ts` 的 pino `redact` 逐一列舉路徑（`req.body.password`、`newPassword`、`oldPassword`、`confirmPassword`、`token`、`refreshToken`、`accessToken`、`req.headers.authorization` / `cookie`）。pino 的 redact **不支援子字串比對**，只能列舉——與 `sanitize.ts` 的策略不同。這是縱深防禦：`serializers.req` 目前只留 `id/method/url`，body 本來就不會進 log。
 
 ### 資料脫敏
 
 `apps/api/src/infrastructure/sanitize.ts` 提供多層脫敏，自動套用於 System Log 的 request / response：
 
-| 場景                                           | 行為                    |
-| ---------------------------------------------- | ----------------------- |
-| 物件欄位名稱含敏感關鍵字                       | 值替換為 `[REDACTED]`   |
-| Base64 圖片資料（`data:image/...`）            | 替換為 `[BASE64_IMAGE]` |
-| URL Query String 中的 `email`、`phone`、`name` | 替換為 `[REDACTED]`     |
+| 場景 | 比對方式 | 行為 |
+| --- | --- | --- |
+| 物件欄位名稱 | **子字串**（`password` / `token` / `secret` / `credential` / `apikey` / `privatekey` / `authorization` / `cookie` / `bearer`，去底線連字號後比對） | 值替換為 `[REDACTED]` |
+| Base64 圖片資料（`data:image/...`） | 前綴 | 替換為 `[BASE64_IMAGE_REMOVED]` |
+| `file` / `files` 欄位 | 精確 | 替換為 `[FILE_DATA_REMOVED]` |
+| URL query 參數（`email` / `phone` / `name` / `token` / `key`） | **精確** | 值替換為 `[REDACTED]` |
+
+**同一支檔案兩種相反策略，是刻意的**：body 用子字串因為敏感欄位的變形是開放集合
+（`newPassword` 就漏過一次，讓 reset-password 的新密碼明文寫進 `system_logs`），
+少遮一次是憑證外洩、多遮一次只是少一條除錯資訊；query 用精確比對因為子字串會讓
+`key` 吃掉 `keyword`、`name` 吃掉所有 `*Name` 過濾條件，而 URL 帶的是 PII 不是機密。
+`sanitize-coverage.spec.ts` 會掃 request DTO 的欄位名，把看起來敏感的實際餵進
+`sanitize()` 驗證真的被遮。
 
 ### Zod 驗證
 
@@ -129,7 +137,17 @@ export default async function seed(prisma: PrismaClient): Promise<void> {
 
 預設開而非預設關，是因為兩種失效的代價不對稱：沒有保留策略會讓資料庫無界成長，
 而「刪掉 90 天前、沒有任何功能在讀的日誌」幾乎沒有損失。日誌 flag 全關時，
-排程每天只是跑一次空的 `deleteMany`。
+排程每天只是跑一次刪不到東西的批次。
+
+清理採**分批**（每批 5000 筆、批間讓出 100ms），不是單一 `deleteMany`：
+單一 `DELETE` 本身就是一個交易，對一個跑了一年、累積數百萬列的部署，
+第一次執行那一發會長時間持鎖、阻塞同表寫入——**防止資料庫爆掉的機制自己造成一次事故**。
+批次有上限（2000 批）作為無限迴圈的保險，達上限會記 warn 並由下次排程接續。
+
+**多副本部署要注意**：`LogRetentionScheduler` 在每個實例的 `onModuleInit` 都會註冊 cron，
+水平擴展到 N 個副本時凌晨三點會有 N 個相同的刪除同時打進去互相卡鎖。
+專案已有 Redis，用一把短 TTL 的分散式鎖（`SET key NX EX`）即可收斂成單一執行者。
+單副本不受影響，這裡先記著。
 
 **若之後要補稽核查詢端點**，兩張表已有 `createdAt` / `email` / `memberId` 複合索引
 （`20260816200000_add_log_indexes`），不必再補。測試環境於 `setup-env*.ts`

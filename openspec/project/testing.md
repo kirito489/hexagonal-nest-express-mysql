@@ -82,7 +82,7 @@ pnpm --filter @app/api test:arch   # 只跑架構守則
 pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行）
 ```
 
-現有規則（15 支 / 51 項斷言）：
+現有規則（18 支 / 59 項斷言）：
 
 | 檔案 | 項 | 守住的規則 |
 | --- | --- | --- |
@@ -100,7 +100,10 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `openspec-schema.spec.ts` | 5 | 自訂 schema 存在；建立 change 一律帶 `--schema`；opsx 指令維持薄殼 |
 | `openspec-spec-format.spec.ts` | 5 | 能力命名前綴；`api-*` 的 endpoint 需求須寫請求與回應 |
 | `project-docs.spec.ts` | 4 | `project.md` 索引連結有效、無孤兒子檔、全 repo 引用有效 |
-| `compose-files.spec.ts` | 3 | 每份 compose 都有 script 會啟動；`compose.yml` 的對外埠須寫進 README |
+| `compose-files.spec.ts` | 4 | 每份 compose 都有 script 會啟動；對外埠須寫進 README；docker 相關檔案提到的 `pnpm <script>` 須存在 |
+| `global-guards.spec.ts` | 3 | 認證與授權 guard 全域註冊，且授權排在 `JwtAuthGuard` 之後 |
+| `sanitize-coverage.spec.ts` | 2 | request DTO 中看起來敏感的欄位，實際餵進 `sanitize()` 驗證真被遮蔽 |
+| `traditional-chinese.spec.ts` | 2 | 全專案不得混入日文假名或非繁體漢字 |
 
 **新增一條規則的作法**（三步缺一不可）：
 

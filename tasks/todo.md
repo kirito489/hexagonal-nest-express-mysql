@@ -35,6 +35,22 @@
 
 ## 已完成
 
+### 2026-08-16 — 第二輪審查 7 項修復 + 整套容器化
+
+依 `pr/2026-08-16-21-50-project-review.md`。本輪問題的形狀與上輪不同——**全部落在「兩個各自正確的決定之間的接縫」**，而非功能內部。
+
+**🔴 舊格式黑名單被當成「不在黑名單」**：上輪把 `isBlacklisted`（boolean）改成 `getBlacklistReason`（reason）時，adapter 把無法辨識的值壓成 `null`。註解意圖是「少撤銷」，但呼叫端把 `null` 當成沒進過黑名單，**連 throw 都跳過**——部署當下所有既存的已登出 / 已輪替 refresh token 在剩餘 TTL 內（預設 7 天）全部復活。修法是 port 加第三個狀態 `'unknown'`，service 一行未改。**bug 在 adapter 的翻譯層，service 邏輯從頭到尾都是對的**，所以 service 層測試怎麼寫都抓不到，補的是 adapter 層測試。
+
+**🟡 Redis 已是硬相依但文件還在承諾降級**：節流與黑名單都改 fail-closed 後，`JwtAuthGuard` 內「Redis 掛掉就降級查 DB」那段變成永遠到不了的死碼（同一個 `client.isOpen`，前面已 throw 503），三處文件也還寫著「選填」「服務不中斷」。已刪死碼、改寫文件為「Redis 是硬相依」。
+
+**🟡 日誌清理改分批**：單一 `deleteMany` 本身就是一個交易，對累積數百萬列的部署，第一次執行會長時間持鎖——防止資料庫爆掉的機制自己造成事故。改為每批 5000、批間讓出 100ms，對真 DB 實測 12000 筆 / 299ms。
+
+**🟡🟢 其餘**：`docker/api.container.env` 註解指向已刪除的 `compose.app.yml` 與 `pnpm app:up`；`Dockerfile` 宣稱「映像單獨也能跑」但 `.dockerignore` 排除了 4 支守則讀的路徑（改為據實說明）；production target 的非 root 提醒；MySQL healthcheck 拿掉命令列密碼。
+
+**整套容器化**：三份 compose 併為一份 `compose.yml`，`docker compose up -d` 起 api + web + mysql + redis，前後端都支援熱重載。過程踩到六個坑（Node 版本看 `packageManager` 不是 `engines`、`node_modules` 五處遮罩、host `.env` 洩漏、`nest start --watch` 換不掉行程、`deleteOutDir` 空窗、`up` 撞 pnpm 內建別名），全部寫進 `tooling.md`。
+
+**護欄 18 支 / 58 項 → 18 支 / 59 項**：`compose-files.spec.ts` 加一條——docker 相關檔案提到的 `pnpm <script>` 必須存在，正是為了擋 🟡 那類「改名後註解沒跟上」。
+
 ### 2026-08-16 — 專案審查 12 項問題修復（review report 追蹤）
 
 依 `pr/2026-08-16-18-30-project-review.md` 分四批處理，每批附帶對應守則——**報告自己的結論是「高槓桿投資不是修這 12 個問題，而是把其中 3 個變成守則」**，實作時把這點放大成每批都做。

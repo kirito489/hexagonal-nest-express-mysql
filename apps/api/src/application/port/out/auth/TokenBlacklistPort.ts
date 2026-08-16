@@ -10,6 +10,21 @@ export const TOKEN_BLACKLIST_PORT = 'TOKEN_BLACKLIST_PORT';
  */
 export type BlacklistReason = 'rotated' | 'logout';
 
+/**
+ * 黑名單查詢結果。**三種狀態必須分開**，不能把後兩者都壓成 null：
+ *
+ * | 值 | 意義 | 呼叫端 |
+ * | --- | --- | --- |
+ * | `null` | 不在黑名單 | 放行 |
+ * | `'rotated'` | 輪替後的舊 token 被重用 | 拒絕 + 撤銷全部 session |
+ * | `'logout'` | 登出的 token 被重用 | 只拒絕本次 |
+ * | `'unknown'` | 在黑名單，但值無法辨識（改用 reason 之前寫入的舊格式） | 只拒絕本次 |
+ *
+ * 曾把 `'unknown'` 與 `null` 混為一談：意圖是「少撤銷」，實際卻讓呼叫端連拒絕都跳過，
+ * 部署當下所有既存的已登出 / 已輪替 refresh token 在剩餘 TTL 內（預設 7 天）全部復活。
+ */
+export type BlacklistLookup = BlacklistReason | 'unknown' | null;
+
 export interface TokenBlacklistPort {
   /** 將 token 加入黑名單，TTL 配合 JWT 剩餘效期；reason 決定重用時的處置 */
   addToBlacklist(
@@ -21,8 +36,8 @@ export interface TokenBlacklistPort {
   isBlacklisted(token: string): Promise<boolean>;
   /**
    * 取出 token 進黑名單的原因。
-   * 不在黑名單時為 null；舊格式的紀錄會回傳非 BlacklistReason 的值，
-   * 呼叫端一律以「不是 rotated」處理，寧可少撤銷也不要誤踢。
+   * @returns 不在黑名單為 `null`；在黑名單但值無法辨識為 `'unknown'`。
+   *          兩者都不是 `'rotated'`，故都不觸發連坐撤銷——但 `'unknown'` 仍須拒絕本次。
    */
-  getBlacklistReason(token: string): Promise<BlacklistReason | null>;
+  getBlacklistReason(token: string): Promise<BlacklistLookup>;
 }

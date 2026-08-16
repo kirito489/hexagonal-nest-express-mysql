@@ -46,6 +46,46 @@ describe('架構守則：compose 檔的執行路徑與埠號文件', () => {
     expect(Object.keys(rootScripts).length).toBeGreaterThan(0);
   });
 
+  it('docker 相關檔案提到的 pnpm script 都必須存在', () => {
+    // 檔案或指令改名後，註解裡的指引不會有任何工具提醒。實際發生過：
+    // 三份 compose 併成一份後，docker/api.container.env 仍寫著 `compose.app.yml`
+    // 與 `pnpm app:up`，兩個可操作的指引都指向不存在的東西。
+    const targets = [
+      ...files,
+      'Dockerfile',
+      '.dockerignore',
+      ...(existsSync(join(REPO_ROOT, 'docker'))
+        ? readdirSync(join(REPO_ROOT, 'docker')).map((f) => `docker/${f}`)
+        : []),
+    ].filter((f) => existsSync(join(REPO_ROOT, f)));
+
+    const broken: string[] = [];
+    let referenced = 0;
+
+    for (const file of targets) {
+      // 只認含冒號的 script 名（docker:up / verify:ci / db:migrate…）——
+      // 那涵蓋了所有會被改名的 docker 相關指令，而散文裡的「.pnpm store」
+      // 「pnpm 11 需要」不含冒號，不會誤判。代價是漏掉 `pnpm dev` 這類單字名，
+      // 但那幾支是慣例名稱、幾乎不會改。
+      for (const match of read(file).matchAll(/pnpm ([a-z][\w-]*:[\w:-]+)/g)) {
+        const script = match[1];
+        referenced += 1;
+        if (!(script in rootScripts)) broken.push(`  ${file}: pnpm ${script}`);
+      }
+    }
+
+    // 完全沒引用代表正規式或掃描清單失效，這條規則會空轉
+    expect(referenced).toBeGreaterThan(0);
+
+    expect(
+      broken.length === 0
+        ? ''
+        : `以下 docker 相關檔案提到不存在的 pnpm script：\n${broken.join(
+            '\n',
+          )}\n照著做的人會找不到指令。改 script 名稱時記得一併搜尋 compose / Dockerfile / docker/ 的註解`,
+    ).toBe('');
+  });
+
   it('每份 compose 都要有指令會啟動它', () => {
     const allScripts = Object.values(rootScripts).join('\n');
     const shellScripts = existsSync(join(REPO_ROOT, 'scripts'))

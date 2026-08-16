@@ -39,7 +39,9 @@ const envSchema = z.object({
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
 
-  // Redis（選填，缺少時服務繼續運行）
+  // Redis（**必要相依**）：token 黑名單採 fail-closed——無法查詢就無法確認 token
+  // 是否已被撤銷，因此一律回 503。連線參數有預設值只是為了本機方便，
+  // 不代表服務可以沒有 Redis。
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_PASSWORD: z.string().optional(),

@@ -116,12 +116,9 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
       );
     }
 
-    if (!this.memberContextCache.isAvailable) {
-      this.logger.warn(
-        '[JwtAuthGuard] Redis 不可用，MemberContext 快取降級，每次請求直接查詢 DB',
-      );
-    }
-
+    // 走到這裡代表快取未命中或內容不可用——Redis **本身**不可用的情況
+    // 在上方的 isBlacklisted 就已經 throw 503 了（兩者是同一個 client.isOpen），
+    // 所以這裡不需要、也不可能是「Redis 掛掉的降級路徑」。
     const data = await this.loadMemberContext.loadMemberContext(payload.sub);
     if (!data) {
       throw new UnauthorizedException('會員不存在');
