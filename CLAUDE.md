@@ -43,7 +43,7 @@ At the start of every new session:
 - 🚫 **Never set `"type": "module"` on the root or `apps/api` `package.json`** — stay on the NestJS CommonJS baseline; switching to ESM cascades into breaking nest CLI / ts-jest / decorator metadata (`apps/web` is the exception — it's Vite ESM by design). 〔**測試**〕
 - 🚫 **Never skip env validation** — any new env var must be added to the `envSchema` in `apps/api/src/infrastructure/validate-env.ts` (production-mandatory ones also into `productionErrors`), or it fails silently as `undefined` at runtime. 〔**測試**〕
 - 🚫 **Never let an Exception message leak sensitive info** — SQL / stack traces must not reach the client; unexpected errors always return 500 + a generic message (domain exceptions return only a safe message). 〔**自律**〕
-- 🚫 **Never mock the database in e2e / integration tests** — run against a dedicated test database (`test/setup-env.ts` overrides `DB_DATABASE` to a `*_test` DB — object-config Prisma, no `DATABASE_URL`). `globalSetup` must verify the target DB name ends in `_test` before migrating/resetting; run serially (`--runInBand`) since all specs share one test DB. 〔**測試**〕
+- 🚫 **Never mock the database in e2e / integration tests** — run against a dedicated test database (`test/setup/setup-env.e2e.ts` overrides `DB_DATABASE` to a `*_test` DB — object-config Prisma, no `DATABASE_URL`). `globalSetup` must verify the target DB name ends in `_test` before migrating/resetting; run serially (`--runInBand`) since all specs share one test DB. 〔**測試**〕
 - 🚫 **Never run `pnpm dev` on your own** (including per-`--filter`) — the dev server is started by the user for verification. 〔**自律**〕
 - 🚫 **Never modify `.env`** — that's the user's DB / secret config; only edit `.env.example`. 〔**自律**〕
 
@@ -203,6 +203,6 @@ into `openspec/project/`. Read the index first, then open only the file you need
 | `project/frontend.md` | `apps/web` layout, shadcn integration, form / API conventions, api-client design (source-first, auto-unwrap of `{ success, data, timestamp }`) |
 | `project/testing.md` | Unit / e2e / architecture-guardrail split, where rules live, how to add one, the exemption list, coverage thresholds |
 | `project/openspec-conventions.md` | Capability naming prefixes, `api-*` request/response format, change naming, tasks.md block splitting |
-| `project/tooling.md` | `.agents/hooks/*.sh` (logic is tool-agnostic; `.claude/settings.json` only registers it — edit the script, not the JSON; `hook-scripts.spec.ts` auto-checks new ones), `pnpm verify:ci`, CI job responsibilities and their local equivalents, full command reference |
+| `project/tooling.md` | `.agents/hooks/*.sh` (logic is tool-agnostic; `.claude/settings.json` only registers it — edit the script, not the JSON; `hook-scripts.spec.ts` auto-checks new ones), containerised dev (single `compose.yml`; `pnpm docker:up` runs the whole stack) and its six non-obvious gotchas, `pnpm verify:ci`, CI job responsibilities and their local equivalents, full command reference |
 
 Don't duplicate any of that here. When in doubt, read `openspec/project.md` first.

@@ -17,22 +17,58 @@ hexagonal-nest-express-mysql/
 
 ## 環境需求
 
-- Node.js **20+**（建議用 nvm）
+- Node.js **22.13+**（`packageManager` 釘的 pnpm 11 需要，Node 20 會在 `pnpm install` 當場失敗）
 - pnpm **11+**（透過 corepack 啟用：`corepack enable`）
-- MySQL / MariaDB 與 Redis —— 沒有現成的可用 `pnpm dev:db` 起容器，見下節
+- MySQL / MariaDB 與 Redis —— 沒有現成的用 Docker 起，見下節（也可整套跑在容器裡）
 
-## 用 Docker 起開發資料庫（選用）
+## 用 Docker 開發
 
-repo 附 `compose.dev.yml`，一行指令就有 MySQL 9 + Redis 7：
+repo 只有**一份** `compose.yml`，三種用法靠「指定服務」與 profile 區分：
 
 ```bash
-pnpm dev:db          # 啟動（等 healthcheck 通過才返回，約 10 秒）
-pnpm dev:db:stop     # 停止，資料保留
-pnpm dev:db:reset    # 停止並刪除資料卷（重新來過）
+pnpm docker:up   # 整套跑在容器裡：api + web + mysql + redis
+pnpm docker:deps # 只起 mysql + redis，api / web 跑在 host
+pnpm verify:ci   # 重現 CI 的 e2e 環境（--profile verify 起 mysql-verify 於 13306，跑完即拋）
 ```
 
-**對外埠刻意避開預設值**——多數開發機已經有 MySQL 3306 / Redis 6379 在跑，佔用會直接起不來。
-用它的話 `apps/api/.env` 要對應設成：
+### 整套跑在容器裡
+
+```bash
+pnpm docker:up   # 首次建置約 2-3 分鐘，之後有快取
+pnpm docker:init # 建表 + seed，首次跑一次即可
+pnpm docker:logs # 跟蹤 api / web 的 log
+pnpm docker:down # 停止，資料保留
+pnpm docker:renew  # 改了依賴後用這個：只重建 node_modules，DB / Redis 資料保留
+pnpm docker:reset  # 全部清掉（含 DB 與 Redis 資料），要重跑 docker:init
+```
+
+| | 位置 |
+| --- | --- |
+| 前端 | http://127.0.0.1:5173 |
+| 後台 API | http://127.0.0.1:3000/api/admin/* |
+| Swagger | http://127.0.0.1:3000/api/admin/docs |
+
+原始碼以 bind mount 掛進容器，**前後端都支援熱重載**——改 `apps/web` 走 Vite HMR，
+改 `apps/api` 約 15 秒內自動重啟生效。預設帳號 `admin@test.com` / `Admin1234!`。
+
+> **改了依賴要重建 volume。** `node_modules` 放在具名 volume 裡（避免載到 host 的
+> macOS 產物），而 volume 只在第一次建立時從映像複製內容——改了 `package.json` 或
+> lockfile 之後即使重建映像，容器裡仍是舊的。用 `pnpm docker:renew`——它只砍
+> `node_modules` 的 volume，**不動 DB 與 Redis 的資料**（`docker:reset` 會連資料一起清，
+> 之後得重跑 `docker:init`）。
+
+> **用 `127.0.0.1` 而不是 `localhost`。** 容器只綁 IPv4，而 macOS 的 `localhost` 會優先
+> 解析成 IPv6 `::1`——若你機器上另有服務綁在 `::1:5173`（例如另一個 Vite 專案），
+> 用 `localhost` 會連到它而不是這裡，症狀是「畫面完全不對」。
+
+### 只起資料庫（api / web 跑在 host）
+
+```bash
+pnpm docker:deps
+```
+
+對外埠刻意避開預設值——多數開發機已經有 MySQL 3306 / Redis 6379 在跑。
+用這個模式時 `apps/api/.env` 要設成：
 
 ```bash
 DB_HOST=127.0.0.1
@@ -45,10 +81,10 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6389       # 非預設 6379
 ```
 
-要改埠或密碼就在 repo 根目錄的 `.env` 設 `DEV_DB_PORT` / `DEV_REDIS_PORT` / `DEV_DB_PASSWORD`
-（compose 會讀，預設值即上表）。
+要改埠或密碼就在 repo 根目錄的 `.env` 設 `APP_API_PORT` / `APP_WEB_PORT` /
+`DEV_DB_PORT` / `DEV_REDIS_PORT` / `DEV_DB_PASSWORD`（compose 會讀，預設值即上表）。
 
-已經有自己的 MySQL / Redis 就跳過這節，直接把 `.env` 指向它們即可。
+已經有自己的 MySQL / Redis 就兩個都不用，直接把 `.env` 指向它們即可。
 
 ## 快速開始
 
@@ -58,7 +94,7 @@ pnpm install
 
 # 2. 設定後端環境變數（見下方「必填環境變數」）
 cp apps/api/.env.example apps/api/.env
-# 編輯 apps/api/.env（沒有現成資料庫的話先跑 pnpm dev:db，並照上節填埠號）
+# 編輯 apps/api/.env（沒有現成資料庫的話先跑 pnpm docker:deps，並照上節填埠號）
 
 # 3. 建立資料庫 + 跑 migration + seed
 pnpm --filter @app/api db:create
@@ -97,7 +133,7 @@ pnpm --filter @app/api test:e2e               # 改 controller / 路由時加跑
 
 # 品質檢查（CI 跑的就是這個）
 pnpm test:cov                                 # 單元測試 + 覆蓋率門檻 + 架構守則
-pnpm --filter @app/api test:arch              # 只跑架構守則（11 支規則檔 / 32 項斷言，約 0.3 秒）
+pnpm --filter @app/api test:arch              # 只跑架構守則（18 支規則檔 / 58 項斷言，約 0.4 秒）
 pnpm --filter @app/api swagger:check          # 驗證 swagger bundle 與 api-client 產物是否最新（產物寫入 tmp，不動工作目錄）
 pnpm verify:ci                                # 以容器重現 CI 的 e2e 環境跑一次（需 docker，約 60 秒）
 
@@ -133,7 +169,7 @@ pnpm --filter @app/api gen:module <name> --front    # 前台模組 → /api/fron
 | --- | --- | --- |
 | TypeScript | 錯誤碼與訊息表的完整性（少一條就編譯失敗） | 隨時 |
 | eslint import 邊界 | controller 不得碰持久層、前後台不得互穿、前端下層不得反向相依 routes | `pnpm lint` |
-| 架構守則測試 | 不得用原生 `Error`、錯誤碼單一真相、env 必進 schema、API 契約三段同步… | `pnpm test` |
+| 架構守則測試 | 不得用原生 `Error`、錯誤碼單一真相、env 必進 schema、API 契約同步、授權 guard 全域註冊… | `pnpm test` |
 | 覆蓋率門檻 | api 70/60/70/70、web 75/75/60/75 | `pnpm test:cov` |
 | GitLab CI | 上述全部 + e2e（MySQL service container） | Merge Request 與 develop / master 推送 |
 

@@ -10,7 +10,7 @@ const read = (relative: string): string =>
 
 const composeFiles = (): string[] =>
   readdirSync(REPO_ROOT)
-    .filter((f) => /^compose\..*\.ya?ml$/.test(f))
+    .filter((f) => /^compose(\..+)?\.ya?ml$/.test(f))
     .sort();
 
 /** 取出 `- '127.0.0.1:3316:3306'` 這類對外埠宣告中的主機埠 */
@@ -68,8 +68,8 @@ describe('架構守則：compose 檔的執行路徑與埠號文件', () => {
     ).toBe('');
   });
 
-  it('compose.dev.yml 的對外埠必須寫進 README', () => {
-    const devCompose = 'compose.dev.yml';
+  it('compose.yml 的對外埠必須寫進 README', () => {
+    const devCompose = 'compose.yml';
     if (!files.includes(devCompose)) return;
 
     const ports = publishedPorts(read(devCompose));
@@ -82,7 +82,7 @@ describe('架構守則：compose 檔的執行路徑與埠號文件', () => {
     expect(
       undocumented.length === 0
         ? ''
-        : `compose.dev.yml 的對外埠未寫進 README：\n${undocumented
+        : `compose.yml 的對外埠未寫進 README：\n${undocumented
             .map((p) => `  ${p}`)
             .join('\n')}\n照 README 設 .env 的人會連不上，且錯誤訊息指不到原因`,
     ).toBe('');

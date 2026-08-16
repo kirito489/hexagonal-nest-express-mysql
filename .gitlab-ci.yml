@@ -86,7 +86,7 @@ variables:
 #
 # 為何不用 healthcheck：GitLab CI 的 services 不支援 docker compose 的
 # `healthcheck` / `depends_on: condition: service_healthy` 語法，只能手動等。
-# 本機驗證環境（compose.verify.yml）則使用 healthcheck——兩邊的 MySQL 版本
+# 本機驗證環境（compose.yml 的 mysql-verify）則使用 healthcheck——兩邊的 MySQL 版本
 # 與初始化參數保持一致，差別僅在等待機制。
 .wait_for_mysql_script: &wait_for_mysql_script
   - |

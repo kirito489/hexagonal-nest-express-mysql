@@ -14,12 +14,21 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // 綁 0.0.0.0：容器內若只綁 127.0.0.1，從 host 對映的埠連不進來。
+    // 直接在 host 跑不受影響。
+    host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        // 容器化開發時 api 是另一個 service，localhost 會指向 web 自己，
+        // 故 target 可由 VITE_API_PROXY_TARGET 覆寫（compose 設為 http://api:3000）
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:3000',
         changeOrigin: true,
         // 後端在 main.ts 設了 setGlobalPrefix('api')，故不需 rewrite
       },
+    },
+    watch: {
+      // macOS 的 bind mount 不會傳遞 inotify 事件，容器內必須改用輪詢才看得到檔案變更
+      usePolling: process.env.VITE_USE_POLLING === 'true',
     },
   },
   test: {

@@ -39,22 +39,55 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 | `e2e-test` | quality | 對 `mysql:9` service container 跑完整 e2e | `pnpm --filter @app/api test:e2e` |
 | `prepare-production` | optimize | Prisma generate + build（**需 `quality-check` 通過**） | `pnpm build` |
 
-**本機重現 CI 的測試環境**：`pnpm verify:ci` 以 `compose.verify.yml` 起一個 MySQL 9 容器（healthcheck 等就緒、`tmpfs` 跑在記憶體）並執行 e2e，實測約 60 秒。定位是「測試環境重現」而非「pipeline 模擬」——runner 行為與 cache 命中仍只能在實際 pipeline 觀察。
+**本機重現 CI 的測試環境**：`pnpm verify:ci` 以 `docker compose --profile verify` 起一個 MySQL 9 容器（healthcheck 等就緒、`tmpfs` 跑在記憶體）並執行 e2e，實測約 60 秒。定位是「測試環境重現」而非「pipeline 模擬」——runner 行為與 cache 命中仍只能在實際 pipeline 觀察。
 
-### 兩份 compose 的分工
+### 容器化（單一 `compose.yml`）
 
-| 檔案 | 用途 | 資料 | 對外埠 |
-| --- | --- | --- | --- |
-| `compose.dev.yml` | 開發用 MySQL 9 + Redis 7（`pnpm dev:db`） | named volume，重啟保留 | 3316 / 6389 |
-| `compose.verify.yml` | 重現 CI e2e 環境（`pnpm verify:ci`） | `tmpfs`，跑完即消失 | 13306 |
+三種用法靠「指定服務」與 profile 區分，不需要多份檔案：
 
-**刻意不合併成一份。** 兩者對資料的要求相反——dev 要持久、verify 要每次乾淨；
-埠也必須各自錯開，否則同時開著會撞。三個檔案（含 CI 的 service）共用 `mysql:9`
-同一條版本線，避免出現「本機過、CI 掛」。
+| 指令 | 起什麼 | 用途 |
+| --- | --- | --- |
+| `pnpm docker:up` | api + web + mysql + redis | 整套跑在容器裡，原始碼 bind mount + 熱重載 |
+| `pnpm docker:deps` | mysql + redis | 只要資料庫，api / web 跑在 host |
+| `pnpm verify:ci` | mysql-verify（`--profile verify`） | 重現 CI e2e 環境，跑完即 `down -v` |
 
-對外埠一律避開預設的 3306 / 6379：多數開發機已經有一組資料庫在跑。
-`compose.dev.yml` 的埠與密碼可用 repo 根目錄 `.env` 的 `DEV_DB_PORT` / `DEV_REDIS_PORT` /
-`DEV_DB_PASSWORD` 覆寫。
+`mysql-verify` 獨立成一個服務而非共用開發用的那個，因為兩者對資料的要求相反：
+開發要 named volume 重啟保留，驗證要 `tmpfs` 每次乾淨。它掛在 profile 底下，
+平常的 `up` 不會啟動它。兩者與 CI 的 service 共用 `mysql:9` 同一條版本線，
+避免「本機過、CI 掛」。
+
+對外埠一律避開預設的 3306 / 6379（多數開發機已有一組資料庫在跑），
+可用 repo 根目錄 `.env` 的 `APP_API_PORT` / `APP_WEB_PORT` / `DEV_DB_PORT` /
+`DEV_REDIS_PORT` / `DEV_DB_PASSWORD` 覆寫。
+
+#### 容器化開發的六個非顯而易見之處
+
+這些都是實測踩出來的，改 `compose.yml` 或 `Dockerfile` 前先看過：
+
+1. **Node 版本看 `packageManager` 不是 `engines`**——pnpm 11 需要 Node ≥ 22.13，
+   用 node:20 會在 `pnpm install` 當場失敗（缺 `node:sqlite` 內建模組）。
+2. **`node_modules` 五個位置都要用 volume 蓋掉**——pnpm 的 workspace `node_modules`
+   是指向根目錄 `.pnpm` store 的 symlink，漏任一個就會載到 host 的 macOS/arm64 產物
+   （症狀：bcrypt 或 Prisma 引擎 invalid ELF header）。用具名 volume 而非匿名，
+   否則 Docker Desktop 清單裡十個隨機 hash 無從辨識。
+3. **host 的 `apps/api/.env` 會被 bind mount 帶進容器**，而 dotenv 不覆寫既有的
+   `process.env`——等於「compose 沒設的都由開發者本機補」。用 `docker/api.container.env`
+   遮掉，設定才只有 compose 與 envSchema 預設兩個來源。
+4. **api 不能用 `nest start --watch`**——重啟時舊行程還在跑 `enableShutdownHooks` 的
+   優雅關閉（Prisma pool + Redis quit），新行程搶埠失敗直接死，症狀是**編譯成功但
+   改動不生效**，log 完全正常。改為 `nest build --watch` + `node --watch` 兩段，
+   並用 `nest-cli.docker.json` 關掉 `deleteOutDir`（否則 rebuild 清空 dist 的空窗期
+   會讓 `node --watch` MODULE_NOT_FOUND 後放棄）。
+5. **bind mount 不傳遞 inotify 事件**（macOS）——看 host 改動的 watch 必須輪詢：
+   tsc 用 `TSC_WATCHFILE`、Vite 用 `server.watch.usePolling`。反過來，容器**自己**
+   寫出的檔案（`dist`）事件是通的，不必輪詢。
+6. **容器只綁 IPv4，`localhost` 在 macOS 優先解析 IPv6**——機器上若有別的服務綁在
+   `::1:5173`，用 `localhost` 會連到它。文件一律寫 `127.0.0.1`。
+
+**改了依賴後具名 volume 不會自動更新**：volume 只在第一次建立時從映像複製內容，
+之後即使重建映像也沿用舊的。改 `package.json` / lockfile 後用 `pnpm docker:renew`
+——它只砍 `node_modules` 的 volume 再重建，**不動 `mysql-data` / `redis-data`**。
+`docker:reset`（`down -v`）會移除專案的**所有** volume 含資料庫，之後得重跑 `docker:init`。
 
 要點：
 
@@ -83,6 +116,16 @@ pnpm build                   # 依序 build apps/api → apps/web（api-client s
 pnpm typecheck               # 三個 workspace 全部 tsc --noEmit
 pnpm lint                    # 三個 workspace 全部 eslint
 pnpm test                    # 跑各 workspace 的 test script
+
+# 容器化（單一 compose.yml，詳見上方「容器化」）
+pnpm docker:up               # 整套跑在容器裡（api + web + mysql + redis）
+pnpm docker:init             # 容器內建表 + seed（首次一次）
+pnpm docker:logs             # 跟蹤 api / web
+pnpm docker:deps             # 只起 mysql + redis，api / web 跑在 host
+pnpm docker:down             # 停止，資料保留
+pnpm docker:renew            # 改依賴後：只重建 node_modules volume，資料保留
+pnpm docker:reset            # 刪除所有 volume（含 DB / Redis 資料）
+pnpm verify:ci               # 重現 CI 的 e2e 環境跑一次
 ```
 
 ### 後端 `apps/api`
