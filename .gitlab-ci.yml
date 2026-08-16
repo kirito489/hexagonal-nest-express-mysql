@@ -82,7 +82,12 @@ variables:
     fi
 
 # 等待 MySQL service 就緒：GitLab Runner 只確保 container 啟動，
-# MySQL 初始化期間 port 可能已開但尚不接受連線
+# MySQL 初始化期間 port 可能已開但尚不接受連線。
+#
+# 為何不用 healthcheck：GitLab CI 的 services 不支援 docker compose 的
+# `healthcheck` / `depends_on: condition: service_healthy` 語法，只能手動等。
+# 本機驗證環境（compose.verify.yml）則使用 healthcheck——兩邊的 MySQL 版本
+# 與初始化參數保持一致，差別僅在等待機制。
 .wait_for_mysql_script: &wait_for_mysql_script
   - |
     node -e "

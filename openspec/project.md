@@ -700,6 +700,28 @@ docs/swagger/<side>/openapi.yaml                    # 自動註冊 paths
 
 ---
 
+## AI 工具設定（`.agents/`）
+
+hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設定只負責「註冊」呼叫。
+
+```
+.agents/hooks/
+├── check-typescript.sh          # PostToolUse：對剛改的單一 .ts 跑該 workspace 的 eslint
+├── check-prisma-schema.sh       # PostToolUse：schema.prisma 異動 → 提醒 migrate / generate / 連動檔
+├── check-domain-exception.sh    # PostToolUse：新增 exception → 提醒補 code + 訊息（成對）
+└── check-swagger-artifacts.sh   # Stop：改了來源 yaml 但產物沒重生 → exit 2 擋下
+```
+
+為什麼不放 `.claude/`：這些檢查（產物是否過期、schema 是否要 migrate）本質上與 AI 工具無關，git pre-commit 或其他 agent 也該能用。script 以 `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}` 取得專案根目錄，不相依特定工具。
+
+**新增 hook 的作法**：寫 `.agents/hooks/<name>.sh`（檔頭註明用途 / 觸發時機 / exit code 語意）→ 在 `.claude/settings.json` 註冊 → 架構測試 `hook-scripts.spec.ts` 會自動以 `bash -n` 檢查語法，並驗證「settings.json 註冊的 script 都存在」。
+
+**exit code 語意**：`0` 通過；`2` 在 Stop hook 代表阻止結束並把 stderr 回饋給 AI。用 `2` 要保守——誤判會讓人無法收工，判斷條件寧可漏判也不要誤擋。
+
+`AGENTS.md` 是 `CLAUDE.md` 的 symlink，讓讀 `AGENTS.md` 慣例的工具（Codex 等）拿到同一份規則。
+
+---
+
 ## CI（GitLab）
 
 `.gitlab-ci.yml` 的 stages：`prepare → quality → optimize → cleanup → pr_agent`。
@@ -710,6 +732,8 @@ docs/swagger/<side>/openapi.yaml                    # 自動註冊 paths
 | `quality-check` | quality | 型別 / lint / 單元測試 + **覆蓋率門檻** + 架構守則 | `pnpm typecheck && pnpm lint && pnpm test:cov` |
 | `e2e-test` | quality | 對 `mysql:9` service container 跑完整 e2e | `pnpm --filter @app/api test:e2e` |
 | `prepare-production` | optimize | Prisma generate + build（**需 `quality-check` 通過**） | `pnpm build` |
+
+**本機重現 CI 的測試環境**：`pnpm verify:ci` 以 `compose.verify.yml` 起一個 MySQL 9 容器（healthcheck 等就緒、`tmpfs` 跑在記憶體）並執行 e2e，實測約 60 秒。定位是「測試環境重現」而非「pipeline 模擬」——runner 行為與 cache 命中仍只能在實際 pipeline 觀察。
 
 要點：
 

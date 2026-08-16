@@ -13,7 +13,7 @@
 
 - **`.env.example` 補 `ALLOW_PROD_SEED`**：`envSchema` 已補宣告（2026-08-14），但 `.env.example` 尚未加。此檔在 AI 的權限設定中被拒絕存取，需開發者手動加一行 `ALLOW_PROD_SEED=`（註明僅正式環境用）。
 
-- **首次 CI pipeline 需人工觀察**：CI 設定的正確性**無法在本機完全驗證**——YAML 結構、各 job 的 script 內容、e2e 的環境變數供應方式皆已本機驗證過，但 runner 行為、cache 命中、service container 啟動時序只能在實際 pipeline 上確認。首次推送後檢查三件事：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) `e2e-test` 的 MySQL 等待迴圈是否足夠（目前 30 次 × 2 秒）；(3) pipeline 總時長可否接受，過慢可把 `e2e-test` 限縮為只在 MR 跑。
+- **首次 CI pipeline 需人工觀察**：`pnpm verify:ci` 已能在本機以容器重現 e2e 測試環境（2026-08-16 加入），**測試層面的驗證範圍縮小到剩下 runner 專屬行為**：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) cache 是否命中；(3) pipeline 總時長可否接受，過慢可把 `e2e-test` 限縮為只在 MR 跑。GitLab 的 services 不支援 compose 的 healthcheck，CI 端沿用手動等待迴圈（30 次 × 2 秒）—— 首跑時留意是否足夠。
 
 ### 觀察中
 
@@ -36,6 +36,18 @@
 ---
 
 ## 已完成
+
+### 2026-08-16 — AI 工程設置升級（借鏡 times-account-backend）
+
+對方的 AI 設置比本專案成熟一個世代，四項全部落地：
+
+- **hook 抽成 `.agents/hooks/*.sh`**：settings.json 從長串 shell 字串變成純註冊；邏輯放工具無關位置（git hook / Codex 也能呼叫同一支），根目錄以 `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}` 推斷。同步加 `hook-scripts.spec.ts` 做 `bash -n` 檢查——否則只是把「不在檢查範圍的設定」換個地方放。
+- **Stop hook 補上連動守門**（原本 `"Stop": []` 是空的）：改了 swagger 來源 yaml 但產物沒重生就 `exit 2` 擋下。判斷刻意保守（只有「來源變更且兩產物皆未變更」才擋）——誤判會讓人無法收工。
+- **`pnpm verify:ci` 本機重現 CI**：compose 起 MySQL 9（healthcheck + tmpfs），實測 144 tests / 62 秒。順帶確認 GitLab services 不支援 compose 的 healthcheck 語法，CI 端的手動等待迴圈是必要的。
+- **`AGENTS.md` symlink + Hard Rules 標註強制方式**：標註後浮現一個事實——**12 條 Hard Rules 只有 5 條有機器守，7 條純靠自律**。
+
+架構規則 20 → 24，master spec 的 engineering-guardrails 16 → 19 條。
+
 
 ### 2026-08-14 — 工程護欄體系：把 Hard Rules 變成會失敗的檢查
 

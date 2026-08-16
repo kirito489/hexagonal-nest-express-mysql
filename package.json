@@ -15,6 +15,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "test:cov": "pnpm -r test:cov",
+    "verify:ci": "bash scripts/verify-ci.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
