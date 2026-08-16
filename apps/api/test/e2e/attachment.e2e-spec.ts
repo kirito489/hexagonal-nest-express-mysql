@@ -45,7 +45,11 @@ describe('Attachment E2E', () => {
     mockRedis.isTokenBlacklisted.mockResolvedValue(false);
     mockRedis.throttleIncrement.mockResolvedValue(1);
     await resetDb(prisma);
-    await seedMember(prisma, { email: ADMIN_EMAIL, password: PASSWORD });
+    await seedMember(prisma, {
+      email: ADMIN_EMAIL,
+      password: PASSWORD,
+      permissionCodes: ['BACKEND:ATTACHMENT:EDIT'],
+    });
     const res = await request(app.getHttpServer())
       .post('/api/admin/auth/login')
       .send({ email: ADMIN_EMAIL, password: PASSWORD });
@@ -142,5 +146,87 @@ describe('Attachment E2E', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expectApiError(res, 404, ResponseCodes.ATTACHMENT_NOT_FOUND);
+  });
+
+  // 兩層授權各自要有測試釘住：權限碼擋「有沒有資格碰附件」，
+  // 擁有者檢查擋「有資格的 A 刪掉 B 的附件」。少任一層都是任何已登入者可刪任何附件。
+  describe('授權', () => {
+    /** 建一個沒有附件權限的帳號並取得 token */
+    const loginAs = async (
+      email: string,
+      permissionCodes: string[],
+      roleCode?: string,
+    ): Promise<string> => {
+      await seedMember(prisma, {
+        email,
+        password: PASSWORD,
+        roleName: `role-${email}`,
+        roleCode,
+        permissionCodes,
+      });
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/auth/login')
+        .send({ email, password: PASSWORD });
+      return (res.body as { data: { accessToken: string } }).data.accessToken;
+    };
+
+    const uploadOne = async (bearer: string): Promise<string> => {
+      const up = await request(app.getHttpServer())
+        .post('/api/admin/attachments')
+        .set('Authorization', `Bearer ${bearer}`)
+        .field('folder', 'attachments')
+        .field('relatedTable', 'members')
+        .field('relatedId', 'm1')
+        .attach('file', PNG, { filename: 'a.png', contentType: 'image/png' });
+      return (up.body as { data: { id: string } }).data.id;
+    };
+
+    it('無 BACKEND:ATTACHMENT:EDIT → 上傳 403', async () => {
+      const other = await loginAs('noperm@test.com', ['BACKEND:ACCOUNT:VIEW']);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/attachments')
+        .set('Authorization', `Bearer ${other}`)
+        .field('folder', 'attachments')
+        .field('relatedTable', 'members')
+        .field('relatedId', 'm1')
+        .attach('file', PNG, { filename: 'a.png', contentType: 'image/png' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('有權限但非上傳者 → 刪除 403，附件仍在', async () => {
+      const id = await uploadOne(token);
+      const other = await loginAs('other@test.com', [
+        'BACKEND:ATTACHMENT:EDIT',
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/admin/attachments/${id}`)
+        .set('Authorization', `Bearer ${other}`);
+
+      expectApiError(res, 403, ResponseCodes.ATTACHMENT_FORBIDDEN);
+      expect(
+        await prisma.attachmentRecord.findUnique({ where: { id } }),
+      ).not.toBeNull();
+    });
+
+    it('非上傳者但為 SUPERADMIN → 刪除成功', async () => {
+      const id = await uploadOne(token);
+      const su = await loginAs(
+        'su@test.com',
+        ['BACKEND:ATTACHMENT:EDIT'],
+        'SUPERADMIN',
+      );
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/admin/attachments/${id}`)
+        .set('Authorization', `Bearer ${su}`);
+
+      expect(res.status).toBe(204);
+      expect(
+        await prisma.attachmentRecord.findUnique({ where: { id } }),
+      ).toBeNull();
+    });
   });
 });

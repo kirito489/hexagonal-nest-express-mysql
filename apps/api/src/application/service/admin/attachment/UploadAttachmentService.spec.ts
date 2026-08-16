@@ -25,7 +25,8 @@ describe('UploadAttachmentService', () => {
   let service: UploadAttachmentService;
 
   const baseCmd: UploadAttachmentCommand = {
-    buffer: Buffer.from('x'),
+    // 真正的 PNG 檔頭——上傳會以 magic byte 比對宣告的 MIME，隨便的 buffer 會被拒
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex'),
     mimeType: 'image/png',
     size: 1000,
     originalName: 'a.png',
@@ -50,6 +51,17 @@ describe('UploadAttachmentService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new UploadAttachmentService(fileStorage, attachmentRepo);
+  });
+
+  // 白名單只比對 client 宣告的 Content-Type，通過只代表字串填對了。
+  // 沒有這道檢查，宣告 image/png 但 body 是 HTML 的檔案會以 .png 落地，
+  // 屆時只剩 nosniff 擋著——而 S3 路徑上沒有那道 header。
+  it('宣告的 MIME 與檔案內容不符 → InvalidUploadException，不寫檔不落庫', async () => {
+    await expect(
+      service.execute({ ...baseCmd, buffer: Buffer.from('<html>evil</html>') }),
+    ).rejects.toBeInstanceOf(InvalidUploadException);
+    expect(fileStorage.upload).not.toHaveBeenCalled();
+    expect(attachmentRepo.save).not.toHaveBeenCalled();
   });
 
   it('合法上傳 → 存檔 + 落 attachment，回 { id, url }；副檔名由 MIME 推導', async () => {

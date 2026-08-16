@@ -35,21 +35,39 @@
 
 ## 已完成
 
+### 2026-08-16 — 第三輪審查 4 項修復 + spec 補登
+
+依 `pr/2026-08-16-22-30-project-review.md`。本輪**三輪來第一個「原本就存在、與修復無關」**的問題。
+
+**附件端點完全沒有授權（IDOR）**：`AttachmentController` 兩支端點零裝飾器，`uploadedBy` 有寫入、有索引、就是沒被讀——任何已登入者（含零權限帳號）可刪任何附件，連同實體檔案，不可逆、預設無稽核。四層修復：新增 `BACKEND:ATTACHMENT:EDIT` → 兩支端點標 `@Permissions` → `DeleteAttachmentService` 補擁有者檢查（非上傳者僅 SUPERADMIN）→ 單元 3 條 + e2e 3 條。**權限碼擋不住「有資格的 A 刪掉 B 的附件」**，附件 ID 隨上傳回應外流。
+
+**補第一條「檢查應存在而不存在」的守則**：既有授權守則檢查的是「有標註的標對了」，漏洞出在「沒標的」。該 controller 通過了當時全部 18 支守則——每一條它都遵守，只是少了沒有規則要求它有的東西。新守則反向驗證時精準命中。
+
+**purge 的 raw SQL 零測試**：第二輪把 `deleteMany` 換成手寫 SQL，換掉了 Prisma 的型別保護。補單元（迴圈）+ e2e（對真 DB，含跨批 6000 筆）——後者是唯一會在欄位改名／Prisma 升級時亮紅燈的。
+
+**「驗過的 MIME」名不副實**：白名單比對的是 client 宣告值，不驗內容。註解改成事實，並補 `sniffMime` magic byte 檢查（5 種類型、無新依賴）。原本只靠 `nosniff` 緩解，而 `STORAGE_DRIVER=s3` 時那道 header 不在路徑上。
+
+**spec 補登（`add-guardrail-and-container-specs`）**：`openspec/specs/` 落後實作——guardrails 停在 22 條需求（實際 19 支/61 項）、容器化零覆蓋，且我這幾輪直接改 master spec 繞過了 delta 流程。開追認 change 走完整流程，補 10 條守則需求 + 新能力 `platform-container-dev`。順帶補實兩支 master spec 掛了三個月的 `TBD` Purpose，並把 archive 兩個動詞離群值改名（16 個全部合規）。
+
+**護欄 19 支 / 61 項。**
+
+**本輪暴露的缺口**：change 命名沒有守則檢查——本 change 初始命名用了不在白名單的 `record-`，靠人工發現。
+
 ### 2026-08-16 — 第二輪審查 7 項修復 + 整套容器化
 
 依 `pr/2026-08-16-21-50-project-review.md`。本輪問題的形狀與上輪不同——**全部落在「兩個各自正確的決定之間的接縫」**，而非功能內部。
 
-**🔴 舊格式黑名單被當成「不在黑名單」**：上輪把 `isBlacklisted`（boolean）改成 `getBlacklistReason`（reason）時，adapter 把無法辨識的值壓成 `null`。註解意圖是「少撤銷」，但呼叫端把 `null` 當成沒進過黑名單，**連 throw 都跳過**——部署當下所有既存的已登出 / 已輪替 refresh token 在剩餘 TTL 內（預設 7 天）全部復活。修法是 port 加第三個狀態 `'unknown'`，service 一行未改。**bug 在 adapter 的翻譯層，service 邏輯從頭到尾都是對的**，所以 service 層測試怎麼寫都抓不到，補的是 adapter 層測試。
+**舊格式黑名單被當成「不在黑名單」**：上輪把 `isBlacklisted`（boolean）改成 `getBlacklistReason`（reason）時，adapter 把無法辨識的值壓成 `null`。註解意圖是「少撤銷」，但呼叫端把 `null` 當成沒進過黑名單，**連 throw 都跳過**——部署當下所有既存的已登出 / 已輪替 refresh token 在剩餘 TTL 內（預設 7 天）全部復活。修法是 port 加第三個狀態 `'unknown'`，service 一行未改。**bug 在 adapter 的翻譯層，service 邏輯從頭到尾都是對的**，所以 service 層測試怎麼寫都抓不到，補的是 adapter 層測試。
 
-**🟡 Redis 已是硬相依但文件還在承諾降級**：節流與黑名單都改 fail-closed 後，`JwtAuthGuard` 內「Redis 掛掉就降級查 DB」那段變成永遠到不了的死碼（同一個 `client.isOpen`，前面已 throw 503），三處文件也還寫著「選填」「服務不中斷」。已刪死碼、改寫文件為「Redis 是硬相依」。
+**Redis 已是硬相依但文件還在承諾降級**：節流與黑名單都改 fail-closed 後，`JwtAuthGuard` 內「Redis 掛掉就降級查 DB」那段變成永遠到不了的死碼（同一個 `client.isOpen`，前面已 throw 503），三處文件也還寫著「選填」「服務不中斷」。已刪死碼、改寫文件為「Redis 是硬相依」。
 
-**🟡 日誌清理改分批**：單一 `deleteMany` 本身就是一個交易，對累積數百萬列的部署，第一次執行會長時間持鎖——防止資料庫爆掉的機制自己造成事故。改為每批 5000、批間讓出 100ms，對真 DB 實測 12000 筆 / 299ms。
+**日誌清理改分批**：單一 `deleteMany` 本身就是一個交易，對累積數百萬列的部署，第一次執行會長時間持鎖——防止資料庫爆掉的機制自己造成事故。改為每批 5000、批間讓出 100ms，對真 DB 實測 12000 筆 / 299ms。
 
-**🟡🟢 其餘**：`docker/api.container.env` 註解指向已刪除的 `compose.app.yml` 與 `pnpm app:up`；`Dockerfile` 宣稱「映像單獨也能跑」但 `.dockerignore` 排除了 4 支守則讀的路徑（改為據實說明）；production target 的非 root 提醒；MySQL healthcheck 拿掉命令列密碼。
+**其餘**：`docker/api.container.env` 註解指向已刪除的 `compose.app.yml` 與 `pnpm app:up`；`Dockerfile` 宣稱「映像單獨也能跑」但 `.dockerignore` 排除了 4 支守則讀的路徑（改為據實說明）；production target 的非 root 提醒；MySQL healthcheck 拿掉命令列密碼。
 
 **整套容器化**：三份 compose 併為一份 `compose.yml`，`docker compose up -d` 起 api + web + mysql + redis，前後端都支援熱重載。過程踩到六個坑（Node 版本看 `packageManager` 不是 `engines`、`node_modules` 五處遮罩、host `.env` 洩漏、`nest start --watch` 換不掉行程、`deleteOutDir` 空窗、`up` 撞 pnpm 內建別名），全部寫進 `tooling.md`。
 
-**護欄 18 支 / 58 項 → 18 支 / 59 項**：`compose-files.spec.ts` 加一條——docker 相關檔案提到的 `pnpm <script>` 必須存在，正是為了擋 🟡 那類「改名後註解沒跟上」。
+**護欄 18 支 / 58 項 → 18 支 / 59 項**：`compose-files.spec.ts` 加一條——docker 相關檔案提到的 `pnpm <script>` 必須存在，正是為了擋「改名後註解沒跟上」。
 
 ### 2026-08-16 — 專案審查 12 項問題修復（review report 追蹤）
 

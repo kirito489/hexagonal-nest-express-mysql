@@ -41,6 +41,7 @@
 | Me       | `GET /api/admin/me`                 | JWT                                      |
 | Members  | `GET/POST/PATCH/DELETE /api/admin/members*` | JWT + `BACKEND:ACCOUNT:VIEW/EDIT` 權限 |
 | Roles    | `GET/POST/PATCH/DELETE /api/admin/roles*` | JWT + `BACKEND:ROLE:VIEW/EDIT` 權限      |
+| Attachments | `POST/DELETE /api/admin/attachments*` | JWT + `BACKEND:ATTACHMENT:EDIT`；刪除另需為上傳者或 SUPERADMIN |
 | Security | `/api/admin/security/ip-{whitelist,blacklist}*`、`/api/admin/security/unlock-account` | JWT + ADMIN 角色 |
 | Attachments | `POST /api/admin/attachments`（multipart 上傳）、`DELETE /api/admin/attachments/{id}` | JWT |
 | Front    | `GET /api/front/ping`（骨架示範，待實際前台端點取代） | 公開                        |
@@ -61,6 +62,7 @@
 | `BACKEND_ACCOUNT_EDIT` | `BACKEND:ACCOUNT:EDIT` |
 | `BACKEND_ROLE_VIEW`    | `BACKEND:ROLE:VIEW`    |
 | `BACKEND_ROLE_EDIT`    | `BACKEND:ROLE:EDIT`    |
+| `BACKEND_ATTACHMENT_EDIT` | `BACKEND:ATTACHMENT:EDIT` |
 
 Seed 預設建立一個角色（`roleCode: SUPERADMIN`，`isDefault: true`）並指派所有權限。
 

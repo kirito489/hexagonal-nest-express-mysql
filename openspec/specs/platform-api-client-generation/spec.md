@@ -1,7 +1,12 @@
 # platform-api-client-generation Specification
 
 ## Purpose
-TBD - created by archiving change setup-monorepo-frontend. Update Purpose after archive.
+定義 `packages/api-client` 的產生與使用契約：型別如何從後端的 OpenAPI bundle 推導、
+產物為何進版控、產生流程為何獨立於 build，以及對外暴露的 runtime API。
+
+核心約束是**單向推導**：後端 controller 是唯一真相，型別經
+`swagger:bundle → openapi-typescript` 產生，前端不得手寫或修改產物。
+三段轉換的同步由 `platform-engineering-guardrails` 的守則保證。
 ## Requirements
 ### Requirement: API client 從 OpenAPI bundle 產生
 

@@ -1,7 +1,11 @@
 # platform-monorepo-workspace Specification
 
 ## Purpose
-TBD - created by archiving change setup-monorepo-frontend. Update Purpose after archive.
+定義 monorepo 的骨架契約：三個 workspace（`apps/api`、`apps/web`、`packages/api-client`）
+的目錄結構、pnpm workspace 的使用方式、`@app/*` 的套件命名慣例，以及共用的 TypeScript 設定。
+
+這些是「動一處會影響全部」的決定——`overrides` 寫錯位置會被 pnpm 靜默忽略、
+`tsconfig.base.json` 的 strict 設定由三個 workspace 繼承——因此收斂成單一 capability。
 ## Requirements
 ### Requirement: Workspace 目錄結構
 

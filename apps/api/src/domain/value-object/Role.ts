@@ -19,6 +19,9 @@ export const PermissionCode = {
   // 後台 - 角色與權限管理
   BACKEND_ROLE_VIEW: 'BACKEND:ROLE:VIEW',
   BACKEND_ROLE_EDIT: 'BACKEND:ROLE:EDIT',
+
+  // 後台 - 附件（上傳與刪除共用一個碼：兩者都是寫入操作，附件沒有「只能看」的場景）
+  BACKEND_ATTACHMENT_EDIT: 'BACKEND:ATTACHMENT:EDIT',
 } as const;
 
 export type PermissionCode =

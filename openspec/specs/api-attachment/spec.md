@@ -15,7 +15,7 @@
 ### Requirement: 上傳附件
 
 `POST /api/admin/attachments` SHALL 以 `multipart/form-data` 接收**單一**檔案，
-成功回 `201` 與附件 ID 及可存取 URL。需要有效 JWT。
+成功回 `201` 與附件 ID 及可存取 URL。MUST 要求 `BACKEND:ATTACHMENT:EDIT` 權限。
 檔案欄位名 MUST 固定為 `file`；未提供檔案 MUST 回 `400`、`code: "INVALID_UPLOAD"`。
 
 MUST 記錄上傳者（由 JWT 取得），以及 `relatedTable` / `relatedId` 的歸屬關係。
@@ -42,8 +42,9 @@ MUST 記錄上傳者（由 JWT 取得），以及 `relatedTable` / `relatedId` �
 
 **Failure Responses**：
 
-- `400`、`code: "INVALID_UPLOAD"`：未提供檔案、MIME 不在白名單、超過大小上限，
-  或 `folder` 不在白名單
+- `400`、`code: "INVALID_UPLOAD"`：未提供檔案、MIME 不在白名單、**檔案內容與宣告的
+  MIME 不符**（magic byte 比對）、超過大小上限，或 `folder` 不在白名單
+- `403`、`code: "FORBIDDEN"`：缺 `BACKEND:ATTACHMENT:EDIT`
 - `401`、`code: "UNAUTHORIZED"`：未帶或帶了無效的 Access Token
 - `413`：檔案大小超過 multer 的硬上限（在進入應用層驗證之前即被擋下）
 
@@ -101,7 +102,10 @@ MUST 記錄上傳者（由 JWT 取得），以及 `relatedTable` / `relatedId` �
 
 `DELETE /api/admin/attachments/:id` SHALL 依 ID 刪除附件，
 **同時刪除儲存後端的實體檔案與資料庫紀錄**——只刪其一會留下孤兒檔案或斷掉的 URL。
-`id` 由 `ParseUUIDPipe` 驗證。需要有效 JWT。
+`id` 由 `ParseUUIDPipe` 驗證。MUST 要求 `BACKEND:ATTACHMENT:EDIT` 權限，
+且 MUST 另做**擁有者檢查**：非上傳者僅 `SUPERADMIN` 可刪。
+權限碼只能擋「有沒有資格碰附件」，擋不住「有資格的 A 刪掉 B 的附件」——
+刪除不可逆、會一併移除實體檔案，而附件 ID 隨上傳回應外流，能看到 ID 的人就能刪。
 
 與 IP 名單的刪除不同，本 endpoint 找不到紀錄時 MUST 回 `404` 而非靜默通過：
 附件刪除多半由使用者明確操作觸發，靜默成功會讓「刪錯了」與「早就不存在」無法區分。
@@ -116,12 +120,24 @@ MUST 記錄上傳者（由 JWT 取得），以及 `relatedTable` / `relatedId` �
 
 - `400`：`id` 非合法 uuid（`ParseUUIDPipe`）
 - `401`、`code: "UNAUTHORIZED"`：未帶或帶了無效的 Access Token
+- `403`、`code: "FORBIDDEN"`：缺 `BACKEND:ATTACHMENT:EDIT`
+- `403`、`code: "ATTACHMENT_FORBIDDEN"`：非上傳者且非 SUPERADMIN
 - `404`、`code: "ATTACHMENT_NOT_FOUND"`：附件不存在
 
 #### Scenario: 刪除成功
 
 - **WHEN** 已登入者刪除一個存在的附件
 - **THEN** 回 `204`，DB 紀錄與儲存後端的實體檔案皆被移除
+
+#### Scenario: 非上傳者不得刪除
+
+- **WHEN** 具 `BACKEND:ATTACHMENT:EDIT` 但非上傳者、亦非 SUPERADMIN 者刪除他人附件
+- **THEN** 回 `403`、`code: "ATTACHMENT_FORBIDDEN"`，附件與實體檔案 MUST 保留
+
+#### Scenario: SUPERADMIN 可刪他人附件
+
+- **WHEN** `roleCode` 為 `SUPERADMIN` 者刪除他人上傳的附件
+- **THEN** 回 `204`，附件與實體檔案皆被移除
 
 #### Scenario: 附件不存在
 

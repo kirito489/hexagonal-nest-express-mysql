@@ -55,3 +55,5 @@ responses:
     $ref: '../openapi.yaml#/components/responses/BadRequest'
   '401':
     $ref: '../openapi.yaml#/components/responses/NoToken'
+  '403':
+    $ref: '../openapi.yaml#/components/responses/Forbidden'

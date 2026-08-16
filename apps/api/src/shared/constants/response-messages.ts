@@ -56,6 +56,7 @@ export const ResponseMessages = {
   // 若日後要讓前端針對不同原因分支，應拆成多個錯誤碼而非放寬此處
   INVALID_UPLOAD: (reason: string) => reason,
   ATTACHMENT_NOT_FOUND: '找不到附件',
+  ATTACHMENT_FORBIDDEN: '沒有權限刪除此附件',
 
   // 系統：刻意維持通用英文訊息，不洩漏內部實作細節
   INTERNAL_SERVER_ERROR: 'Internal server error',

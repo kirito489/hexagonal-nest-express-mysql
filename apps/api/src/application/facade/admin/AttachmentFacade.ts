@@ -8,6 +8,7 @@ import {
 import {
   DELETE_ATTACHMENT_USE_CASE,
   DeleteAttachmentUseCase,
+  type DeleteAttachmentActor,
 } from '../../port/in/admin/attachment/DeleteAttachmentUseCase';
 
 /** 附件 Facade：上傳與刪除的對外入口，controller 只透過此 facade 操作 */
@@ -24,7 +25,7 @@ export class AttachmentFacade {
     return this.uploadUseCase.execute(command);
   }
 
-  remove(id: string): Promise<void> {
-    return this.deleteUseCase.execute(id);
+  remove(id: string, actor: DeleteAttachmentActor): Promise<void> {
+    return this.deleteUseCase.execute(id, actor);
   }
 }

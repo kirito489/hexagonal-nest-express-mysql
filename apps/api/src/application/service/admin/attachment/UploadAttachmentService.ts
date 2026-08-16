@@ -17,6 +17,7 @@ import {
 import {
   extForMime,
   isAllowedMime,
+  sniffMime,
   isUploadFolder,
 } from '@app/shared/constants/upload';
 import { InvalidUploadException } from '@app/domain/exception/InvalidUploadException';
@@ -42,12 +43,19 @@ export class UploadAttachmentService implements UploadAttachmentUseCase {
     if (!isAllowedMime(command.mimeType)) {
       throw new InvalidUploadException(`不允許的檔案類型：${command.mimeType}`);
     }
+    // 白名單比對的是 client 自行宣告的 Content-Type——通過只代表字串填對了。
+    // 用 magic byte 確認檔案內容真的是那個類型，擋掉「宣告 image/png、body 是 HTML」
+    // 這類內容偽造（否則得完全仰賴 nosniff，而 S3 路徑上沒有那道 header）。
+    if (sniffMime(command.buffer) !== command.mimeType) {
+      throw new InvalidUploadException('檔案內容與宣告的類型不符');
+    }
     const maxBytes = getEnv().MAX_UPLOAD_BYTES;
     if (command.size > maxBytes) {
       throw new InvalidUploadException(`檔案過大（上限 ${maxBytes} bytes）`);
     }
 
-    // 副檔名一律由「驗過的 MIME」推導，不取 client 原始檔名（擋 evil.png.html 之類 stored XSS）
+    // 副檔名由通過白名單與 magic byte 兩道檢查的 MIME 推導，不取 client 原始檔名
+    // （擋 evil.png.html 這類雙副檔名 stored XSS）
     const ext = extForMime(command.mimeType);
     const key = `${command.folder}/${randomUUID()}.${ext}`;
 

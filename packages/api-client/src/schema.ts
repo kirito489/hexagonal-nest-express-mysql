@@ -2403,6 +2403,7 @@ export interface paths {
                 };
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
             };
         };
         delete?: never;
@@ -2445,6 +2446,27 @@ export interface paths {
                     content?: never;
                 };
                 401: components["responses"]["NoToken"];
+                /**
+                 * @description 缺 `BACKEND:ATTACHMENT:EDIT` 權限（code: FORBIDDEN），
+                 *     或具權限但非上傳者且非 SUPERADMIN（code: ATTACHMENT_FORBIDDEN）。
+                 *     擁有者檢查不可省——刪除不可逆且會移除實體檔案，而附件 ID 會隨上傳回應外流。
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "沒有權限刪除此附件",
+                         *       "code": "ATTACHMENT_FORBIDDEN",
+                         *       "timestamp": "2024-01-01T00:00:00.000Z"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description 找不到附件 */
                 404: {
                     headers: {

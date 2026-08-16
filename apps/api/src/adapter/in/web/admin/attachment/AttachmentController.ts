@@ -19,6 +19,8 @@ import {
   CurrentMember,
   MemberContext,
 } from '../../decorator/current-member.decorator';
+import { Permissions } from '../../decorator/permissions.decorator';
+import { PermissionCode } from '@app/domain/value-object/Role';
 import {
   UploadAttachmentRequest,
   uploadAttachmentSchema,
@@ -40,6 +42,7 @@ export class AttachmentController {
   constructor(private readonly attachmentFacade: AttachmentFacade) {}
 
   @Post()
+  @Permissions(PermissionCode.BACKEND_ATTACHMENT_EDIT)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: MULTER_HARD_LIMIT } }),
@@ -67,10 +70,16 @@ export class AttachmentController {
   }
 
   @Delete(':id')
+  @Permissions(PermissionCode.BACKEND_ATTACHMENT_EDIT)
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeAttachment(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentMember() member: MemberContext,
   ): Promise<void> {
-    await this.attachmentFacade.remove(id);
+    // 權限碼之外還要擋「有權限的 A 刪掉 B 的附件」，故把 actor 一路帶到 service
+    await this.attachmentFacade.remove(id, {
+      memberId: member.sub,
+      roleCode: member.roleCode,
+    });
   }
 }
