@@ -37,6 +37,16 @@
 
 ## 已完成
 
+### 2026-08-16 — 補守剩餘的 Hard Rules
+
+上一項標註強制方式後浮現「7 條純靠自律」的清單。盤點後只有三條屬「程式碼約束」可機器守，全部補上（現況零違規、零豁免）：
+
+- **DTO 一律 z.infer**：同時查「有 z.infer」與「無手寫 class/interface」——只查前者不夠，一個檔案可以兩者並存而實際用手寫的那個。
+- **e2e 不得 mock DB**：除了禁 `overrideProvider(PrismaService)`，也禁 `test-app.ts` **提供** mock 入口——留著入口等於官方認可的繞道。順手移除標了 `@deprecated ... 待轉完移除` 但條件早已滿足的 `TestAppOverrides.prisma`。
+- **CommonJS baseline**：root 與 apps/api 不得設 `type: module`（apps/web 是設計上的例外，寫進規則範圍而非豁免清單）。
+
+其餘四條維持自律是對的：兩條需語意判斷（訊息是否洩漏敏感資訊、of()/trusted() 用錯路徑），兩條是行為而非程式碼（不自行起 dev server、不改 .env）。**Hard Rules 的機器守覆蓋率 5/12 → 8/12**，架構規則 24 → 32。
+
 ### 2026-08-16 — AI 工程設置升級（借鏡 times-account-backend）
 
 對方的 AI 設置比本專案成熟一個世代，四項全部落地：

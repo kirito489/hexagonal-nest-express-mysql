@@ -9,12 +9,6 @@ import { createE2EApp, createMockRedis } from './test-app';
 // fixture 由 WEB_STATIC_ROOT（setup-env 指定）指向，beforeAll 先放 index.html，
 // 才讓 AppModule 的 forRootAsync 在 init 時偵測到並掛載（含 forceServeStatic 對齊生產 loader）。
 // ──────────────────────────────────────────────
-const createMockPrisma = () => ({
-  $connect: jest.fn(),
-  $disconnect: jest.fn(),
-  $queryRaw: jest.fn().mockResolvedValue([{ '1': 1 }]),
-});
-
 const WEB_DIST = process.env.WEB_STATIC_ROOT ?? '';
 const INDEX_MARKER = 'web-dist-fixture';
 const INDEX_HTML = `<!doctype html><title>${INDEX_MARKER}</title>`;
@@ -26,8 +20,8 @@ describe('ServeStatic 單一埠 (e2e)', () => {
     mkdirSync(WEB_DIST, { recursive: true });
     writeFileSync(join(WEB_DIST, 'index.html'), INDEX_HTML);
     writeFileSync(join(WEB_DIST, 'robots.txt'), 'static-asset-marker');
+    // 本 spec 不碰 DB，但仍用真 PrismaService——與其餘 e2e 一致（不 mock 資料庫）
     ({ app } = await createE2EApp({
-      prisma: createMockPrisma(),
       redis: createMockRedis(),
       forceServeStatic: true,
     }));

@@ -10,8 +10,6 @@ import { RedisService } from '../src/infrastructure/redis/redis.service';
 import { SAVE_SYSTEM_LOG_PORT } from '../src/application/port/out/shared/SaveSystemLogPort';
 
 export interface TestAppOverrides {
-  /** @deprecated e2e 已改走真 test DB，Prisma 不再 mock；待 4 支 CRUD spec 轉完移除此欄位 */
-  prisma?: Record<string, unknown>;
   redis?: ReturnType<typeof createMockRedis>;
   saveSystemLog?: Record<string, unknown>;
   /**
@@ -55,7 +53,7 @@ export const createMockSaveSystemLog = () => ({
  * 使用方式：
  * ```typescript
  * const mockRedis = createMockRedis();
- * const { app } = await createE2EApp({ prisma: mockPrisma, redis: mockRedis });
+ * const { app } = await createE2EApp({ redis: mockRedis });
  * ```
  */
 export async function createE2EApp(overrides: TestAppOverrides = {}): Promise<{

@@ -56,6 +56,8 @@
 
 **How to apply**：還原一律用 python 字串替換或 `git checkout --`，還原後**實際驗證**（跑一次該檔的載入或測試）。反向驗證的完整循環是「插探針 → 親眼看它紅 → 還原 → **確認 `git status` 乾淨**」，最後一步不能省。
 
+- **用 grep 判斷「還有沒有人在用」會漏多行寫法**：移除 `TestAppOverrides.prisma` 前用 `grep "createE2EApp({" | grep prisma` 判定「0 處在用」，實際上 `serve-static.e2e-spec.ts` 是多行寫法（`createE2EApp({\n  prisma: …`），grep 抓不到，最後是 typecheck 攔下的。作法：判斷「是否還有呼叫端」時，**優先移除後跑 typecheck**（編譯器天生跨行），grep 只當快速預覽；真要用 grep 就搭配 `-A3` 或直接搜屬性名而非整個呼叫式。
+
 - **文件裡的路徑與指令要用機器驗證**：重構改了目錄或 script 名，文件不會有任何工具通知。作法：(1) regex 抓出文件所有 `` `apps/**` `` 路徑逐一 `exists()`；(2) 抓出提到的 `pnpm` script 逐一比對 `package.json`。一次就抓出 4 處過時（含存在一個月的 Swagger 網址）。
 - **JSDoc 裡不要寫含 `*/` 的 glob**（如 `test/**/*`）：`*/` 提前終止註解，整個檔案語法爆掉；若在 `.js` 設定檔更致命——`typecheck`／`lint` 都不掃，只有實際執行才炸。
 - **regex 的 `\s` 包含換行**：`/^(\s*)ANCHOR$/m` 的 `^` 可能匹配到前一空行行首，`\s*` 跨行吃掉換行，`$1` 就夾帶了換行。只想抓行首縮排時用 `[ \t]*`。
