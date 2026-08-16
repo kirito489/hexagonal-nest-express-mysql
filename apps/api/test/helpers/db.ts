@@ -62,6 +62,8 @@ export const seedMember = async (
     roleName?: string;
     roleCode?: string;
     permissionCodes?: string[];
+    /** 排序測試用：顯式指定建立時間，避免連續 insert 落在同一毫秒 */
+    createdAt?: Date;
   },
 ): Promise<SeededMember> => {
   const permIds = await ensurePermissions(
@@ -85,6 +87,7 @@ export const seedMember = async (
       roleId: role.id,
       status: opts.status ?? true,
       isDefault: false,
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
     },
   });
   return { memberId: member.id, roleId: role.id };
@@ -101,6 +104,8 @@ export const seedRole = async (
     status?: boolean;
     roleCode?: string;
     permissionCodes?: string[];
+    /** 排序測試用：顯式指定建立時間 */
+    createdAt?: Date;
   },
 ): Promise<string> => {
   const permIds = await ensurePermissions(prisma, opts.permissionCodes ?? []);
@@ -111,6 +116,7 @@ export const seedRole = async (
       isDefault: opts.isDefault ?? false,
       status: opts.status ?? true,
       permissions: { create: permIds.map((id) => ({ permissionId: id })) },
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
     },
   });
   return role.id;

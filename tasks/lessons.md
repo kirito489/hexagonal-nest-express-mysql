@@ -134,6 +134,14 @@ export {};
 
 **How to apply**：`seedMember` / `seedRole` 開 `roleCode?` 參數。注意 **roleName（顯示名「管理者」）與 roleCode（權限碼）是兩回事**，gate 比對的是後者。
 
+### 2026-08-16 — 測排序時，fixture 的插入順序必須與期望排序相反
+
+**踩到什麼**：6 處 `orderBy`（member / role / permission / ip 名單）**全部拿掉，138 支 e2e 依然全綠**——排序行為完全沒有測試保護。`security.e2e-spec.ts` 雖有 `list[0].ipAddress` 這種依賴順序的斷言，但 seed 資料太少，刪掉 `orderBy` 也照樣過。
+
+**Why**：少了 `ORDER BY` 時資料庫回傳順序是**未定義**的（實務上是插入順序、索引順序或主鍵順序）。若 fixture 的插入順序剛好等於期望順序，測試就分辨不出「真的照 orderBy 排」還是「碰巧照插入順序回傳」。
+
+**How to apply**：讓插入順序與期望排序**相反**——測 `desc` 就按舊→新插入、測 `asc` 就按新→舊插入。另外**筆數決定反向驗證的可靠度**：主鍵是 uuid 時回傳順序近乎隨機，n 筆有 `1/n!` 機率碰巧命中，3 筆是 1/6（實測真的碰到過一次假綠，重跑 3 次才紅），4 筆降到 1/24。範本見 `test/ordering.e2e-spec.ts`。
+
 ### 2026-08-14 — 靜態掃描型的架構測試有兩種「假綠」
 
 **踩到什麼**：(1) 規則寫好跑起來全綠，實際上因為 controller 命名是 `XxxController.ts` 而非 `xxx.controller.ts`，glob 掃到 **0 個檔案**；(2) 違規修掉後豁免清單忘了刪，白名單單向膨脹成無人維護的例外清冊。
@@ -141,6 +149,8 @@ export {};
 **Why**：「沒有違規」與「沒有掃到東西」在斷言上長得一模一樣。
 
 **How to apply**：每條規則加 `expect(files.length).toBeGreaterThan(0)`，並驗證每筆豁免在原始碼中**確實仍存在**。新增規則後一律「插違規探針 → 親眼看它紅 → 移除 → 確認 `git diff` 乾淨」。
+
+**已知盲區**：靜態掃描看不到**套件動態註冊的路由**（如 `/api/metrics` 由條件註冊的 `PrometheusModule` 提供、沒有 controller 檔）。所以「架構測試會抓出所有未寫文件的路由」這個預期並不成立。
 
 - **掃描原始碼的規則要先剝註解**：以「引號 + 中文字元」偵測硬編文案時，TSDoc 裡的 markdown 反引號（`` `code` `` 後接中文）會被當成字串字面值，一次誤判 4 處。**OpenAPI yaml 更是完全不能用 regex 解析**——多行 `description: |` 區塊裡的文字會被當成 path / method 節點，曾得出「35 條路由全部不同步」的荒謬結果（**極端結果本身就是 bug 的訊號**）。yaml 一律用 `js-yaml`。
 - **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔即可判定的 import 邊界交給 eslint（快、IDE 即時）；跨檔語意（錯誤碼註冊、死碼、env 宣告）交給架構測試。**型別能保證的完整性兩者都不用寫**（如「用到不存在的常數」TypeScript 已免費擋掉）。
