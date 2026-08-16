@@ -132,7 +132,7 @@ Three layers work together:
 
 - **Subagent strategy**: offload research, broad searches, or cross-file comparison to an Explore subagent to protect the main context.
 - **Demand elegance**: before acting, ask "is there a more elegant / smaller way?"
-- **Lessons format**: record immediately when corrected or after hitting a non-obvious pitfall; each entry covers Symptom / Why / How to apply (see the "撰寫格式" section at the top of `tasks/lessons.md`).
+- **Lessons format**: record immediately when corrected or after hitting a non-obvious pitfall. Short rules stay one-line bullets; anything needing more than three lines uses the three-part form (踩到什麼 / Why / How to apply) under a dated `###` heading. See the "撰寫格式" section at the top of `tasks/lessons.md`.
 
 ### Memory rules
 
@@ -143,7 +143,7 @@ Three layers work together:
 3. **Cross-change side effect discovered**: write it immediately, don't wait until session end.
 4. **Feature deferred due to external dependency**: record the reason and condition.
 
-**`tasks/lessons.md`** — append after corrections OR after the user confirms a non-obvious approach worked; never delete existing entries.
+**`tasks/lessons.md`** — append after corrections OR after the user confirms a non-obvious approach worked. **Only real pitfalls belong here.** Three things do not: knowledge that is just restating official docs (delete), project conventions and architecture decisions (move to `openspec/project.md` — **move first, then delete**, never drop information), and rules already enforced by a guardrail (delete — if a machine catches it, nobody needs to remember it). Prune periodically rather than appending forever; an unpruned lessons file becomes noise nobody reads.
 
 **Design docs** always live in `openspec/changes/<name>/design.md`.
 

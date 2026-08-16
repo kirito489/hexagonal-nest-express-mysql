@@ -176,7 +176,8 @@ openssl rand -hex 32
 | 前端 API 呼叫、表單、shadcn     | `openspec/project.md` 之「前端架構」            |
 | 架構守則有哪些、怎麼加新規則    | `openspec/specs/engineering-guardrails/spec.md`、`openspec/project.md` 之「架構守則測試」 |
 | CI 各 job 職責與對應的本機指令  | `openspec/project.md` 之「CI（GitLab）」        |
-| 已踩過的坑與決定                | `tasks/lessons.md`                              |
+| 已踩過的坑（非顯而易見的雷）    | `tasks/lessons.md`                              |
+| 待辦、觀察中事項、技術債        | `tasks/todo.md`                                 |
 | 開發中 / 已封存的 change        | `openspec/changes/`、`openspec/changes/archive/` |
 | API spec（互動式）              | `http://localhost:3000/api/admin/docs`（啟動後可用） |
 

@@ -1,295 +1,242 @@
-# Lessons Learned
+# Lessons 踩坑紀錄
 
-_Accumulated rules and validated decisions. Each entry records the rule, the mechanism, and how to apply it directly — no changelog/history narrative._
+> 只記**踩過的坑**：非顯而易見、有具體現象與根因、下次還會再踩的。新 session 開工前先讀；被糾正或踩到坑時立即記錄。
 
 ## 撰寫格式
 
-每條 lesson 至少涵蓋三件事（短的可濃縮成一句 `**規則**：機制 + 套用`；複雜的分三段寫）：
+**三類東西不屬於這裡**，寫進來只會稀釋真正重要的內容：
 
-- **現象 / 規則**：踩到什麼（錯誤訊息 / 症狀），或要遵守的規則。
-- **Why**：根因——哪個工具 / 版本的哪個行為造成，或為何這樣做。
-- **How to apply**：下次怎麼避免 / 怎麼套用。
+| 不收 | 該去哪 |
+| --- | --- |
+| 官方文件查得到的基本知識 | 刪掉（如「改 schema 後要 `prisma generate`」） |
+| 專案慣例與架構決策 | `openspec/project.md`（**先搬再刪**，不要弄丟資訊） |
+| 已被護欄自動擋住的 | 刪掉——機器在守就不需要人記得 |
 
-**只增不減**；被糾正、或踩到非顯而易見的工具 / 設計坑就立即記。**依主題分組**（Prisma / JWT / NestJS…）而非日期流水——同主題聚在一起好找。
+**條目累積後要定期回頭整理**，不是只增不減：2026-08-14 一次整理從 102 條降到 69 條，砍掉的全是上表三類。沒整理的 lessons 會變成沒人讀的雜訊。
 
-## 工作流程 / 文件維護
+**依主題分組**（Prisma / JWT / NestJS…）而非日期流水——同主題聚在一起才找得到。
 
-- **JSDoc / block comment 裡不要寫含 `*/` 的 glob（如 `test/**/*`）**：`*/` 會提前終止註解，整個檔案語法爆掉。這個坑在 `.js` 設定檔特別致命——`jest.arch.config.js` 壞掉後 `typecheck` 與 `lint` 都是綠的（前者不掃 .js、後者當時的 glob 只有 `.ts`），只有實際跑 `test:arch` 才會炸。作法：註解裡改寫成「整個 `test/` 目錄」這類自然語言；並確保 **`.js` 設定檔也在 lint 範圍內**（`eslint "{src,scripts,seeds,test}/**/*.{ts,js}"`），eslint 的 parsing error 能擋下這類語法問題。注意 `.js` 沒有型別資訊，config 需對 `**/*.js` 套 `tseslint.configs.disableTypeChecked`，否則 type-aware 規則會直接 crash。
+每條 lesson 都要涵蓋三件事：**踩到什麼**（現象 / 錯誤訊息 / 做錯了什麼）、**Why**（根因：哪個工具的哪個行為造成）、**How to apply**（下次怎麼避免 / 怎麼套用）。依複雜度選格式：
 
-- **用 `cp` 還原探針檔案不可靠**：多數環境把 `cp` alias 成 `cp -i`，覆寫既有檔時會跳互動提示，在非互動的自動化流程中會靜默變成「not overwritten」——探針就留在原地了。作法：還原一律用 python 的字串替換或 `git checkout --`，並在還原後**實際驗證**（跑一次該檔的載入或測試），不要假設還原成功。
+**短規則**（一兩句話講得完）維持單行 bullet：
 
-- **文件裡的路徑與指令可以（也應該）用機器驗證，別靠肉眼複查**：2026-08-14 更新三份文件時，用兩個小腳本抓出 4 處過時——README 的 Swagger 網址還停在前後台分層前的 `/api/docs`（實際已是 `/api/admin/docs`）、`project.md` 兩處 swagger 範例路徑少了 `admin/` 層、以及「新增 exception 只需加 code」漏了訊息表。作法：改完文件跑兩個檢查——(1) 用 regex 抓出文件中所有 `` `apps/**` `` 路徑，逐一 `exists()`；(2) 抓出提到的 `pnpm` script 名，逐一比對 `package.json` 是否存在。執行期產生的檔案（`logs/*.log`）與使用者自建的 `.env` 會是預期的例外。大型重構（改目錄結構、拆分模組、改 script 名）後一定要跑一次。
+```markdown
+- **規則**：機制 + 套用方式。
+```
 
-- **新增護欄後必須回頭檢查「誰會產出程式碼」——產生器、腳本、模板是最容易被遺漏的受害者**：本輪加完架構守則與 `DomainException` 建構子重載後，`gen:module` 產出的模組立刻 typecheck 失敗（`super('X_NOT_FOUND', …)` 不是 `ResponseCode`）、3 條架構規則變紅、9 個 lint 錯誤——**模板最常被使用的入口壞了整整一輪都沒發現**，因為架構測試只掃既有原始碼，掃不到「還沒被產生出來的程式碼」。作法：任何改動 domain 基底、共用常數、分層規則後，實跑一次 `pnpm --filter @app/api gen:module <probe>` → 驗證 typecheck / lint / 架構守則全綠 → 清除探針；產生器若需維護共用檔（錯誤碼、訊息表、swagger 索引），注入一律做成冪等並在找不到錨點時警告降級。這與下一則是同一問題的兩面：一個是「規則沒有執行路徑」，一個是「規則沒有涵蓋產出路徑」。
+**複雜教訓**（有具體現象、需要解釋根因）用三段式，標題帶日期：
 
-- **正規表示式的 `\s` 包含換行，在多行模式下會讓 `^(\s*)` 夾帶換行**：`/^(\s*)ANCHOR$/m` 的 `^` 可能匹配到前一個空行的行首，`\s*` 再跨行吃掉換行，於是 `$1` 變成「換行 + 縮排」，用它組回去就會多出空行。作法：只想抓「行首縮排」時一律用 `[ \t]*` 而非 `\s*`；注入類的字串處理寫完務必實跑一次並逐行檢視產出（`print(f'{i:3} |{line}|')` 這種帶邊界符的輸出最容易看出多餘空行）。
+```markdown
+### YYYY-MM-DD — 一句話標題
 
-- **「設定寫了但沒有執行路徑」是本專案反覆出現的缺陷型態，加設定時要同時問「誰會執行它」**：一輪稽核就抓到四個同型問題——(1) `eslint.config.mjs` 有 `test/**` 規則區塊，但 `lint` 的 glob 是 `{src,scripts,seeds}`，該區塊從未生效；(2) PostToolUse hook 跑 `npx tsc --noEmit`，而 repo root 既無 `tsconfig.json` 也沒裝 typescript，每次只吐 npx 廣告；(3) CI 完全不跑 test / lint / typecheck，所有護欄只在本機生效；(4) 前後端都設了覆蓋率門檻，但 `pnpm test` 不帶 `--coverage`、web 甚至沒有 `test:cov`，四個門檻數字純屬裝飾。**共同特徵是「看起來有保護」——比完全沒有保護更危險**。作法：新增任何門檻 / 規則 / hook 時，明確寫出「哪個指令、哪個 job 會執行它」，並用探針驗證它真的會失敗；審查既有設定時，優先檢查執行路徑而非設定內容本身。
+**踩到什麼**：現象 / 錯誤訊息 / 做錯了什麼。
 
-- **功能完成當下就要回頭更新 `tasks/todo.md`，否則清單會反向誤導**：2026-08-14 稽核發現「安全強化」段落的兩條待辦（全域 JwtAuthGuard 預設拒絕、refresh token 重用連坐撤銷）其實都已實作完成，只是完成時沒回頭勾掉，導致清單失真近一個月。後果不只是不整潔——新 session 讀到會以為還沒做，可能重複實作，或誤判專案的安全現況。作法：`/opsx:archive` 或每塊實作收尾時，**先比對原始碼再更新 todo**，不要憑印象；懷疑某條待辦是否過時，直接 grep 關鍵實作（如 `APP_GUARD`、`tokenVersion`）確認，成本只有幾秒。
+**Why**：根因 — 哪個工具的哪個行為、哪個慣例造成。
+
+**How to apply**：下次遇到怎麼避免。
+```
+
+判準：**寫出來超過三行就改用三段式**。長 bullet 塞五百字讀不動，也找不到重點。
+
+## 工作流程 / 驗證方法
+
+### 2026-08-14 — 「設定寫了但沒有執行路徑」是本專案最常見的缺陷型態
+
+**踩到什麼**：一輪稽核抓到**七個**同型問題——`eslint.config.mjs` 的 `test/**` 區塊不在 lint glob 內、PostToolUse hook 跑的 `npx tsc` 在 root 根本跑不起來、CI 完全不跑 test/lint/typecheck、四個覆蓋率門檻沒有任何指令帶 `--coverage`、兩個 `.js` 設定檔不在任何檢查範圍、`gen:module` 產出物不符合新護欄、`overrides` 宣告在 pnpm 根本不讀的位置。
+
+**Why**：加設定的當下只想「規則內容對不對」，沒問「哪個指令會執行它」。這類缺陷**沒有任何工具會警告**，而且「看起來有保護」比完全沒有保護更危險——它讓人停止懷疑。
+
+**How to apply**：新增任何門檻 / 規則 / hook 時，明確寫出「哪個指令、哪個 job 會執行它」，並**插探針驗證它真的會失敗**。審查既有設定時，優先查執行路徑而非設定內容。三個高頻盲區：`.js` 設定檔（tsc 不掃、lint glob 常漏）、產生器產出物（架構測試掃不到「還沒產生的程式碼」）、文件裡的路徑與指令（重構後無人通知）。
+
+### 2026-08-14 — 反向驗證的還原步驟本身也要驗證
+
+**踩到什麼**：插探針驗證規則會不會紅，之後用 `cp backup.js target.js` 還原，指令跑完顯示 `overwrite? (y/n [n]) not overwritten`——**檔案根本沒還原**，是後續跑測試才發現。
+
+**Why**：多數環境把 `cp` alias 成 `cp -i`，非互動情境下互動提示會靜默變成「不覆寫」。
+
+**How to apply**：還原一律用 python 字串替換或 `git checkout --`，還原後**實際驗證**（跑一次該檔的載入或測試）。反向驗證的完整循環是「插探針 → 親眼看它紅 → 還原 → **確認 `git status` 乾淨**」，最後一步不能省。
+
+- **文件裡的路徑與指令要用機器驗證**：重構改了目錄或 script 名，文件不會有任何工具通知。作法：(1) regex 抓出文件所有 `` `apps/**` `` 路徑逐一 `exists()`；(2) 抓出提到的 `pnpm` script 逐一比對 `package.json`。一次就抓出 4 處過時（含存在一個月的 Swagger 網址）。
+- **JSDoc 裡不要寫含 `*/` 的 glob**（如 `test/**/*`）：`*/` 提前終止註解，整個檔案語法爆掉；若在 `.js` 設定檔更致命——`typecheck`／`lint` 都不掃，只有實際執行才炸。
+- **regex 的 `\s` 包含換行**：`/^(\s*)ANCHOR$/m` 的 `^` 可能匹配到前一空行行首，`\s*` 跨行吃掉換行，`$1` 就夾帶了換行。只想抓行首縮排時用 `[ \t]*`。
+- **完成當下就更新 `todo.md`**：曾有兩條安全待辦早已實作完成卻掛著近一個月，讓人誤判專案現況。收尾時**先 grep 原始碼再更新**，不要憑印象。
 
 ## Prisma / 資料庫
 
-- **修改 schema 後必須執行 `npx prisma generate`**：否則 `@prisma/client` 的 TypeScript 會找不到新 model，甚至 `PrismaClient` 型別報 "has no exported member"。
+- **軟刪除 model 的所有 read path 都要加 `deletedAt: null`**：`findUnique` 只接受 unique 欄位，要過濾軟刪得改用 `findFirst({ where: { id, deletedAt: null } })`。`count` 用於「是否還有相關紀錄」判斷時（如阻擋刪除有成員的角色）也要排除軟刪，否則永遠刪不掉。例外是「恢復」場景才用 `loadIncludingDeleted` 顯式 opt-in。
 
-- **Prisma v7 MariaDB adapter 用物件組態，不用 URL**：`new PrismaMariaDb({ host, port, user, password, database, timezone: 'Z' })`。URL 形式（`mysql://...?timezone=Z`）不被 v7 driver 穩定解析，且密碼含特殊字元會炸 URL parser。
+- **一次性 token 要原子 claim**：`validateToken + markUsed` 兩步驟之間有 bcrypt 雜湊，併發請求可雙雙通過。改用 Prisma extended where 在單一 UPDATE 同時檢查條件 + 標記使用（`update({ where: { token, usedAt: null, expiresAt: { gt: now } } })`），找不到 record 會丟 P2025。
 
-- **DB 時間一律 UTC**：`timezone: 'Z'` 已在 `prisma.service.ts` 設定；JS `Date` 寫入/讀回都當作 UTC，跨時區部署不會位移。
+- **P2002 要在 Repository 層轉成 domain exception**：`findByEmail + create` 存在競態。Repository 的 `create` 外層 try/catch，`err.code === 'P2002'` 時丟 domain exception；Service 層不該感知 Prisma 錯誤。
 
-- **MySQL 9 本機開發要設 `allowPublicKeyRetrieval: true`**：MySQL 9 預設 `caching_sha2_password`，非 TLS 連線冷快取下首次認證需向 server 取 RSA 公鑰；localhost dev 未啟用 TLS、不允許取回公鑰時會 `ER_CANNOT_RETRIEVE_RSA_KEY` 連不上。作法：`prisma.service.ts` 的 `PrismaMariaDb({ ... })` 加 `allowPublicKeyRetrieval: true`。生產走 TLS 時此選項無作用，安全上僅在無 TLS 的 MITM 情境有理論風險（dev/localhost 可接受）。
+- **MySQL 9 本機開發要設 `allowPublicKeyRetrieval: true`**：MySQL 9 預設 `caching_sha2_password`，非 TLS 連線冷快取下首次認證需向 server 取 RSA 公鑰，取不到會 `ER_CANNOT_RETRIEVE_RSA_KEY`。生產走 TLS 時此選項無作用。
 
-- **Prisma P2002 `unique constraint violation` 應在 Repository 層轉為 domain exception**：`findByEmail + create` 存在競態，Repository 的 `create` 外層 try/catch，`err.code === 'P2002'` 時 throw domain exception；Service 層不需感知 Prisma 錯誤。
-
-- **軟刪除 model 的所有 read path 都要加 `deletedAt: null`**：Prisma `findUnique` 只接受 unique 欄位，要過濾軟刪需改用 `findFirst({ where: { id, deletedAt: null } })`。`count` 用於「是否還有相關紀錄」判斷時（如 DeleteRoleService 阻擋有成員的角色）也要排除軟刪，否則永遠刪不掉。例外是「恢復」場景才用 `loadIncludingDeleted` 顯式 opt-in。
-
-- **PasswordResetToken 等「一次性 token」要原子 claim**：`validateToken + markUsed` 兩步驟之間有 bcrypt 雜湊（非阻塞 CPU 工作），併發請求可雙雙通過驗證。改用 Prisma extended where（`update({ where: { token, usedAt: null, expiresAt: { gt: now } } })` 在單一 UPDATE 同時檢查條件 + 標記使用），找不到 record Prisma 丟 P2025。
-
-- **密碼重設 token DB 只存 sha256 雜湊**：`randomBytes(32)` 產生原文，DB 存 `createHash('sha256')`，claim 時把輸入 hash 後比對；原文僅回傳給呼叫端寄信。token 是高熵隨機值，單向 hash 即足以防 DB 外洩反推，不需 bcrypt。
+- **Docker MySQL 剛啟動的前幾秒會 pool timeout**：容器要 5–30 秒才完整 ready，這段期間 Prisma adapter 建不起連線（`pool timeout after 10000ms`），但 mysql2 直連正常。等 10 秒重試即可。
 
 ## JWT / 認證
 
-- **LoginService 生成 token 時必須帶 `type: 'access'`**：`JwtAuthGuard` 有 `payload.type !== 'access'` 安全檢查，缺少此欄位會拒絕所有請求。`JwtPayload.type` 設為必填 union `'access' | 'refresh'`。
+- **簽 token 時必須帶 `type: 'access'`**：`JwtAuthGuard` 有 `payload.type !== 'access'` 檢查，缺這個欄位會拒絕所有請求。`JwtPayload.type` 設為必填 union。
 
-- **`REFRESH_SECRET` 必填且與 `ACCESS_SECRET` 不同**：optional 化會 fallback 到 JwtModule default secret（= ACCESS_SECRET），導致雙 secret 失去意義（access 洩漏 = refresh 也洩漏）。validate-env 一律 `z.string().min(32)` required，不要 optional。
+- **`REFRESH_SECRET` 必填且不可與 `ACCESS_SECRET` 相同**：optional 化會 fallback 到 JwtModule 的 default secret（= ACCESS_SECRET），雙 secret 失去意義（access 洩漏 = refresh 也洩漏）。
 
-- **`@nestjs/jwt` 的 `sign`/`verify` 會 merge module 的 `signOptions`/`verifyOptions`**：`issuer`/`audience` 只要在 `jwt.module` 設一次（`signOptions` + `verifyOptions` 各放一份），各呼叫點即使帶 per-call options（如 refresh 簽發/驗證用的 `secret`、`expiresIn`）也會自動套用同一組 iss/aud，不必每處重複。env 用 `JWT_ISSUER` / `JWT_AUDIENCE`（皆有預設值）。注意：**改 iss/aud 屬破壞性變更**——既有已簽發的 token 驗證會失敗，部署後所有使用者需重新登入。
+- **`@nestjs/jwt` 的 `sign`/`verify` 會 merge module 的 options**：`issuer`/`audience` 在 `jwt.module` 設一次即可，各呼叫點即使帶 per-call options（`secret`、`expiresIn`）也會套用同一組 iss/aud。注意**改 iss/aud 屬破壞性變更**——既有 token 全部失效，部署後所有人要重新登入。
 
-- **`/auth/forgot-password` 的時間差列舉是已知殘留風險**：email 不存在立刻 return（~10ms），email 存在要寫 DB + 寄 SMTP（~100ms-1s），攻擊者能用回應時間列舉註冊 email。已實作的緩解：`forgot-password` / `reset-password` 加 per-route 嚴格 `@Throttle({ limit: 3, ttl: 60s })`、回應改 `204` 不回 message、service log 不寫 email。要徹底消除得引入 queue（寫 + 寄都 fire-and-forget）或固定 delay，成本不划算，未來真有需求才做。
+- **`JwtAuthGuard` 的快取命中與 DB 查詢兩條路徑都要檢查 `member.status`**：只檢查一條的話，停用帳號的舊 JWT 在自然過期前仍可通行。
 
-- **refresh_token 放 localStorage 必搭配 rotation**：access_token 放 localStorage 可接受，但 refresh_token 一起放等於 XSS 一次拿到長效憑證。`/auth/refresh` 採 **rotation**：每次 refresh 同時發新 access + 新 refresh，舊 refresh 立刻 `tokenBlacklist.addToBlacklist`；攻擊者偷到 refresh 但晚於使用者下次 refresh → 舊 token 已黑名單 → 401。前端 `apiClient` 的 `refreshAccessToken` 要同步更新 storage。未來強化路線：refresh token family / reuse detection（需新增 DB 表），或改 httpOnly cookie + CSRF token。
+- **改動 member context 後必須清快取**：`status` / `roleId` / 密碼變更後要呼叫 `clearMemberContext(memberId)`，否則最長延遲 `PERMISSION_CACHE_TTL`（預設 300 秒）才生效。
 
-- **JwtAuthGuard 快取命中與 DB 查詢兩條路徑都要檢查 `member.status`**：停用帳號的舊 JWT 在自然過期前仍可通，兩條路徑都要 `if (!data.status) throw new AccountDisabledException()`。
-
-- **可變更 member context 的操作都要清除快取**：`status` / `roleId` / 密碼變更後必須呼叫 `clearMemberContext(memberId)`，否則最長延遲 `PERMISSION_CACHE_TTL` 秒（預設 300s）才生效。
+- **`/auth/forgot-password` 的時間差列舉是已知殘留風險**：email 不存在立刻 return（~10ms），存在則要寫 DB + 寄信（~100ms-1s），可被用來列舉註冊 email。已緩解：per-route `@Throttle({ limit: 3, ttl: 60s })`、回 204 不帶 message、log 不寫 email。要根除得引入 queue 或固定 delay，成本不划算。
 
 ## NestJS / HTTP 層
 
-- **Controller 只回傳原始值，不要自行 wrap**：`TransformInterceptor` 會把回傳值包成 `{ success, data, timestamp }`；Controller 若再包一層 `{ data }`（或 `{ message }`）會變成 `data.data`，測試與前端都要多挖一層。不需回傳內容的端點直接回 `void` + `@HttpCode(204)`。
+### 2026-07 — Express 5 的 Request augmentation 用 `declare module` 會 silent fail
 
-- **APP_GUARD 的 providers 順序 = 執行順序**：`app.module.ts` 裡 `{ provide: APP_GUARD, useClass: X }` 的宣告順序即套用順序。ThrottlerGuard → IpBlacklistGuard → IpWhitelistGuard → SessionIdleGuard 是刻意設計，新增 Guard 時注意位置。
+**踩到什麼**：要幫 `Request` 擴 `member` 欄位，照慣例寫 `declare module 'express-serve-static-core' { interface Request { … } }`。typecheck **通過**，但取用 `request.member` 仍報 `TS2339`。
 
-- **Express 5 下 literal 路由要避免被 `:id` 吃掉**：`@Patch('bulk-status')` 即使宣告在 `@Patch(':id')` 前，仍可能被 `:id` 先匹配。解法：用兩段式路徑（如 `bulk/status`），`:id` 只匹配單一 segment。
+**Why**：Express 5 的型別把 `Request` 宣告在 `declare global { namespace Express { … } }` 之內，**不是 module export**。對 module 做 augmentation 找不到目標介面，TS 不報錯、只是靜默無效。
 
-- **PATCH/PUT 預設回傳 200，要 204 需明確加 `@HttpCode(HttpStatus.NO_CONTENT)`**：只有 POST 預設 201，其他方法預設皆 200。
+**How to apply**：改用 global namespace 形式，檔尾加 `export {}` 讓 TS 視為 module，放在 `src/types/*-augment.d.ts`：
 
-- **`request.ip` 在反向代理後不可信，要明確設定 `trust proxy`**：Express 預設不採信 `X-Forwarded-For`，部署在 LB / 反向代理後 `request.ip` 會變成 proxy 內網 IP，導致 IP 黑名單失效、白名單誤判、登入失敗封鎖失準。用 env `TRUST_PROXY` 控制（預設 `'loopback'` = 安全、不採信外部 XFF），部署時依拓樸改為信任跳數（如 `'1'`）或具體 CIDR；**切勿用 `true`**（會無條件採信偽造的 XFF）。封鎖類 Guard（IP 黑名單）取不到 IP 時應 fail-closed（拒絕）而非放行。
-
-- **Express 5 的 Request augmentation 要用 `declare global { namespace Express }`，不要用 `declare module 'express-serve-static-core'`**：Express 5 的 `@types/express-serve-static-core` 把 `Request` 宣告在 `declare global { namespace Express { interface Request {} } }` 之內，不是 module export，所以擴自定欄位（如 `JwtAuthGuard` 掛上的 `member: MemberContext`）要走 global namespace augmentation：
-
-  ```ts
-  declare global {
-    namespace Express {
-      interface Request {
-        member?: MemberContext;
-      }
-    }
+```ts
+declare global {
+  namespace Express {
+    interface Request { member?: MemberContext }
   }
-  export {};
-  ```
+}
+export {};
+```
 
-  寫 `declare module 'express-serve-static-core' { interface Request { ... } }` 會 **silent fail**（typecheck 過但 augmentation 不生效，`request.member` 仍報 `TS2339: Property 'member' does not exist on type 'Request'`）。作法：在 `apps/api/src/types/*-augment.d.ts` 用 global namespace 形式擴 Request，檔案結尾加 `export {}` 讓 TS 視為 module；tsconfig 的 `include: ["src/**/*"]` 會自動載入。
+- **Express 5 下 literal 路由會被 `:id` 吃掉**：`@Patch('bulk-status')` 即使宣告在 `@Patch(':id')` 之前仍可能被後者先匹配。解法：用兩段式路徑（`bulk/status`），`:id` 只匹配單一 segment。
 
-## Domain Exception / GlobalExceptionFilter
+## Domain Exception / 錯誤處理
 
-- **型別能保證的完整性，不要退回用測試檢查**：錯誤碼與訊息表的對應用 `as const satisfies Record<ResponseCode, string | ((...args: never[]) => string)>` 約束——新增 code 卻忘了補訊息，`pnpm typecheck` 當場失敗（`TS1360: is missing the following properties`），回饋在編輯器裡即時出現，不必等跑測試。作法：訊息表用 `satisfies`（不要用型別註記，否則動態訊息的參數型別會被抹成 `never[]`）；「靜態 / 動態」的分類也從表推導成 `StaticResponseCode`，不要手工維護第二份清單。架構測試只做型別擋不住的部分（例如「有沒有人繞過常數寫字面值」）。
+- **型別能保證的完整性，不要退回用測試檢查**：錯誤碼與訊息表用 `as const satisfies Record<ResponseCode, …>` 約束，新增 code 忘了補訊息當場 `TS1360`，回饋即時出現在編輯器。用 `satisfies` 而非型別註記（後者會把動態訊息的參數型別抹成 `never[]`）；「靜態／動態」的分類也從表推導，不要手工維護第二份清單。架構測試只做型別擋不住的部分。
 
-- **建構子重載可以把「哪些情況必須傳參數」寫進型別**：`DomainException` 兩個重載——`(code: StaticResponseCode, kind)` 與 `(code: ResponseCode, kind, message: string)`——讓靜態訊息的子類只傳兩個參數（基底自表中取），需要參數的訊息漏傳時直接編譯失敗（`TS2345: not assignable to 'StaticResponseCode'`），不會出現「函式被當成訊息字串」的執行期怪象。作法：實作簽名的 fallback 分支雖不可達也別留空字串，取 code 本身較安全；重載寫完務必用探針驗證「該擋的真的擋、該過的真的過」。
+- **建構子重載可以把「哪些情況必須傳參數」寫進型別**：`DomainException` 兩個重載讓靜態訊息只傳 `(code, kind)`，需要參數的訊息漏傳直接 `TS2345`，不會出現「函式被當成訊息字串」的執行期怪象。實作簽名的 fallback 分支雖不可達也別留空字串（取 code 本身較安全）；重載寫完務必用探針驗證「該擋的擋、該過的過」。
 
-- **value object 要分「驗證新輸入」與「還原已持久化資料」兩條路徑**：`of()` 驗證並拋 `INVALID`（400），`trusted()` 不驗證、供 `reconstitute` 使用。若還原路徑也跑驗證，DB 資料損毀會被回報成 400（客戶端輸入錯誤），但客戶端根本沒做錯——那是 500 的情境。作法：`Member.reconstitute` 一律走 `trusted()`；改動這類設計時記得既有測試可能正在保護舊行為（本專案就有一支「reconstitute 無效 UUID → 拋錯」需要改寫為「不重複驗證」）。
-
-- **domain exception 一律 `extends DomainException(code, kind)`，filter 靠 `kind → status` 自動映射，新增例外不用改 filter**：每個 domain exception：(1) `src/domain/exception/` 檔 `extends DomainException`，`super(ResponseCodes.XXX, '<kind>', message)`；(2) code 加進 `src/shared/constants/response-codes.ts`；(3) 選 kind（`NOT_FOUND/UNAUTHORIZED/FORBIDDEN/INVALID/CONFLICT/LOCKED/INTERNAL`），`GlobalExceptionFilter` 的 `KIND_TO_STATUS` 表自動給 HTTP status——**不再需要在 filter 加 instanceof / map**（舊做法：filter 維護一張隨例外數膨脹的 `DOMAIN_EXCEPTION_MAP`，已廢除）。Repository 層不要讓 Prisma 原生錯誤（P2025 等）冒泡到 service，轉成明確的 domain exception。
+- **value object 要分 `of()` 與 `trusted()` 兩條路徑**：`of()` 驗證新輸入並拋 `INVALID`（400）；`trusted()` 不驗證，供 `reconstitute()` 從 DB 還原使用。還原路徑若重跑驗證，**資料損毀會被回報成 400**（客戶端輸入錯誤），但客戶端根本沒做錯——那是 500 的情境。改這類設計時注意既有測試可能正在保護舊行為。
 
 ## 測試
 
-- **寫 spec 前一定先 Read 受測檔的真實簽章，不要憑模式猜**：常見誤判——`execute({ id })` 其實是 `execute(id: string)`、repo 回 `{ list, meta }` 其實是 `{ data, total }`（轉換在 service）、建構子參數順序、元件 / helper 名稱。作法：每個 spec 動筆前先讀「受測 class/function 本體 + 它呼叫的 port interface + in-port Command 型別」三者；委派型 service 要確認回傳是原樣轉發還是有 map 轉換。
+### 2026-07 — 物件組態的 Prisma 跑真 DB e2e：runtime 與 migrate CLI 吃的組態不是同一套
 
-- **`jest.clearAllMocks()` 不清 mock implementation，throw 會洩漏到後續測試**：`mockImplementation(() => { throw ... })` 設的錯誤，`clearAllMocks` 只重置呼叫紀錄、不還原 implementation，後面的 test 會繼續 throw。作法：一次性行為用 `mockImplementationOnce` / `mockResolvedValueOnce`；或 `beforeEach` 用 `mockReset()`（會清 implementation）而非 `clearAllMocks()`。
+**踩到什麼**：runtime 用 `PrismaMariaDb({ host, user, password, database })` 物件組態（無 `DATABASE_URL`），但 e2e 的 `global-setup` 要跑 `prisma migrate deploy` 建測試庫的表——**CLI 只吃 `DATABASE_URL`**。
 
-- **`mockResolvedValueOnce` 佇列沒被消費完會洩漏到後續測試（莫名 500 / 狀態碼錯亂）**：`clearAllMocks()` 不清 once 佇列。SUT 改查詢方法（如 `isLocked` 從 `findUnique` 改 `findFirst`）後，原本餵給它的 `findUnique.mockResolvedValueOnce(...)` 變孤兒，殘留值被「下一個剛好呼叫 `findUnique` 的測試」吃掉、回傳缺欄位物件導致 mapper crash。作法：改 SUT 查詢方法時全文搜尋相關測試的 `mockResolvedValueOnce` / `mockReturnValueOnce`，確認每個 once 仍會被消費；改 `findFirst` 的就把 mock 也改 `findFirst`，別留孤兒。
+**Why**：Prisma 7 的 driver adapter 與 CLI 是兩條路徑，adapter 走程式碼傳入的物件、CLI 走環境變數，互不相通。
 
-- **coverage 門檻聚焦邏輯層，用 `coveragePathIgnorePatterns` 排除 wiring/DTO**：`*.module.ts`、`main.ts`、`*Controller.ts`、`*Request.ts`、`*Query.ts`、`port/`、`facade/`、`adapter/out/`、`validate-env.ts` 屬 wiring / 宣告 / 已由 e2e 涵蓋，納入只會稀釋數字、逼著為 DI 配線寫無意義測試。作法：後端 jest 設 `coveragePathIgnorePatterns` 排除上述再設 `coverageThreshold`（本專案 70/60/70/70）；前端 vitest 的 coverage `include` 只列可獨立單測的純函式 + 共用元件，排除需 Router / api-client context 的組合層（pages、與 /me 整合的 hooks）。
+**How to apply**：(1) `helpers/e2e-env.ts` 從真 `.env` 載帳密；(2) **守門**：斷言 `DB_TEST_DATABASE` 名稱含 `test`，不含就 throw（防打到正式庫），通過才覆寫 `DB_DATABASE`；(3) `global-setup.ts` 建庫後 `execSync('pnpm exec prisma migrate deploy', { env: { …, DATABASE_URL: '…' } })` 現組 URL 給 CLI。用 **`pnpm exec` 而非 `npx`**（monorepo 下 npx 抓不到 workspace bin）。帳密只在 runtime 從 `.env` 讀，絕不寫進任何檔案。
 
-- **Guard 邏輯變更後，spec mock payload 必須同步更新**：mock `jwtService.verify` 回傳值若缺少 `type: 'access'`，測試直接失敗且錯誤訊息會誤導排查。
+### 2026-07 — e2e 過不了 `@Roles(SUPERADMIN)`：JWT payload 裡根本沒有 roleCode
 
-- **Zod v4 的 `z.string().uuid()` 嚴格 RFC 4122**：測試 UUID 不能用 `00000000-0000-0000-0000-000000000010`（版本/變體皆 0），要改成合法 v4 形式如 `00000000-0000-4000-8000-000000000001`。
+**踩到什麼**：`SecurityController` 掛 `@Roles('SUPERADMIN')`，e2e 用 admin 帳號登入卻一直 403。
 
-- **e2e 跑完 Jest worker 卡住 → `forceExit: true`**：`pino-roll` file stream 在 `app.close()` 後仍持有 handle。在 `test/jest.e2e.config.js` 加 `forceExit: true`；各 spec 的 `afterAll(() => app.close())` 仍需保留。
+**Why**：`JwtPayload` 刻意輕量只存 `sub`，`request.member.roleCode` 是 `JwtAuthGuard` **每個 request 從 DB 撈的**。seed 的 role 沒設 `roleCode`，guard 撈到的自然不是 `SUPERADMIN`。
 
-- **新增 Port 方法會讓既有 mock spec 報 TypeScript 錯誤**：擴充 port interface 時要同步在所有相關 spec 的 mock 物件補上 `jest.fn()`，否則 compile fail。
+**How to apply**：`seedMember` / `seedRole` 開 `roleCode?` 參數。注意 **roleName（顯示名「管理者」）與 roleCode（權限碼）是兩回事**，gate 比對的是後者。
 
-### 真 DB e2e（object-config Prisma）
+### 2026-08-14 — 靜態掃描型的架構測試有兩種「假綠」
 
-- **物件組態 Prisma（無 `DATABASE_URL`）跑真 DB e2e：env 層覆寫 `DB_DATABASE` 到 `*_test` 庫、守門庫名含 `test`、`global-setup` 才組 `DATABASE_URL` 給 migrate CLI**：runtime 用 `PrismaMariaDb({ host, user, password, database })` 物件組態，但 `prisma migrate deploy` CLI 只吃 `DATABASE_URL`。作法：`helpers/e2e-env.ts` 從真 `.env` 載 DB 帳密（`config({ path: '../../.env' })`）→ 斷言 `DB_TEST_DATABASE` 名稱含 `test`（不含就 throw，防打到正式庫）→ `process.env.DB_DATABASE = 測試庫`；`global-setup.ts` 用 mysql2 `CREATE DATABASE IF NOT EXISTS` 後 `execSync('pnpm exec prisma migrate deploy', { env: { ...process.env, DATABASE_URL: 'mysql://user:pw@host:port/testdb' } })`（**`pnpm exec` 非 `npx`**，monorepo 下 npx 抓不到 workspace bin）。`.env*` 受權限保護不可改，帳密只在 runtime 從 `.env` 讀，絕不寫進任何檔案 / commit。
+**踩到什麼**：(1) 規則寫好跑起來全綠，實際上因為 controller 命名是 `XxxController.ts` 而非 `xxx.controller.ts`，glob 掃到 **0 個檔案**；(2) 違規修掉後豁免清單忘了刪，白名單單向膨脹成無人維護的例外清冊。
 
-- **mock 斷言 spec 轉真 DB：`toHaveBeenCalledWith` → 真 seed + 查庫斷言；P2025 模擬 → 真的打不存在的 id**：原本 `expect(mockPrisma.x.update).toHaveBeenCalledWith(...)` 改成先 `prisma.x.create` seed、呼叫 API、再 `prisma.x.findUnique` 驗證落庫值；原本手動 `Object.setPrototypeOf(err, Prisma.PrismaClientKnownRequestError.prototype)` 模擬「更新不存在 → P2025 → 404」的 case，真庫直接 PATCH 一個不存在的 UUID 即可（repo 的 `update` 自然丟 P2025 → 映射 404），程式更短更真。每個 spec `beforeEach` 先 `resetDb`（依 FK 序 deleteMany）再 seed，序列執行（`maxWorkers:1`）避免互相 race。
+**Why**：「沒有違規」與「沒有掃到東西」在斷言上長得一模一樣。
 
-- **真 DB e2e 過 `@Roles(SUPERADMIN)` gate：JWT payload 不含 roleCode，靠 seed 的 role.roleCode + JwtAuthGuard 每次查 DB 補上**：`JwtPayload` 輕量只存 `sub`，`request.member.roleCode` 是 `JwtAuthGuard` 每個 request 呼叫 `loadMemberContext(sub)` 從 DB 撈的。所以 SecurityController 這種 `@Roles(SUPERADMIN)` 端點，seed admin 時必須把 role 的 `roleCode` 設成 `'SUPERADMIN'`（`APPLICATION_ADMIN_ROLE_ENABLED` 預設 `'true'`，e2e 未覆寫故 RolesGuard 生效）。作法：`seedMember` / `seedRole` 開 `roleCode?` 參數傳進 `prisma.role.create`；roleName（顯示名「管理者」）與 roleCode（權限碼 `SUPERADMIN`）是兩回事，gate 比對的是後者。
+**How to apply**：每條規則加 `expect(files.length).toBeGreaterThan(0)`，並驗證每筆豁免在原始碼中**確實仍存在**。新增規則後一律「插違規探針 → 親眼看它紅 → 移除 → 確認 `git diff` 乾淨」。
 
-- **Redis 仍 mock 時，限流 429 與黑名單在真 DB e2e 中不會誤觸**：throttle 計數走 `redis.throttleIncrement`（mock 回 `1`）、token 黑名單走 `redis.isTokenBlacklisted`（mock 回 `false`），故轉真 DB 後 KGIE 那條「ThrottlerGuard 429 要關 env」的坑在本專案自動迴避，唯一要主動測 429 的 case 才 `mockResolvedValue(1_000_000)`。也因全域 guard（APP_GUARD）此路徑不需 `.overrideGuard`。
+- **掃描原始碼的規則要先剝註解**：以「引號 + 中文字元」偵測硬編文案時，TSDoc 裡的 markdown 反引號（`` `code` `` 後接中文）會被當成字串字面值，一次誤判 4 處。**OpenAPI yaml 更是完全不能用 regex 解析**——多行 `description: |` 區塊裡的文字會被當成 path / method 節點，曾得出「35 條路由全部不同步」的荒謬結果（**極端結果本身就是 bug 的訊號**）。yaml 一律用 `js-yaml`。
+- **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔即可判定的 import 邊界交給 eslint（快、IDE 即時）；跨檔語意（錯誤碼註冊、死碼、env 宣告）交給架構測試。**型別能保證的完整性兩者都不用寫**（如「用到不存在的常數」TypeScript 已免費擋掉）。
+- **寫 spec 前先 Read 受測檔的真實簽章，不要憑模式猜**：常見誤判——`execute({ id })` 其實是 `execute(id)`、repo 回 `{ list, meta }` 其實是 `{ data, total }`（轉換在 service）、建構子參數順序。動筆前先讀「受測 class + 它呼叫的 port interface + in-port Command 型別」三者。同理，Guard 邏輯或 Port 介面變更後，既有 spec 的 mock payload / mock 物件要同步更新，否則錯誤訊息會誤導排查方向。
+- **`jest.clearAllMocks()` 不清 mock implementation**：`mockImplementation(() => { throw … })` 設的錯誤會洩漏到後續測試。一次性行為用 `mockImplementationOnce` / `mockResolvedValueOnce`，或改用 `mockReset()`。
+- **`mockResolvedValueOnce` 佇列沒被消費完也會洩漏**：`clearAllMocks()` 不清 once 佇列。改了 SUT 的查詢方法（`findUnique` → `findFirst`）後，原本餵的 once 值變孤兒，會被「下一個剛好呼叫該方法的測試」吃掉，症狀是莫名 500 或狀態碼錯亂。改查詢方法時全文搜尋相關的 `*Once` 確認都會被消費。
+- **mock 斷言的 spec 轉真 DB 後會變短也變真**：`toHaveBeenCalledWith(...)` → 先 seed、呼叫 API、再查庫驗證**落庫值**；「更新不存在 → P2025 → 404」不必手動 `setPrototypeOf` 偽造錯誤，真庫直接 PATCH 一個不存在的 UUID 即可。每個 spec `beforeEach` 先 `resetDb`（依 FK 序）再 seed，序列執行避免 race。
+- **Zod v4 的 `z.string().uuid()` 嚴格檢查 RFC 4122**：測試 fixture 用 `00000000-0000-0000-0000-000000000001` 這種會被拒（version nibble 不合法），要用 `…-4000-8000-…` 這類合法值。
+- **e2e 跑完 Jest worker 卡住 → `forceExit: true`**：Nest app 關閉後仍有 handle 未釋放（Redis mock、Prisma 連線池）。
+- **Redis 仍 mock 時，限流與黑名單在真 DB e2e 中不會誤觸**：`throttleIncrement` 回固定值，序列連跑不會累計到 429；改成真 Redis 時要重新評估。
 
-- **靜態掃描型的架構測試必須自帶「掃描數 > 0」與「豁免過期」兩道自我檢查**：這類測試有兩種假綠——(1) 目錄改名或命名慣例不同導致掃到 0 個檔案，測試回報「無違規」；(2) 違規修掉後豁免忘了刪，白名單單向膨脹成無人維護的例外清冊。本專案實例：controller 命名是 `XxxController.ts`（PascalCase）而非 `xxx.controller.ts`，照後者寫 glob 會掃到 0 個檔案且全綠。作法：每條規則加 `expect(files.length).toBeGreaterThan(0)`；每筆豁免都驗證它在原始碼中確實仍存在；新增規則後一律「插違規探針 → 親眼看它紅 → 移除探針 → 確認還原乾淨（`git diff` 應為空）」，沒看過紅的架構測試等於沒證明任何事。
+## 建置 / 工具鏈
 
-- **OpenAPI yaml 絕不可用 regex 解析**：`docs/swagger/**/*.yaml` 有大量多行 `description: |` 區塊，區塊內的文字（含以 `/` 開頭的行、`get:` 這類字樣）會被當成 path / method 節點。第一版比對腳本因此得出「35 條路由全部不同步」的荒謬結果——**極端結果本身就是 bug 的訊號**，不要當成真發現。作法：用 `js-yaml`（已在 lockfile 中，提升為 `apps/api` 直接 devDependency）；比對路由時記得補上 `servers[0].url` 的 pathname（OpenAPI 的 `paths` 是相對 base 的），並把 NestJS 的 `:id` 正規化成 `{id}`。
+- **`tsBuildInfoFile` 必須放在 dist 內**：`nest-cli.json` 的 `deleteOutDir: true` 每次 build 刪整個 dist，但 `.tsbuildinfo` 預設在 root 不會被清 → TS 以為「沒變動 = 不用 emit」→ build 完 dist 是空的、啟動失敗。設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`；遇到「改了 code 卻沒重編」先刪它。
+- **`preserveWatchOutput: true`**：否則 `tsc --watch`（含 `nest start --watch`）用 alternate screen buffer，每次重建會吃掉終端 scrollback，先前的 Vite ready URL 等輸出全消失。
+- **Husky pre-commit 在 nvm 環境找不到 pnpm**：nvm 的 node/pnpm 只在互動 shell 載入後才進 PATH，git commit 的子 shell 不一定繼承。`.husky/pre-commit` 開頭加 `command -v pnpm || . "$HOME/.nvm/nvm.sh"`。
+- **api 的 `lint` 必須先 `db:generate`**：client 未生成時 Prisma 回傳被推成 `any`，`recommendedTypeChecked` 會噴大量假陽性（`no-unsafe-call`、`require-await`）。加 `"prelint": "pnpm db:generate"`。注意 lint-staged 直接呼叫 `eslint --fix` 不走 pre 腳本。
+- **Monorepo 共用 ESLint 基底不能含 tseslint 預設集**：api 走 `recommendedTypeChecked`、web 走 `recommended`，兩者都會註冊 `@typescript-eslint` 外掛；基底再帶一組會觸發 `ConfigError: Cannot redefine plugin`。基底只放 `ignores` + `js.configs.recommended` + 家規（家規以 named export 交由各 workspace **在自己的 tseslint 預設之後**最後套用，否則 `no-explicit-any` 會被蓋回 error）。
+- **type-aware lint 對 ORM 邊界 / jest mock / seed 腳本要分區關掉 `no-unsafe-*`**：這些地方天生 `any`，全開會爆數百個假訊號淹沒真發現（本專案 524 → 9）。核心層（application / domain / infrastructure）維持全嚴格，floating-promise 這類真問題才浮得出來。
+- **`.prettierignore` 相對「執行目錄」解析，不是逐檔就近**（與 `.prettierrc` 不同）：所以 `format` / `format:check` 必須放**根**並從 repo root 跑才吃得到。根 ignore 必排除手寫繁中文件（`**/*.md`，否則 openspec / README 被 reflow）、工具生成檔（`schema.ts`、swagger bundle）、`prisma/migrations`。
 
-- **以「引號 + 中文字元」偵測硬編文案，會被 TSDoc 的 markdown 反引號誤判**：`/['"\`][^'"\`]*[一-鿿]/` 掃 exception 檔時，註解裡的 `` `code` 與語意 `kind` `` 這種寫法會被當成字串字面值，導致 4 處假陽性。作法：比對前先跳過註解行（`/^\s*(\/\/|\/\*|\*)/`）；更廣義地說，任何「掃原始碼字串字面值」的規則都要先剝註解，別假設註解裡不會出現引號。
+### 2026-08-14 — eslint flat config 中同名規則是「後蓋前」，不會合併 patterns
 
-- **架構測試與 lint 的分工判準是「eslint 表達得了嗎」**：單檔就能判定的 import 邊界交給 eslint（快、IDE 即時、可 autofix 提示）；跨檔語意（錯誤碼有沒有註冊、有沒有死碼、env 有沒有進 schema）交給架構測試。另外「用到不存在的常數」不必寫檢查——TypeScript 已免費保證，架構測試只該做型別擋不住的部分（例如繞過常數直接寫字面值）。
+**踩到什麼**：`no-restricted-imports` 拆成多個區塊各給一組 `patterns`，結果 admin 目錄下的 controller 該同時受「不得碰持久層」與「不得相依 front」兩條約束，**實測只有後者生效**，前者靜默失效而 lint 全綠。
 
-## NestJS build
+**Why**：同時匹配多個區塊的檔案，該規則只吃**最後一個**區塊的設定，先前的整包被覆蓋。
 
-- **tsconfig 設 `preserveWatchOutput: true`，否則 `tsc --watch` 會吃掉終端 scrollback**：tsc 預設用 alternate screen buffer，watch 每次重建會整個替換畫面，先前輸出（如 `[web]` 的 Vite ready URL）消失且無法往上 scroll。作法：monorepo 內任何用 `tsc --watch` 的 workspace（含 `nest start --watch`）都設 `"preserveWatchOutput": true`。
-
-- **`tsBuildInfoFile` 必須放在 dist 內**：`nest-cli.json` 的 `deleteOutDir: true` 每次 build 會刪整個 dist，但 `incremental` 的 `.tsbuildinfo` 預設在 root 不會被清，TS 以為「沒變動 = 不用 emit」→ build 完 dist 是空的、啟動 `dist/main` 失敗。作法：`apps/api/tsconfig.json` 設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`；遇到「改了 code 卻沒重編」先刪 `.tsbuildinfo` 重跑。
-
-## Git hooks / Husky
-
-- **Husky pre-commit 在 nvm 環境下找不到 pnpm，要主動 source `nvm.sh`**：nvm 安裝的 node / pnpm 只在互動 shell 載入 nvm 後才進 PATH，git commit 的子 shell 不一定繼承，hook 跑 `pnpm lint-staged` 會 `command not found`。作法：`.husky/pre-commit` 開頭加 `if ! command -v pnpm >/dev/null 2>&1; then [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"; fi`（非 nvm 用戶這條 if 直接跳過）。
-
-## Docker / 本機服務
-
-- **Docker MySQL 容器剛啟動的前幾秒，Prisma adapter 連線池會 pool timeout**：容器要 5–30 秒才完整 ready，這段過渡期 Prisma 7 mariadb adapter 建不起連線（報 `pool timeout ... after 10000ms`），但 mysql2 直連、`docker exec` 都正常。作法：看到 pool timeout 先等 10 秒重試；要徹底解可加 `wait-on tcp:3306` 或 retry，但 dev 影響不大不值得。
-
-## 外部服務 / Redis
-
-- **所有外部服務呼叫都要設 timeout**：recaptcha 用 `fetch(..., { signal: AbortSignal.timeout(5000) })`；nodemailer `createTransport` 設 `connectionTimeout` / `greetingTimeout` / `socketTimeout`；AWS S3 用 `client.send(cmd, { abortSignal: AbortSignal.timeout(ms) })`；firebase-admin 不支援 AbortSignal，用 `Promise.race` 加逾時上限。沒 timeout 時單一外部服務變慢會耗盡連線池 / event loop、拖垮整個 API。
-
-- **Redis client 設 `socket.connectTimeout` + `pingInterval`**：`isOpen` 只看連線旗標，偵測不到 half-open（socket 開著卻無回應）；half-open 時指令會 hang 到 client 自己 timeout。`pingInterval` 定期送 PING 偵測並觸發 reconnect。token 黑名單採 fail-closed（Redis 斷線拋 503，不放行已登出 token）。
-
-## 前端 / TanStack Query infinite
-
-- **`useInfiniteQuery` 不會走 `useApiQuery` 的 envelope unwrap，要手動呼叫 `unwrapEnvelope`**：`useApiQuery` / `useApiMutation` 內部會剝開 `{ success, data, timestamp }`；但自寫 `useInfiniteQuery` 的 `queryFn` 用 `apiClient.GET(...)` 不經過 unwrap，`lastPage.list` 會是 undefined（實際是 `{ success, data: { list, meta } }`）。作法：把 `unwrapEnvelope` 從 `@app/api-client` export，自寫 `queryFn` 在 return 前呼叫一次。
-
-## API endpoint 設計
-
-- **「分頁列表」與「按 id 取單筆」是同一 capability 的兩個 endpoint，不要借用其他模組同資料的 endpoint**：Combobox 編輯要顯示「不在第一頁的角色」名稱，`GET /api/roles/:id` 看似夠用但需 `BACKEND:ROLE:VIEW`，只有 `BACKEND:ACCOUNT:VIEW` 的會員管理者打不到。作法：同資料但「呼叫情境不同 = 權限模型不同」時，開薄的窄化 endpoint（如 `GET /api/members/role/options/:id`，沿用會員管理權限），不要借別模組。
-
-## Zod / 後端 validation
-
-- **`z.coerce.boolean()` 對字串 `'false'` 會 coerce 成 `true`，list query 不要用**：coerce 底層走 JS `Boolean()`，非空字串皆 truthy，`?status=false` 會被變成 `true`。作法：query 的 boolean filter 一律用 `z.enum(['true', 'false']).optional().transform((v) => v === undefined ? undefined : v === 'true')`，Swagger 配 `enum: [true, false]`，client 只送這兩個值。
-
-## Hexagonal 架構慣性
-
-- **不要讓 Facade 直接呼叫 Out Port、跳過 UseCase / Service 層**：少了 service 層，domain 規則（IP 正規化、unlock 前狀態檢查等）沒地方放，只能擠 facade 或 controller。作法：新模組從一開始就完整四層 `Controller → Facade → UseCase → Service → Port`；admin / management 類即使動作簡單，service 層佔位也保留（未來補 domain rule 零摩擦）。
-
-- **`@Roles` / RolesGuard 受 feature flag 控制，要注意爆炸半徑**：`RolesGuard` 在 `adminRoleEnabled` 關閉時一律放行，會讓所有 `@Roles` 端點（如 SecurityController 的 IP 黑白名單、帳號解鎖）對任何已登入者開放。生產環境由 validate-env 強制 `adminRoleEnabled=true`（關閉即 `process.exit(1)`）守住；dev 關閉時 security 模組形同不設防，勿在共用環境關閉。
-
-## 前後台分層 (admin/front)
-
-- **兩套 API 只切 in 側 5 層,out 側 + domain + 橫切共用**：後台 `admin/`（`/api/admin/*`）、前台 `front/`（`/api/front/*`）。切分只在 controller / facade / service / port-in / module（各進 `<side>/`）；persistence / port-out / domain（model・VO・exception）/ guard・filter・interceptor・decorator 一律共用、照 domain 放各層根目錄。中性 infra module（health/redis/jwt…）留 `modules/` 根。前台 module 類名加 `Front` 前綴避免與後台同名在 app.module 撞名（controller/service/facade 類名不需，因只在自己 module 內 import）。
-
-- **搬整包資料夾深一層 = 兩個正交轉換,可腳本化 + typecheck 把關**：把 flat 結構搬進 `<side>/` 時，(1) 全域把 `<side>/` 段插進「指向 in 側各層」的 import 路徑（`adapter/in/web/<name>/`、`facade/<Name>Facade`、`service/<name>/`、`port/in/<name>/`、`modules/<name>.module`；**不碰** `port/out`、`persistence`、`domain`、`infrastructure`）；(2) 被搬檔的每個 `../` import 各 +1 層（`from '../` → `from '../../`）。兩者位置正交（段在中間、深度在前綴），先 (1) 後 (2)。**坑**：`jest.mock('../…')` 是字串字面量、TS 不當 module 解析，typecheck 過但 jest 執行期掛，(2) 的深度 +1 要一併涵蓋 jest.mock/require 的路徑字串（見 [[測試]]）。`git mv` 保留歷史；rename 偵測門檻內容改太多會顯示成 D+A（非掉檔）。
-
-- **swagger 分兩份用 `serveFiles`(非共用 `swaggerUi.serve`)各綁各的 doc**：swagger-ui-express 的 `serve` 有 module 級共用狀態，兩份 UI 掛不同路徑時第二份會載到第一份的 spec。作法：`swaggerUi.serveFiles(doc, opts)` + `swaggerUi.setup(doc, opts)` 每份各一，掛 `/api/admin/docs`、`/api/front/docs`；`swagger:bundle` 打前後台兩份 bundle。
-
-- **api-client 切 `/api/admin` 前綴,靠 baseUrl 承載、path key 不動 → 呼叫端零改**：openapi-typescript 用 yaml 的 **path key**（`/auth/login`）當 schema key，不看 `servers`。所以把 swagger `servers` 改 `/api/admin`、yaml path key 維持 `/auth/login`，重生 schema.ts 內容不變（僅移除中性的 `/health`）；apps/web 只改 `createApiClient` 的 baseUrl `/api`→`/api/admin`，`apiClient.POST('/auth/login')` 全不動。health 是 ops 中性端點（`/api/health`），不入 admin 契約、從 client swagger 移除。
-
-## 模組產生器 / gen:module
-
-- **新後端模組用 `pnpm --filter @app/api gen:module <name> [--admin|--front]` 產骨架,不要手刻**：產生器 `apps/api/scripts/gen-module.ts`（單檔內嵌模板 map，token 用 `%name%`/`%Name%`/`%NAME%`/`%names%`/`%Names%`/`%NAMES%`/`%camelName%`）一次產出最小 CRUD 六角骨架（port in/out、5 service + spec、facade、controller + Zod DTO、Prisma repo、NotFound exception、module）並自動接線 `app.module` imports 與 `GlobalExceptionFilter` 的 `DOMAIN_EXCEPTION_MAP`（NotFound→404）。冪等 skip-if-exists（`--force` 覆寫），錨點找不到會警告降級不中斷。**邊界**：`Prisma<Name>Repository` 依賴 schema.prisma 的 `<Name>Record` model（欄位 id/name/status/createdAt/updatedAt/deletedAt），要先建 model + `db:generate` 才 typecheck 過（其餘 23 檔立即乾淨）；欄位僅佔位 `name`/`status`，產完依實際欄位調整 DTO/port/service/repo。前端 CRUD 頁不在產生範圍。
-
-- **`--admin`/`--front` 用「執行期轉換」實作,模板保持扁平**：模板仍寫扁平路徑（如 `adapter/in/web/%name%/`），產生器在寫檔時對「in 側」檔案套上與搬移同款轉換——path 插 `<side>/`、內容把指向 in 側各層的 import 插 `<side>/` + 深度 +1、`@Controller('<names>')` 加 `<side>/` 前綴、前台 module 類名換 `Front<Name>Module`；out 側 / domain 模板原樣輸出。判斷 in 側用 layer 前綴白名單（`adapter/in/web/`、`application/{facade,service,port/in}/`、`modules/`）。`app.module` 註冊：後台掛 `AuthModule,` 後、前台掛 `PingModule,` 後。**驗證產生器**：產一個 admin + 一個 front 模組，typecheck 後**只有 `Prisma<Name>Repository` 因缺 model 報錯、其餘全綠**即證明兩側 import 深度正確；驗完 `git clean -fd` + `git restore app.module/GlobalExceptionFilter` 清測試產物。
-
-## OpenSpec workflow
-
-- **propose 階段先核對 API contract，不要假設「list 有的欄位 update 也支援」**：例如 role 的 GET 回應有 `status`，但 `PATCH /api/roles/:id` 的 DTO / service 沒處理 `status`，誤判成「純前端 change」會在動工後才發現要連動改後端 + Swagger + api-client + spec + e2e。作法：寫 proposal / design 前先讀 `adapter/in/web/<module>/{Create,Update}*Request.ts` 與對應 service，把每個前端互動點對應到後端 endpoint 與 DTO 欄位；缺欄位的擴充列為 Modified / ADDED 並排在「前端開動前」phase。
-
-- **archive commit body 必須列出新建 / 修改的 master spec，不要只有標題**：`openspec-archive-change` 只搬資料夾、合併 spec，commit message 看不到動了哪些 spec，未來 `git log` 難追「某 capability 何時定義 / reqs 變動」。作法：archive commit 用此樣板（短橫線縮排，禁用 `- +` / `- ~` 等自訂前綴）：
-
-  ```
-  chore: 封存 <change-name>
-
-    - 移到 openspec/changes/archive/<YYYY-MM-DD>-*/
-    - master specs：
-      <spec-A> 新建（N reqs：簡述涵蓋範圍）
-      <spec-B> 修（簡述變動）
-  ```
-
-  Reqs 數量用 `grep -c "^### Requirement:" openspec/specs/<spec>/spec.md` 取得。
-
-- **archive 前先把 swagger / api-client / 前端同步完，archive commit 純粹搬檔 + 落 master spec**：swagger 修正、bundle 重打、api-client 重生屬 feat / refactor 的尾巴，混進 archive 會讓未來 cherry-pick / revert 歸檔時連帶動到 swagger、污染歷史。作法（按順序）：(1) `swagger:bundle`；(2) `api-client generate`；(3) `typecheck && lint && test`；(4) 全綠後 commit feat / refactor；(5) 再 `openspec-archive-change`。archive 後若 `git status` 還有 swagger / schema.ts 變動，是前面沒做乾淨。
-
-## Swagger
-
-- **採分檔 + `$ref` 結構**：`openapi.yaml` 只放 components / servers / info 與 paths 索引；每個 endpoint 一個獨立 yaml。不要 inline 寫整包 spec。
-
-- **新增 endpoint 後要重新 `npm run swagger:bundle`**：`main.ts` 讀的是 bundle 檔，忘了 bundle Swagger UI 不更新。bundle 同時也會驗證所有 `$ref`。
-
-- **成功回應不要用 `$ref: SuccessResponse`，每個 endpoint 自己 inline 寫 `{ success, data: <具體 shape>, timestamp }`**：`SuccessResponse.data` 是 generic `type: object, nullable: true`，openapi-typescript 推導出來只會是 `Record<string, unknown> | null`，型別失去意義。作法：endpoint 在 200/201 直接 inline 整個外殼 + data 具體 properties（參照 `profile/get-me.yaml`、`auth/login.yaml`）；真的沒 data 也要寫 `data: { type: null }` 或對應 message 型別。
-
-## Seeds / Scripts
-
-- **`seed-runner.ts` 必須擋 production**：`if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_PROD_SEED) process.exit(1)`，避免誤把測試資料 upsert 到生產庫。
-
-## 前端 / React hooks
-
-- **自訂 hook 回傳的函式若會進到呼叫端 useEffect deps，必須 `useCallback` 包起來，否則無限迴圈**：每 render 建新 function instance → 進 deps 後 effect 每 render 都跑 → effect 內呼叫會改父 state / URL 的 setter（如 `setSearchParams`）→ 父 re-render → 新 instance → 再跑 → Chrome 擋 `Throttling navigation to prevent the browser from hanging`。`useRef` 持有狀態用 `useCallback([])` 包是安全的（mount 建一次，閉包讀 `ref.current` 永遠最新）。作法：任何 `useXxx()` 回傳函式若可能進 deps 就一律 `useCallback`，jsdoc 標註當路標（react-compiler 不會抓這條）。
-
-- **`useCallback` dep 不要放整個 hook 回傳的 object，要 destructure 出 method 再放**：`useCallback(..., [coreObject])` 中 `coreObject` 每 render 都是新 reference，等於沒包（無限迴圈）。作法：`const { setX: coreSetX } = core; useCallback(..., [coreSetX])` 把 method destructure 成 local const 再放 dep；`exhaustive-deps` 看到單一變數就接受。
-
-## 前端 / React + zod + react-hook-form
-
-- **zod v4.1+ 不要用 `zodResolver`，改用 `standardSchemaResolver`**：`@hookform/resolvers/zod` 的 v4 overload 針對 zod 4.0 編譯（檢查 `_zod.version.minor === 0`），zod 4.1+ 會報 `Type '4' is not assignable to type '0'`。作法：`import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'`（zod v4 原生實作 Standard Schema，型別不依賴 zod 內部版本欄位；未來換 valibot/arktype 也同一 resolver）。
-
-- **react-hook-form 表單 schema 不要用 zod `.transform()`**：`standardSchemaResolver(schemaWithTransform)` 讓 input/output 型別分歧，但 `useForm<T>` 把 T 同時套在 defaultValues / control / handleSubmit 三邊，會報 `Type 'FieldValues' is missing the following properties...`。作法：表單 schema 只做 validate，normalize 放 submit handler（組 body 時呼叫 helper，helper export 給其他呼叫端共用）。真要在 schema 轉換得拆 `z.input<T>` / `z.output<T>` + `useForm<TInput, TContext, TOutput>`，成本不划算。
-
-- **分組多選 checkbox（如 PermissionsField）用垂直 stack，不要把 module 名與 checkboxes 擺同一行**：label + 含 i18n 文字的 checkbox + 全選 button 同 row，寬度一變動就換行錯位 / 全選被推下去。作法：每個 module 一張 card，分兩層——header row（module 名 + 全選 button，`flex justify-between`）、checkbox 區（垂直 `flex flex-col gap-2`，每個獨佔一行）。
-
-- **shadcn nova preset 的 registry 沒有 `form`**：`pnpm dlx shadcn@latest add form` 會 silent fail（只印 "Checking registry"），其他元件如 input/label/card/sidebar 都正常。解法：自寫 `src/components/ui/form.tsx`，內容是標準 shadcn form pattern（Controller + Slot + FormItemContext + useFormField），radix-ui 是 mega-package，import 寫 `import { Slot } from 'radix-ui'`。
-
-- **TypeScript 6 把 `baseUrl` 標為 deprecated**：tsconfig 只需要 `paths`，不用 baseUrl。`paths: { "@/*": ["./src/*"] }` 中的相對路徑會以 tsconfig.json 所在位置為基準。shadcn CLI 不依賴 tsconfig 的 baseUrl，看的是 `components.json` 的 aliases。
+**How to apply**：重疊的檔案範圍必須各自列齊**完整**限制——用 `ignores` 切成互不重疊，重疊者（如 `src/adapter/in/**/admin/**/*Controller.ts`）一次列出所有 pattern。另外用 `@typescript-eslint/no-restricted-imports` 而非 base 版，才涵蓋 `import type`。每加一條邊界規則都要用探針實測「該擋的每一種都真的擋」。
 
 ## Monorepo / pnpm
 
-- **pnpm 10+ 的 `overrides` 必須寫在 `pnpm-workspace.yaml`，寫在 `package.json` 會被靜默忽略**：本專案原本宣告在 `apps/api/package.json`（雙重錯誤：pnpm 只讀 root、且 10+ 起改讀 workspace 檔），三條 override 長期完全沒生效——`@hono/node-server` 宣告 `>=1.19.13` 但實際裝 1.19.11、`@tootallnate/once` 宣告 3.0.1 但實際裝 2.0.1。**沒有任何警告**。作法：(1) overrides 一律寫 `pnpm-workspace.yaml`；(2) 改完檢查 `pnpm-lock.yaml` 開頭是否出現 `overrides:` 區塊（這是 pnpm 有讀到的證據）；(3) 再以 `pnpm why <pkg>` 或 `ls node_modules/.pnpm` 確認實際版本。
+### 2026-08-14 — pnpm 10+ 的 `overrides` 寫在 `package.json` 會被靜默忽略
 
-- **override 的 range 用 `^` 不要用 `>=`**：`>=1.19.15` 沒有上界，pnpm 會直接解析到最新的 major（實測 `@hono/node-server` 跳到 2.1.0），可能與上游期望的 API 不相容。要修安全漏洞時用 `^1.19.15` 鎖在同一 major 內。
+**踩到什麼**：三條 override 長期完全沒生效——宣告 `@hono/node-server >=1.19.13` 實際裝 1.19.11、宣告 `@tootallnate/once 3.0.1` 實際裝 2.0.1。**沒有任何警告**。
 
-- **pnpm 11 預設不執行套件的 build scripts，需在 `pnpm-workspace.yaml` 的 `allowBuilds` 段明確核准**：Prisma、bcrypt、@nestjs/core、@firebase/util、protobufjs 等有 postinstall/install script 的套件首次 `pnpm install` 會被擋下並警告 `[ERR_PNPM_IGNORED_BUILDS]`。解法：把每個套件設成 `true`（信任）或 `false`（明確拒絕，如 telemetry-only 的 `@scarf/scarf`）。新加套件遇到此警告時更新 `allowBuilds` 即可。
+**Why**：雙重錯誤——pnpm 的 overrides 只在 workspace **root** 生效，且 10+ 起又從 `package.json` 搬到 `pnpm-workspace.yaml`（`allowBuilds` 等設定同批搬遷）。
 
-- **Monorepo 下 Prisma client 落在 pnpm 虛擬 store**：執行 `pnpm db:generate` 後 client 生成在 `node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client`（不是傳統的 `node_modules/@prisma/client`）。`apps/api/package.json` 的 `postinstall` symlink 仍有效，TypeScript 也能解析。重點：搬完 monorepo 後**必須先跑一次 `pnpm db:generate`** 再 typecheck，否則所有 Prisma model 型別找不到，會誤導以為是 strict mode 的問題。
+**How to apply**：(1) overrides 一律寫 `pnpm-workspace.yaml`；(2) 改完檢查 `pnpm-lock.yaml` 開頭是否出現 `overrides:` 區塊——**這是 pnpm 有讀到的唯一證據**；(3) 再以 `pnpm why <pkg>` 確認實際版本。range 用 `^` 不要用 `>=`：後者沒有上界，pnpm 會直接拉到最新 major（實測 `@hono/node-server` 跳到 2.1.0）。
 
-## ESLint / 工具鏈
+- **pnpm 11 預設不執行套件的 build scripts**：Prisma、bcrypt、@nestjs/core 等有 postinstall 的套件會被擋下並警告 `ERR_PNPM_IGNORED_BUILDS`，需在 `pnpm-workspace.yaml` 的 `allowBuilds` 明確核准（`true` 信任 / `false` 明確拒絕，如 telemetry-only 的 `@scarf/scarf`）。
+- **Monorepo 下 Prisma client 落在 pnpm 虛擬 store**：生成在 `node_modules/.pnpm/@prisma+client@…/` 而非傳統路徑。搬完 monorepo **必須先跑一次 `db:generate` 再 typecheck**，否則所有 model 型別找不到，會誤導成 strict mode 的問題。
 
-- **Monorepo 共用 ESLint 基底放 `packages/eslint-config`,基底「不含」任何 typescript-eslint 預設集**：api 走 `recommendedTypeChecked`、web 走 `recommended`,兩者都會註冊 `@typescript-eslint` 外掛;若共用基底也帶一組 tseslint 預設,和 workspace 自帶的那組併存會觸發 `ConfigError: Cannot redefine plugin "@typescript-eslint"`。作法:基底只放 `ignores` + `js.configs.recommended` + 家規(以 named export `houseRules` 交由各 workspace「在自己的 tseslint 預設之後」最後套用,否則 `no-explicit-any` 等會被 recommended 蓋回 error);tseslint 預設由各 workspace 自帶且僅一組。
+## 外部服務 / 排程
 
-- **api 的 `lint` 必須先 `db:generate`,否則 type-aware 規則對 Prisma 回傳大量假陽性**：client 未生成時 `this.prisma.x.count()` 回 `any`,`recommendedTypeChecked` 會誤報 `no-unsafe-call`(型別解析不到)與 `require-await`(回傳不被視為 Promise)。作法:`apps/api/package.json` 加 `"prelint": "pnpm db:generate"`(對齊既有的 `predev`/`prebuild`/`pretypecheck`)。注意 lint-staged 直接呼叫 `eslint --fix` 不走 pre 腳本,靠 dev 環境 client 已生成。
+- **所有外部服務呼叫都要設 timeout**：沒 timeout 時單一服務變慢會耗盡連線池 / event loop、拖垮整個 API。recaptcha 用 `AbortSignal.timeout(5000)`；nodemailer 設 `connectionTimeout` / `greetingTimeout` / `socketTimeout`；S3 用 `client.send(cmd, { abortSignal })`；firebase-admin 不支援 AbortSignal，用 `Promise.race`。
+- **Redis 要設 `socket.connectTimeout` + `pingInterval`**：`isOpen` 只看連線旗標，偵測不到 half-open（socket 開著卻無回應），指令會 hang 到自己 timeout。token 黑名單採 **fail-closed**（Redis 斷線拋 503，不放行已登出 token）。
 
-- **type-checked lint 對「ORM 邊界 / jest mock / seed 腳本」的 `no-unsafe-*` 是雜訊,分區關掉、核心層維持嚴格**：Prisma 查詢結果、mapper、jest mock 回傳天生 `any`,全開 `no-unsafe-*` 會爆數百個假訊號淹沒真發現(本專案 524→9)。作法:`eslint.config.mjs` 對 `src/adapter/out/persistence/**`、`seeds/**`+`scripts/**`、`**/*.spec.ts`(另加 `unbound-method`)關掉 no-unsafe-* 家族;application/domain/infrastructure 維持全嚴格,真發現(floating-promise 等)才浮得出來。
+### 2026-07 — `@Cron('expr')` 的表達式在「模組載入時」求值，讀不到 `.env`
 
-- **Prettier 全 repo 統一一份根 `.prettierrc`(`semi:true` + `singleQuote:true` + `trailingComma:all`)**：前後端同一套;前端原為 Vite 無分號,已 reformat 加回分號對齊(一次性 ~107 檔),後端 0 churn(根設定與 api 既有風格一致,`eslint-plugin-prettier` 走 walk-up 解析同一份根設定)。`format`/`format:check` 放**根**(`prettier --write/--check .`)並從 repo root 跑——因為 **`.prettierignore` 相對「執行目錄(CWD)」解析**(不像 `.prettierrc` 逐檔就近),放根 + 根執行才吃得到。根 ignore 必排除:手寫繁中文件(`**/*.md`,否則 openspec / README / CLAUDE 被 reflow)、工具生成檔(`packages/api-client/src/schema.ts`、swagger bundle)、`prisma/migrations`、build / lockfile。shadcn `components/ui` 也一併吃根設定(引號等),格式不另設特例(eslint 的 `components/ui` 特例只關 lint 規則、與格式無關)。formatOnSave 需 `.vscode/settings.json` 對 `[typescriptreact]`/`[javascriptreact]` 也設 prettier formatter(前端多為 .tsx)。
+**踩到什麼**：cron 表達式想從 env 讀，拿到 `undefined`；在 decorator 內呼叫 `getEnv()` 更直接 `process.exit(1)`。
 
-- **flat config 中同名規則是「後蓋前」而非合併 patterns**：`no-restricted-imports` 若拆成多個區塊各給一組 `patterns`，同時匹配多個區塊的檔案**只吃最後一個區塊**，先前的整包被覆蓋（不是 patterns 相加）。症狀極隱蔽：admin 目錄下的 controller 該同時受「不得碰持久層」與「不得相依 front」約束，實測只有後者會紅、前者靜默失效，lint 仍然全綠。作法：重疊的檔案範圍必須各自列出**完整**限制——用 `ignores` 把區塊切成互不重疊，重疊者（如 `src/adapter/in/**/admin/**/*Controller.ts`）一次列齊所有 pattern；另外用 `@typescript-eslint/no-restricted-imports` 而非 base 版，才會涵蓋 `import type`。每加一條邊界規則都要用探針檔實測「該擋的每一種都真的擋」，不要假設會合併。
+**Why**：import 會 hoist 到檔案最上方，`AppModule`（含排程器）在 `main.ts` 的 `dotenv.config()` **之前**就被 require，decorator 的參數那時已經求值。
 
-## 可觀測性 / Sentry & metrics
+**How to apply**：改在 `onModuleInit()`（dotenv 已載入）用 `SchedulerRegistry.addCronJob(name, CronJob.from({ cronTime, onTick, timeZone }))` 動態註冊。`CronJob` 來自 `cron` 套件（`@nestjs/schedule` 沒 re-export），版本要與 schedule 內部相依一致。
 
-- **`instrument.ts`（Sentry init）必須自行呼叫 `dotenv.config()`**：ES module import 會 hoist 到所有語句前，即使 `main.ts` 第一行 import instrument、第二行才 `dotenv.config()`，instrument 內的 `Sentry.init` 仍早於 main 的 dotenv 執行而讀不到 env。作法：`instrument.ts` 固定「`dotenv.config({ quiet: true })` → `getEnv()` → `Sentry.init()`」；`main.ts` 第一行 import 它（main 的 dotenv 重複呼叫無害）。
+## 單一埠部署 / ServeStatic
 
-- **可觀測性套件用 feature flag 包、預設關閉，兩種包法**：Sentry 由 `Sentry.init({ enabled: flag && !!DSN })` 控制，停用時 `captureException` 是 no-op，呼叫端可無條件呼叫；Prometheus 會掛 endpoint，要用 `...(flag ? [PrometheusModule.register()] : [])` 在 imports 條件 spread，關閉時完全不註冊 `/api/metrics`。作法：SDK 自帶 enabled 開關的走 init 旗標 + 呼叫端無條件呼叫；會掛 controller / endpoint 的走 imports 條件 spread。
+- **`ServeStaticModule` 用 `forRootAsync` + 執行期偵測，不要在 `@Module` 載入時判斷**：`@Module` 的 imports 在 import 時就 evaluate，那時 e2e fixture 還沒建。`forRootAsync({ useFactory })` 在 `app.init()` 才偵測 `index.html`（前端未 build 時回 `[]` 等同不掛載）。
+- **`exclude` 要用 Express 5 / path-to-regexp v8 的 named wildcard `'/api/{*path}'`**：舊式 `/api*`、`/api/*` 都不對；`'/api/*path'` 會漏掉裸 `/api`。漏設會讓 API 的 404 回 `index.html`（HTML）而非 JSON。本機媒體 static 同理要加 `/media/{*path}`，否則被 SPA fallback 攔截。
+- **e2e 測 serve-static 要把 `AbstractLoader` override 成 `ExpressLoader`**：loader factory 依 `httpAdapter` 是否存在挑 loader，測試用 `compile()` 在 `createNestApplication` 之前就實例化 → 拿到 **NoopLoader**（靜態檔全 404）。
 
-## 單一埠部署 / ServeStaticModule
+## 檔案上傳
 
-- **單一埠：由 api 服務前端 `dist`，用 `forRootAsync` + 執行期偵測，不要在 `@Module` 載入時判斷**：`ServeStaticModule.forRootAsync({ useFactory })` 在 `app.init()` 時才偵測 `index.html`（前端未 build / 純 API 部署時回 `[]` 等同不掛載，dev 走 Vite 不受影響）。`@Module` 的 imports 陣列在 import 時就 evaluate，那時 e2e fixture 還沒建。靜態根目錄預設相對 api 編譯輸出找 `apps/web/dist`，可用 env `WEB_STATIC_ROOT` 覆寫（見 `app.module.ts` 的 `resolveWebStaticRoot`）。
+- **multipart 中文檔名要 latin1→UTF-8 還原**：busboy/multer 預設以 latin1 讀 filename，中文變亂碼。存入前 `Buffer.from(name, 'latin1').toString('utf8')`。
+- **multer 2.x 的 `Express.Multer.File` 全域型別解不到**：2.x + @types/multer 2.x 不再穩定擴充全域 namespace，會報 `Namespace 'global.Express' has no exported member 'Multer'`。controller 自定最小型別（只取 `buffer/mimetype/size/originalname`）避開。
+- **大小上限要在 service 檢查，不要放 decorator**：decorator 選項在模組載入時求值、讀不到 env（同 `@Cron` 那條）。multer decorator 另設大的靜態硬上限防 OOM 即可。
 
-- **`exclude` pattern 要用 Express 5 / path-to-regexp v8 的 named wildcard `'/api/{*path}'`**：舊式 `/api*`、`/api/*` 都不對；`'/api/*path'` 會漏掉裸 `/api`。`'/api/{*path}'` 能涵蓋 `/api`、`/api/health`、`/api/docs`、`/api/metrics` 且不誤殺 `/`、`/assets/*`。漏設 exclude 會讓 API 的 404 回 `index.html`（HTML）而非 JSON，前端會壞。
+## 前端
 
-- **e2e 測 serve-static 要把 `AbstractLoader` override 成 `ExpressLoader`**：`@nestjs/serve-static` 的 loader factory 依 `httpAdapter` 是否存在挑 loader；測試用 `Test...compile()` 在 `createNestApplication(ExpressAdapter)` 之前就實例化 loader → 拿到 **NoopLoader**（靜態檔全 404）。作法：測試 `.overrideProvider(AbstractLoader).useClass(ExpressLoader)`（`test-app.ts` 的 `forceServeStatic` 旗標）對齊生產；fixture 目錄由 `WEB_STATIC_ROOT`（setup-env 指向 `os.tmpdir()`）指定，spec 的 `beforeAll` 先寫 `index.html`。
+- **自訂 hook 回傳的函式若會進 useEffect deps，必須 `useCallback`**：否則每 render 新 instance → effect 每 render 都跑 → 內部 setter 改父 state → 再 render，Chrome 會擋 `Throttling navigation to prevent the browser from hanging`。且 **dep 不能放整個 hook 回傳的 object**（每 render 都是新 reference，等於沒包），要 destructure 出 method 再放。
+- **zod v4.1+ 不要用 `zodResolver`，改用 `standardSchemaResolver`**：`@hookform/resolvers/zod` 的 v4 overload 檢查 `_zod.version.minor === 0`，zod 4.1+ 會報 `Type '4' is not assignable to type '0'`。zod v4 原生實作 Standard Schema，換 valibot/arktype 也同一 resolver。
+- **react-hook-form 的 schema 不要用 zod `.transform()`**：會讓 input/output 型別分歧，而 `useForm<T>` 把 T 同時套在 defaultValues / control / handleSubmit 三邊。normalize 放 submit handler，schema 只做 validate。
+- **`useInfiniteQuery` 不會走 `useApiQuery` 的 envelope unwrap**：自寫 `queryFn` 用 `apiClient.GET` 不經過 unwrap，`lastPage.list` 會是 undefined（實際是 `{ success, data: { list, meta } }`）。從 `@app/api-client` export `unwrapEnvelope` 手動呼叫。
+- **shadcn nova preset 的 registry 沒有 `form`**：`shadcn add form` 會 silent fail（只印 "Checking registry"），其他元件正常。自寫 `components/ui/form.tsx`（標準 Controller + Slot + FormItemContext pattern）。
+- **TypeScript 6 把 `baseUrl` 標為 deprecated**：tsconfig 只需要 `paths`，其中的相對路徑以 tsconfig 所在位置為基準。shadcn CLI 看的是 `components.json` 的 aliases，不依賴 baseUrl。
 
-## 檔案儲存 / 上傳
+## Zod / 驗證
 
-- **儲存走 port + driver 切換（`STORAGE_DRIVER=local|s3`），module 用 `useFactory` 綁**：`FileStoragePort`（upload/getSignedUrl/delete）由 `StorageModule` 依 env 綁 `LocalFileStorageAdapter`（寫本機、dev/衍生專案免 AWS，預設）或 `S3FileStorageAdapter`；兩 adapter 都註冊、factory 選一個，呼叫端只認 port。local 的 `getSignedUrl` 無簽章意義，直接回靜態 URL。
+- **`z.coerce.boolean()` 對字串 `'false'` 會 coerce 成 `true`**：底層走 JS `Boolean()`，非空字串皆 truthy，`?status=false` 會變成 `true`。query 的 boolean filter 一律用 `z.enum(['true','false']).optional().transform(v => v === undefined ? undefined : v === 'true')`。
 
-- **上傳安全三件套：MIME 白名單 + 副檔名由 MIME 推導 + 大小上限**：`shared/constants/upload.ts` 的 `EXT_BY_MIME` 同時是 MIME 白名單與「MIME→正規副檔名」表。key 一律 `<folder>/<uuid>.<extForMime(mime)>`，**絕不取 client 原始檔名的副檔名**（擋 `evil.png.html` stored XSS）；folder 走白名單；size ≤ env `MAX_UPLOAD_BYTES` 在 **service** 檢查（不放 decorator——decorator 選項在模組載入時求值、讀不到 env）。multer decorator 另設大的靜態硬上限防 OOM。
+## 架構慣性
 
-- **multipart 中文檔名要 latin1→UTF-8 還原**：busboy/multer 預設以 latin1 讀 filename，中文變亂碼；存入前 `Buffer.from(originalName, 'latin1').toString('utf8')` 還原（schema 的 `file_name` 欄位已註明此慣例）。
+- **`@Roles` / `RolesGuard` 受 feature flag 控制，注意爆炸半徑**：`adminRoleEnabled` 關閉時 RolesGuard 一律放行，所有 `@Roles` 端點（IP 黑白名單、帳號解鎖）對任何已登入者開放。生產由 validate-env 強制開啟守住，但**勿在共用的 dev 環境關閉**。
+- **不要讓 Facade 直接呼叫 Out Port、跳過 Service 層**：少了 service，domain 規則（IP 正規化、unlock 前狀態檢查）沒地方放，只能擠進 facade 或 controller。即使動作簡單也保留 service 佔位，未來補 domain rule 零摩擦。
+- **同資料但「呼叫情境不同 = 權限模型不同」時，開窄化 endpoint**：Combobox 要顯示不在第一頁的角色名稱，`GET /roles/:id` 看似夠用但需 `BACKEND:ROLE:VIEW`，只有 `BACKEND:ACCOUNT:VIEW` 的會員管理者打不到。開薄的 `GET /members/role/options/:id` 沿用會員管理權限，不要借別模組的 endpoint。
 
-- **multer 2.x 的 `Express.Multer.File` 全域型別解不到**：multer 2.x + @types/multer 2.x 不再穩定擴充 `Express.Multer` 全域 namespace，`@UploadedFile() file: Express.Multer.File` 報 `Namespace 'global.Express' has no exported member 'Multer'`。作法：controller 自定最小型別（只取 `buffer/mimetype/size/originalname`），避開 ambient 擴充版本差異。
+### 2026-07 — 搬整包資料夾深一層 = 兩個正交轉換，可腳本化但 `jest.mock` 會漏
 
-- **刪除時 key 由 fileUrl 尾兩段還原，與 base URL / driver 無關**：AttachmentRecord 存完整 fileUrl，刪 storage 需 key。因 key 固定 `<folder>/<uuid>.<ext>`（兩段），`fileUrl.split('/').slice(-2).join('/')` 即還原，不依賴 base 前綴（避免 env 改動 / driver 差異踩雷）。
+**踩到什麼**：把 flat 結構搬進 `<side>/` 時，typecheck 全綠但 jest 執行期掛掉。
 
-- **本機媒體 static 要排除 SPA fallback + 加 nosniff/CSP**：local driver 檔案由 `main.ts` 的 `express.static(LOCAL_MEDIA_ROOT)` 服務在 `LOCAL_MEDIA_BASE_URL`（`/media`），設 `X-Content-Type-Options: nosniff` + `Content-Security-Policy: default-src 'none'`。因 bootstrap 的 `app.use` static 晚於 ServeStaticModule 註冊，須在 `app.module` 的 web ServeStaticModule `exclude` 加 `/media/{*path}`，否則 `/media` 被 SPA fallback 攔成 index.html。e2e 走 local driver、`LOCAL_MEDIA_ROOT` 指 tmp 避免汙染專案。
+**Why**：兩個轉換是正交的——(1) 把 `<side>/` 段插進「指向 in 側各層」的 import 路徑；(2) 被搬檔案的每個 `../` 各 +1 層。但 **`jest.mock('../…')` 是字串字面量，TS 不當 module 解析**，所以深度 +1 漏掉它時 typecheck 不會報錯。
 
-## 排程 / @nestjs/schedule
+**How to apply**：兩個轉換先 (1) 後 (2)，且 (2) 必須一併涵蓋 `jest.mock` / `require` 的路徑字串。用 `git mv` 保留歷史（rename 偵測門檻內，內容改太多會顯示成 D+A）。
 
-- **`@Cron('expr')` decorator 的表達式在「模組載入時」就求值，讀不到 `.env`**：import 會 hoist 到檔案最上方，`AppModule`（含排程器）在 `main.ts` 的 `dotenv.config()` 之前就被 require，decorator 內 `process.env.X` 拿到 undefined；在 decorator 內呼叫 `getEnv()` 更會在 env 未載入時觸發驗證而 `process.exit(1)`。作法：改在 `onModuleInit()`（dotenv 已載入）用 `SchedulerRegistry.addCronJob(name, CronJob.from({ cronTime, onTick, timeZone }))` 動態註冊（範式見 `ExampleScheduler`）；env gate（`SCHEDULE_ENABLED`）預設關，測試環境保持關閉避免背景 cron 與開檔 handle。
+## OpenSpec workflow
 
-- **`@nestjs/schedule` 沒有 re-export `CronJob`，要顯式安裝 `cron`**：動態註冊用的 `CronJob.from(...)` 來自 `cron` 套件，且版本要與 `@nestjs/schedule` 內部相依一致（本專案 `cron@4.4.0`）以免 `addCronJob` 型別不相容。
+- **propose 階段先核對 API contract，不要假設「list 有的欄位 update 也支援」**：例如 role 的 GET 回應有 `status`，但 `PATCH /roles/:id` 的 DTO 沒處理它，誤判成「純前端 change」會在動工後才發現要連動改後端 + Swagger + api-client + spec + e2e。寫 proposal 前先讀 `{Create,Update}*Request.ts` 與對應 service，把每個前端互動點對應到實際 DTO 欄位。
+- **archive 前先把 swagger / api-client / 前端同步完**：這些屬 feat 的尾巴，混進 archive commit 會讓未來 cherry-pick / revert 歸檔時連帶動到 swagger。順序：`swagger:bundle` → `api-client generate` → 驗證鏈 → commit feat → 才 archive。archive 後若 `git status` 還有 swagger / schema.ts 變動，是前面沒做乾淨。
+- **archive commit body 要列出新建 / 修改的 master spec**：只有標題的話，未來 `git log` 追不到「某 capability 何時定義 / reqs 何時變動」。reqs 數量用 `grep -c "^### Requirement:" openspec/specs/<spec>/spec.md` 取得。

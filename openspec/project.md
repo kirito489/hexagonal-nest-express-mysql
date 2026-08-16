@@ -316,6 +316,12 @@ getMe(@CurrentMember() member: MemberContext) {
 
 `MemberContext` 定義於 `apps/api/src/adapter/in/web/decorator/current-member.decorator.ts`，欄位為 `sub`（memberId）、`email`、`roleName`、`permissions`、`status`、`lastPasswordChange`。
 
+### 反向代理與 `request.ip`
+
+Express 預設不採信 `X-Forwarded-For`，部署在 LB / 反向代理後 `request.ip` 會變成 proxy 的內網 IP，導致 **IP 黑名單失效、白名單誤判、登入失敗封鎖失準**。
+
+以 env `TRUST_PROXY` 控制（預設 `'loopback'` = 不採信外部 XFF）。部署時依拓樸改為信任跳數（如 `'1'`）或具體 CIDR；**切勿設 `true`** —— 會無條件採信偽造的 XFF。封鎖類 Guard（IP 黑名單）取不到 IP 時應 **fail-closed**（拒絕）而非放行。
+
 ### 全域中介層
 
 以下 Provider 在 `apps/api/src/app.module.ts` 全域註冊，**所有端點自動套用，無需手動加裝飾器**：
@@ -476,6 +482,20 @@ formatYMD(2026, 4, 5);         // "2026年04月05日"
 formatDateWithDay(new Date()); // "2026-04-05 (日)"
 ```
 
+### 檔案儲存與上傳安全
+
+儲存走 port + driver 切換（`STORAGE_DRIVER=local|s3`），module 依 env 綁定實作，呼叫端只認 port。
+
+上傳安全三件套，缺一不可：
+
+| 措施 | 作法 |
+| --- | --- |
+| MIME 白名單 | 只允許明列的 content-type |
+| 副檔名由 MIME 推導 | **不信任使用者送來的檔名副檔名** |
+| 大小上限 | `MAX_UPLOAD_BYTES`，超過即拒 |
+
+其他要點：multipart 的中文檔名需 latin1→UTF-8 還原；刪除時 key 由 fileUrl 尾兩段還原（與 base URL / driver 無關）；本機媒體 static 要排除 SPA fallback 並加 `nosniff` / CSP。
+
 ### Seed 管理
 
 Seed 檔案放在 `apps/api/seeds/`，timestamp 前綴確保執行順序，透過 `SeedHistoryRecord` 做冪等控制：
@@ -550,6 +570,15 @@ E2E 走**真正的 test 資料庫**（非 mock Prisma），只 mock Redis：
 | `describeUnauthorized(() => app, 'get', '/api/admin/xxx')` | 一行產生「未帶 token → 401」測試。收 app **getter** 而非實例——app 在 `beforeAll` 才建立，describe 收集階段傳實例會拿到 `undefined` |
 
 > 400（Zod 驗證）、429（限流）、未知路由 404 屬框架層、沒有業務 code，維持只斷言 status。
+
+### 覆蓋率門檻
+
+門檻只涵蓋**邏輯層**，wiring / 宣告 / 已由 e2e 涵蓋的部分排除在分母外——納入只會稀釋數字，並逼著為 DI 配線寫無意義的測試。
+
+- **後端**（jest）：`coveragePathIgnorePatterns` 排除 `*.module.ts`、`main.ts`、`*Controller.ts`、`*Request.ts`、`*Query.ts`、`port/`、`facade/`、`adapter/out/`、`validate-env.ts`；門檻 70/60/70/70。
+- **前端**（vitest）：coverage `include` 只列 `src/lib` 與 `src/components`，排除需 Router / api-client context 的組合層（pages、與 `/me` 整合的 hooks）；門檻 75/75/60/75。
+
+門檻只有 `test:cov` 會執行（`test` 不帶 coverage，供開發時快速回饋）。
 
 ### 架構守則測試
 
