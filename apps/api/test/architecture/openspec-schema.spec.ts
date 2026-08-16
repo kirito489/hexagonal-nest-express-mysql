@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { load } from 'js-yaml';
 import { API_ROOT } from './helpers';
@@ -61,31 +61,44 @@ describe('架構守則：openspec 自訂 schema 的執行路徑', () => {
     expect(ids).toEqual(['design', 'proposal', 'specs', 'tasks']);
   });
 
-  it('openspec-propose skill 必須帶 --schema，否則新 change 會落回內建 schema', () => {
-    const skill = readFileSync(
-      join(REPO_ROOT, '.claude', 'skills', 'openspec-propose', 'SKILL.md'),
-      'utf8',
-    );
+  it('所有教 AI 建立 change 的指令都必須帶 --schema', () => {
+    // 不只盯單一檔案：propose 流程在 .claude/skills/ 與 .claude/commands/opsx/ 各有一份，
+    // 只檢查其中一份的結果，就是改了 skill、command 卻靜默留在內建 schema。
+    const missingFlag: string[] = [];
+    let creations = 0;
 
-    const creations = [...skill.matchAll(/openspec new change[^\n`]*/g)].map(
-      (m) => m[0],
-    );
+    const walk = (relativeDir: string): void => {
+      const absolute = join(REPO_ROOT, relativeDir);
+      if (!existsSync(absolute)) return;
+      for (const entry of readdirSync(absolute)) {
+        const relative = `${relativeDir}/${entry}`;
+        if (statSync(join(REPO_ROOT, relative)).isDirectory()) {
+          walk(relative);
+          continue;
+        }
+        if (!entry.endsWith('.md')) continue;
 
-    // 指令不見了（改寫 skill 時被刪或改名）也要紅，否則這條規則會空轉
-    expect(creations.length).toBeGreaterThan(0);
+        const body = readFileSync(join(REPO_ROOT, relative), 'utf8');
+        for (const match of body.matchAll(/openspec new change[^\n`]*/g)) {
+          creations += 1;
+          if (!match[0].includes(`--schema ${SCHEMA_NAME}`)) {
+            missingFlag.push(`  ${relative}\n    ${match[0].trim()}`);
+          }
+        }
+      }
+    };
 
-    const missingFlag = creations.filter(
-      (line) => !line.includes(`--schema ${SCHEMA_NAME}`),
-    );
+    walk('.claude');
+
+    // 指令全數消失（檔案改名或流程改寫）時先紅，否則這條規則會空轉
+    expect(creations).toBeGreaterThan(0);
 
     expect(
       missingFlag.length === 0
         ? ''
-        : `openspec-propose skill 的建立指令未指定自訂 schema：\n${missingFlag
-            .map((l) => `  ${l.trim()}`)
-            .join(
-              '\n',
-            )}\n應為 \`openspec new change "<name>" --schema ${SCHEMA_NAME}\``,
+        : `以下建立 change 的指令未指定自訂 schema，用它建出來的 change 會落回內建 schema：\n${missingFlag.join(
+            '\n',
+          )}\n應為 \`openspec new change "<name>" --schema ${SCHEMA_NAME}\``,
     ).toBe('');
   });
 

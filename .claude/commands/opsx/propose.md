@@ -31,9 +31,16 @@ When ready to implement, run /opsx:apply
 
 2. **Create the change directory**
    ```bash
-   openspec new change "<name>"
+   openspec new change "<name>" --schema spec-driven-custom
    ```
    This creates a scaffolded change at `openspec/changes/<name>/` with `.openspec.yaml`.
+
+   **The `--schema spec-driven-custom` flag is mandatory.** The project's format rules —
+   capability naming (`api-` / `ui-` / `platform-`), the API request/response shape, and the
+   independently-verifiable task blocks — live in `openspec/schemas/spec-driven-custom/`.
+   `openspec config` only supports global scope, so the project default cannot be committed;
+   omitting the flag silently falls back to the built-in schema and loses every one of those
+   rules. A guardrail test (`openspec-schema.spec.ts`) fails if any change is created without it.
 
 3. **Get the artifact build order**
    ```bash
