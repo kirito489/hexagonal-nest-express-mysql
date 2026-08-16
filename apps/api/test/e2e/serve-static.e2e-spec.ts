@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { createE2EApp, createMockRedis } from './test-app';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
 
 // ──────────────────────────────────────────────
 // 驗證單一埠部署：api 服務前端靜態檔 + SPA fallback，同時不攔截 /api 路由。

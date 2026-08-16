@@ -5,7 +5,7 @@
 import { execSync } from 'child_process';
 import { resolve } from 'path';
 import * as mysql from 'mysql2/promise';
-import { applyE2EDbEnv } from './helpers/e2e-env';
+import { applyE2EDbEnv } from '../helpers/e2e-env';
 
 export default async function globalSetup(): Promise<void> {
   applyE2EDbEnv();
@@ -28,7 +28,8 @@ export default async function globalSetup(): Promise<void> {
   const databaseUrl = `mysql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}`;
   execSync('pnpm exec prisma migrate deploy', {
     stdio: 'inherit',
-    cwd: resolve(__dirname, '..'), // apps/api
+    // 本檔位於 test/setup/，往上兩層才是 apps/api（prisma/schema.prisma 所在）
+    cwd: resolve(__dirname, '..', '..'),
     env: { ...process.env, DATABASE_URL: databaseUrl },
   });
 }

@@ -2,15 +2,15 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { createE2EApp, createMockRedis } from './test-app';
-import { resetDb, seedMember } from './helpers/db';
+import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
+import { resetDb, seedMember } from '../helpers/db';
 import {
   expectUnauthorized,
   expectApiError,
   describeUnauthorized,
-} from './helpers/assertions';
-import { ResponseCodes } from '../src/shared/constants/response-codes';
+} from '../helpers/assertions';
+import { ResponseCodes } from '../../src/shared/constants/response-codes';
 
 // 走真 test DB + local storage driver（LOCAL_MEDIA_ROOT 指向 tmp，見 setup-env.e2e）。
 const ADMIN_EMAIL = 'admin@test.com';

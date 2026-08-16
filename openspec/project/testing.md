@@ -15,27 +15,35 @@ apps/api/src/
 └── adapter/in/web/{guard,filter,interceptor}/*.spec.ts
 
 apps/api/test/
-├── test-app.ts            # createE2EApp()（注入真 PrismaService）、createMockRedis() 工廠
-├── setup-env.ts           # e2e 環境變數：DB_DATABASE=*_test、關限流（超大 rate limit）
-├── jest.arch.config.js    # 架構守則測試專用設定（rootDir 為 apps/api，不載 setupFiles）
-├── architecture/          # 架構守則測試：靜態掃描原始碼，不連 DB / Redis / HTTP
+├── architecture/          # 架構守則：靜態掃描原始碼，不連 DB / Redis / HTTP
 │   ├── helpers.ts         # 收檔、逐行比對、違規報告組裝
-│   ├── allowlist.ts       # 豁免清單（PERMANENT / TEMPORARY）
+│   ├── swagger-helpers.ts # 路由與成功狀態碼的解析
+│   ├── allowlist.ts       # 豁免清單（PERMANENT / TEMPORARY，均受過期檢查）
 │   └── *.spec.ts          # 各條規則一檔
-├── helpers/db.ts          # 測試庫 reset / seed helper（跨 spec 共用）
-├── helpers/assertions.ts  # e2e 共用斷言 + describeUnauthorized 產生器
-├── global-setup.ts        # 守門（僅 *_test 庫）→ 建庫 + migrate deploy + seed baseline
-├── global-teardown.ts     # 收尾（disconnect）
-├── auth.e2e-spec.ts
-├── member.e2e-spec.ts
-├── role.e2e-spec.ts
-├── security.e2e-spec.ts
-└── serve-static.e2e-spec.ts   # 單一埠：服務前端 dist + SPA fallback + /api 不被攔截（forceServeStatic）
+├── e2e/                   # e2e spec，一個模組一支
+│   ├── auth / member / role / security / attachment / front / health
+│   ├── ordering.e2e-spec.ts      # 六處 orderBy 的排序保護（fixture 插入順序刻意與期望相反）
+│   └── serve-static.e2e-spec.ts  # 單一埠：前端 dist + SPA fallback + /api 不被攔截
+├── helpers/               # e2e 與 setup 共用
+│   ├── assertions.ts      # 共用斷言 + describeUnauthorized 產生器
+│   ├── db.ts              # 測試庫 reset / seed
+│   └── e2e-env.ts         # 讀 .env 並算出測試庫連線
+├── setup/                 # jest lifecycle，不含任何測試
+│   ├── test-app.ts        # createE2EApp()（注入真 PrismaService）、createMockRedis()
+│   ├── setup-env.ts       # 單元測試的環境變數（由 package.json 的 jest 欄位載入）
+│   ├── setup-env.e2e.ts   # e2e 環境變數：DB_DATABASE=*_test、關限流
+│   └── global-setup.ts    # 守門（僅 *_test 庫）→ 建庫 + migrate deploy + seed baseline
+├── jest.arch.config.js    # 架構守則專用設定（rootDir 為 apps/api，不載 setupFiles）
+└── jest.e2e.config.js     # e2e 專用設定（globalSetup + setupFiles + maxWorkers 1）
 ```
+
+四個目錄的分工是**有守則擋著的**：`e2e-real-database.spec.ts` 會拒絕放在 `test/e2e/` 以外的
+e2e spec。jest 的 `testRegex` 是 `test/.*\.e2e-spec\.ts$`，平鋪一樣跑得到，
+沒有守則的話這個結構會靜默侵蝕回原狀。
 
 E2E 走**真正的 test 資料庫**（非 mock Prisma），只 mock Redis：
 
-- **專用測試庫**：`test/setup-env.ts` 把 `DB_DATABASE` 覆寫成 `*_test`（本專案 Prisma 走 object-config `PrismaMariaDb`、非 `DATABASE_URL`，故以資料庫「名稱」隔離）；`createE2EApp` 用**真 `PrismaService`** 連該庫。
+- **專用測試庫**：`test/setup/setup-env.e2e.ts` 把 `DB_DATABASE` 覆寫成 `*_test`（本專案 Prisma 走 object-config `PrismaMariaDb`、非 `DATABASE_URL`，故以資料庫「名稱」隔離）；`createE2EApp` 用**真 `PrismaService`** 連該庫。
 - **globalSetup 守門**：目標 DB 名稱不是 `*_test` 就中止（絕不誤 migrate / 清空 dev / prod 庫）；通過才建庫 + `prisma migrate deploy` + seed baseline。腳本內跑 prisma 一律 `pnpm exec`（不用 `npx`，否則噴 pnpm `Unknown env config` warn）。
 - **序列執行**：`test:e2e` 用 `--runInBand`（等同 `maxWorkers:1`）——所有 spec 共用同一測試庫，平行會互相 `deleteMany` race（`AUTH_UNAUTHENTICATED` / `P2025` 間歇失敗）。
 - **關限流**：`setup-env.ts` 設超大 rate limit env 關掉全域 `APP_GUARD ThrottlerGuard`——序列連跑會跨 spec 累計觸發 429；且 `.overrideGuard(ThrottlerGuard)` 對「經 `APP_GUARD` 註冊的全域 guard」**無效**（NestJS 已知坑），只能走 env。
@@ -74,15 +82,24 @@ pnpm --filter @app/api test:arch   # 只跑架構守則
 pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行）
 ```
 
-現有規則：
+現有規則（14 支 / 48 項斷言）：
 
-| 檔案 | 守住的 Hard Rule |
-| --- | --- |
-| `no-native-error.spec.ts` | `src/**` 不得 `throw new Error`（業務錯誤一律 domain exception） |
-| `layering.spec.ts` | controller 不得 import Prisma / persistence / `*Repository` |
-| `side-isolation.spec.ts` | 路徑含 `/admin/` 與 `/front/` 的檔案不得互相 import |
-| `response-codes.spec.ts` | domain exception 不得寫字面值 code；`ResponseCodes` 不得有死碼 |
-| `env-schema.spec.ts` | 每個 `process.env.X` 都必須宣告於 `envSchema` |
+| 檔案 | 項 | 守住的規則 |
+| --- | --- | --- |
+| `no-native-error.spec.ts` | 3 | `src/**` 不得 `throw new Error`（業務錯誤一律 domain exception） |
+| `layering.spec.ts` | 2 | controller 不得 import Prisma / persistence / `*Repository` |
+| `side-isolation.spec.ts` | 2 | 路徑含 `/admin/` 與 `/front/` 的檔案不得互相 import |
+| `response-codes.spec.ts` | 3 | domain exception 不得寫字面值 code；`ResponseCodes` 不得有死碼 |
+| `no-inline-message.spec.ts` | 2 | exception 不得內嵌文案（文案只在 `response-messages.ts`） |
+| `env-schema.spec.ts` | 3 | 每個 `process.env.X` 都必須宣告於 `envSchema` |
+| `dto-from-zod.spec.ts` | 3 | DTO 一律由 `z.infer` 推導，不得手寫 class / interface |
+| `commonjs-baseline.spec.ts` | 2 | root 與 `apps/api` 不得出現 `"type": "module"` |
+| `e2e-real-database.spec.ts` | 4 | e2e 不得 mock DB；spec 一律放 `test/e2e/` |
+| `swagger-sync.spec.ts` | 6 | 契約三段轉換同步；**成功狀態碼須與 `@HttpCode` 一致** |
+| `hook-scripts.spec.ts` | 4 | `.agents/hooks/*.sh` 語法正確且都有註冊 |
+| `openspec-schema.spec.ts` | 5 | 自訂 schema 存在；建立 change 一律帶 `--schema`；opsx 指令維持薄殼 |
+| `openspec-spec-format.spec.ts` | 5 | 能力命名前綴；`api-*` 的 endpoint 需求須寫請求與回應 |
+| `project-docs.spec.ts` | 4 | `project.md` 索引連結有效、無孤兒子檔、全 repo 引用有效 |
 
 **新增一條規則的作法**（三步缺一不可）：
 

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { createE2EApp, createMockRedis } from './test-app';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
 
 // 前台骨架示範端點：公開（免 JWT），驗證 /api/front 路由與 @Public 放行。
 describe('Front Ping E2E', () => {

@@ -1,8 +1,13 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { createE2EApp, createMockRedis } from './test-app';
-import { resetDb, seedMember, seedRole, ensurePermissions } from './helpers/db';
+import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
+import {
+  resetDb,
+  seedMember,
+  seedRole,
+  ensurePermissions,
+} from '../helpers/db';
 
 /**
  * 列表排序守則（涵蓋全部 6 處 `orderBy`）。

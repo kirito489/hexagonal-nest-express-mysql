@@ -24,6 +24,23 @@ describe('架構守則：e2e 對真實資料庫執行', () => {
     expect(specs.length).toBeGreaterThan(0);
   });
 
+  it('e2e spec 一律放在 test/e2e/', () => {
+    // jest.e2e.config.js 的 testRegex 是 `test/.*\.e2e-spec\.ts$`，放回平鋪一樣會被跑到，
+    // 組織會靜默侵蝕回原狀。lifecycle 檔在 test/setup/、共用 helper 在 test/helpers/，
+    // spec 只在 test/e2e/——三者分開才不會又混成一層。
+    const misplaced = specs.filter((f) => !f.startsWith('test/e2e/'));
+
+    expect(
+      misplaced.length === 0
+        ? ''
+        : `以下 e2e spec 不在 test/e2e/：\n${misplaced
+            .map((f) => `  ${f}`)
+            .join(
+              '\n',
+            )}\ntest/ 的分工：e2e/ 放 spec、setup/ 放 jest lifecycle、helpers/ 放共用斷言與 fixture、architecture/ 放守則`,
+    ).toBe('');
+  });
+
   it('e2e 不得覆寫 PrismaService', () => {
     const offenders = findViolations(
       specs,
@@ -38,12 +55,12 @@ describe('架構守則：e2e 對真實資料庫執行', () => {
     ).toBe('');
   });
 
-  it('test-app.ts 不得提供 mock 資料庫的入口', () => {
-    const source = readSource('test/test-app.ts');
+  it('setup/test-app.ts 不得提供 mock 資料庫的入口', () => {
+    const source = readSource('test/setup/test-app.ts');
     const offenders: Violation[] = /^\s*prisma\?:/m.test(source)
       ? [
           {
-            file: 'test/test-app.ts',
+            file: 'test/setup/test-app.ts',
             line:
               source.split('\n').findIndex((l) => /^\s*prisma\?:/.test(l)) + 1,
             text: 'TestAppOverrides 提供了 prisma override 欄位',

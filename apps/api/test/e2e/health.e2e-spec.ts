@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { createE2EApp, createMockRedis } from './test-app';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
 
 // 走真 test DB：DbHealthIndicator 的 `SELECT 1` 打真連線；Redis 仍 mock。
 describe('Health (e2e)', () => {

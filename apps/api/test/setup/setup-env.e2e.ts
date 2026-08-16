@@ -5,7 +5,7 @@
  */
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { applyE2EDbEnv } from './helpers/e2e-env';
+import { applyE2EDbEnv } from '../helpers/e2e-env';
 
 applyE2EDbEnv();
 

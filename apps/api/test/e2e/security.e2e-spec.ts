@@ -1,14 +1,14 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { createE2EApp, createMockRedis } from './test-app';
-import { resetDb, seedMember } from './helpers/db';
+import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
+import { resetDb, seedMember } from '../helpers/db';
 import {
   expectApiError,
   expectUnauthorized,
   describeUnauthorized,
-} from './helpers/assertions';
-import { ResponseCodes } from '../src/shared/constants/response-codes';
+} from '../helpers/assertions';
+import { ResponseCodes } from '../../src/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個 roleCode=SUPERADMIN 的 admin 並登入取 token
 //（security 走 RolesGuard + @Roles(SUPERADMIN)，flag 預設開啟,roleCode 由 JwtAuthGuard 每次查 DB 補上）。

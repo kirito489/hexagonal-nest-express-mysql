@@ -1,14 +1,14 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { createE2EApp, createMockRedis } from './test-app';
-import { resetDb, seedMember, seedRole } from './helpers/db';
+import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { createE2EApp, createMockRedis } from '../setup/test-app';
+import { resetDb, seedMember, seedRole } from '../helpers/db';
 import {
   expectApiError,
   expectUnauthorized,
   expectForbidden,
-} from './helpers/assertions';
-import { ResponseCodes } from '../src/shared/constants/response-codes';
+} from '../helpers/assertions';
+import { ResponseCodes } from '../../src/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個帶 ACCOUNT:VIEW/EDIT 的 admin 並登入；
 // 無權限測試另 seed 空權限會員；目標會員以 prisma 直接建，斷言查真 DB。
