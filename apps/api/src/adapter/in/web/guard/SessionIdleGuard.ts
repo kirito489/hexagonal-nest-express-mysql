@@ -6,13 +6,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 import {
   SESSION_ACTIVITY_PORT,
   SessionActivityPort,
-} from '../../../../application/port/out/auth/SessionActivityPort';
+} from '@app/application/port/out/auth/SessionActivityPort';
 import { MemberContext } from '../decorator/current-member.decorator';
-import { getEnv } from '../../../../infrastructure/validate-env';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 /**
  * 全域 Guard：檢查認證使用者的 session 是否因閒置而過期。

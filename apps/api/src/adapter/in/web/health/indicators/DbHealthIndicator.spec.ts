@@ -1,6 +1,6 @@
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { DbHealthIndicator } from './DbHealthIndicator';
-import { PrismaService } from '../../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 
 const upResult = { database: { status: 'up' } };
 const downResult = { database: { status: 'down' } };

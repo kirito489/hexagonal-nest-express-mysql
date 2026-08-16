@@ -22,12 +22,12 @@ import {
   ClearMemberContextPort,
 } from '../../../port/out/member/ClearMemberContextPort';
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
-import { Email } from '../../../../domain/value-object/Email';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { CannotDisableSelfException } from '../../../../domain/exception/CannotDisableSelfException';
-import { DefaultMemberNotEditableException } from '../../../../domain/exception/DefaultMemberNotEditableException';
+import { Email } from '@app/domain/value-object/Email';
+import { MemberNotFoundException } from '@app/domain/exception/MemberNotFoundException';
+import { EmailAlreadyExistsException } from '@app/domain/exception/EmailAlreadyExistsException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
+import { CannotDisableSelfException } from '@app/domain/exception/CannotDisableSelfException';
+import { DefaultMemberNotEditableException } from '@app/domain/exception/DefaultMemberNotEditableException';
 import { BCRYPT_ROUNDS } from './CreateMemberService';
 
 export { UPDATE_MEMBER_USE_CASE };

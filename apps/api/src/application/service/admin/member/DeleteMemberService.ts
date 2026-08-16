@@ -12,9 +12,9 @@ import {
   SAVE_MEMBER_PORT,
   SaveMemberPort,
 } from '../../../port/out/member/SaveMemberPort';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
-import { CannotDeleteSelfException } from '../../../../domain/exception/CannotDeleteSelfException';
-import { DefaultMemberNotDeletableException } from '../../../../domain/exception/DefaultMemberNotDeletableException';
+import { MemberNotFoundException } from '@app/domain/exception/MemberNotFoundException';
+import { CannotDeleteSelfException } from '@app/domain/exception/CannotDeleteSelfException';
+import { DefaultMemberNotDeletableException } from '@app/domain/exception/DefaultMemberNotDeletableException';
 
 export { DELETE_MEMBER_USE_CASE };
 

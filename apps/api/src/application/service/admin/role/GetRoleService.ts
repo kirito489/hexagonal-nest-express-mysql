@@ -12,7 +12,7 @@ import {
   PERMISSION_REPOSITORY_PORT,
   PermissionRepositoryPort,
 } from '../../../port/out/role/PermissionRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 export { GET_ROLE_USE_CASE };
 

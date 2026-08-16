@@ -12,15 +12,15 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { MemberFacade } from '../../../../../application/facade/admin/MemberFacade';
+import { MemberFacade } from '@app/application/facade/admin/MemberFacade';
 import { PermissionsGuard } from '../../guard/PermissionsGuard';
 import { Permissions } from '../../decorator/permissions.decorator';
 import {
   CurrentMember,
   MemberContext,
 } from '../../decorator/current-member.decorator';
-import { PermissionCode } from '../../../../../domain/value-object/Role';
-import { ZodValidationPipe } from '../../../../../infrastructure/zod-validation.pipe';
+import { PermissionCode } from '@app/domain/value-object/Role';
+import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import { listMembersQuerySchema, ListMembersQuery } from './ListMembersQuery';
 import {
   listRoleOptionsQuerySchema,

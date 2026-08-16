@@ -10,7 +10,7 @@ import {
   UpdateIpBlacklistService,
 } from './SecurityServices';
 import { IpListPort } from '../../../port/out/security/IpListPort';
-import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+import { IpListNotFoundException } from '@app/domain/exception/IpListNotFoundException';
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({ DEFAULT_PAGE_LIMIT: 15 }),

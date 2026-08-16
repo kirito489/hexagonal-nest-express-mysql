@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from '../setup/test-app';
 import {
   resetDb,

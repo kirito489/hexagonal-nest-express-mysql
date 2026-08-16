@@ -6,11 +6,11 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 import {
   IP_LIST_PORT,
   IpListPort,
-} from '../../../../application/port/out/security/IpListPort';
+} from '@app/application/port/out/security/IpListPort';
 
 /**
  * 全域 Guard：當 IP 白名單功能啟用時，僅允許白名單中的 IP 存取。

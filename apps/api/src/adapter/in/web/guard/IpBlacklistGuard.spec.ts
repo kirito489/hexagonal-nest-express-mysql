@@ -1,7 +1,7 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { IpBlacklistGuard } from './IpBlacklistGuard';
-import { IpListPort } from '../../../../application/port/out/security/IpListPort';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { IpListPort } from '@app/application/port/out/security/IpListPort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 
 const makeContext = (ip = '1.2.3.4'): ExecutionContext =>
   ({

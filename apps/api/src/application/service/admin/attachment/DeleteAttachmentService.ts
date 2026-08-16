@@ -11,7 +11,7 @@ import {
   FILE_STORAGE_PORT,
   FileStoragePort,
 } from '../../../port/out/shared/FileStoragePort';
-import { AttachmentNotFoundException } from '../../../../domain/exception/AttachmentNotFoundException';
+import { AttachmentNotFoundException } from '@app/domain/exception/AttachmentNotFoundException';
 
 export { DELETE_ATTACHMENT_USE_CASE };
 

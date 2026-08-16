@@ -1,21 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
   ListMembersPage,
   ListMembersParams,
   LoadMemberPort,
   MemberRecordDto,
-} from '../../../../application/port/out/member/LoadMemberPort';
-import { SaveMemberPort } from '../../../../application/port/out/member/SaveMemberPort';
-import { UpdateMemberPasswordPort } from '../../../../application/port/out/member/UpdateMemberPasswordPort';
+} from '@app/application/port/out/member/LoadMemberPort';
+import { SaveMemberPort } from '@app/application/port/out/member/SaveMemberPort';
+import { UpdateMemberPasswordPort } from '@app/application/port/out/member/UpdateMemberPasswordPort';
 import {
   LoadMemberContextPort,
   MemberContextData,
-} from '../../../../application/port/out/member/LoadMemberContextPort';
-import { Member } from '../../../../domain/model/Member';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
+} from '@app/application/port/out/member/LoadMemberContextPort';
+import { Member } from '@app/domain/model/Member';
+import { EmailAlreadyExistsException } from '@app/domain/exception/EmailAlreadyExistsException';
 import { MemberMapper } from './mapper/MemberMapper';
 
 @Injectable()

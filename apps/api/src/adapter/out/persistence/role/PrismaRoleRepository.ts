@@ -1,22 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
   LoadRolePort,
   ListActiveRolesParams,
   ListActiveRolesResult,
   RoleOptionItem,
-} from '../../../../application/port/out/role/LoadRolePort';
+} from '@app/application/port/out/role/LoadRolePort';
 import {
   ListRolesPage,
   ListRolesParams,
   RoleRecord,
   RoleRepositoryPort,
-} from '../../../../application/port/out/role/RoleRepositoryPort';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
-import { DefaultRoleNotFoundException } from '../../../../domain/exception/DefaultRoleNotFoundException';
-import { RoleCode } from '../../../../domain/value-object/Role';
+} from '@app/application/port/out/role/RoleRepositoryPort';
+import { DuplicateRoleNameException } from '@app/domain/exception/DuplicateRoleNameException';
+import { DefaultRoleNotFoundException } from '@app/domain/exception/DefaultRoleNotFoundException';
+import { RoleCode } from '@app/domain/value-object/Role';
 
 /**
  * RoleCode.SUPERADMIN 的系統角色不可被一般帳號指派。

@@ -1,8 +1,8 @@
 import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of, lastValueFrom } from 'rxjs';
 import { LoggingInterceptor } from './LoggingInterceptor';
-import { SaveSystemLogPort } from '../../../../application/port/out/shared/SaveSystemLogPort';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { SaveSystemLogPort } from '@app/application/port/out/shared/SaveSystemLogPort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({ REDIS_KEY_PREFIX: 'test:', SERVICE_NAME: 'test' }),

@@ -7,9 +7,9 @@ import {
   ROLE_REPOSITORY_PORT,
   RoleRepositoryPort,
 } from '../../../port/out/role/RoleRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { DefaultRoleNotDeletableException } from '../../../../domain/exception/DefaultRoleNotDeletableException';
-import { RoleHasMembersException } from '../../../../domain/exception/RoleHasMembersException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
+import { DefaultRoleNotDeletableException } from '@app/domain/exception/DefaultRoleNotDeletableException';
+import { RoleHasMembersException } from '@app/domain/exception/RoleHasMembersException';
 
 export { DELETE_ROLE_USE_CASE };
 

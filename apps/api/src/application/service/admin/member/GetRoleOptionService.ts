@@ -8,7 +8,7 @@ import {
   LOAD_ROLE_PORT,
   LoadRolePort,
 } from '../../../port/out/role/LoadRolePort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 export { GET_ROLE_OPTION_USE_CASE };
 

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from '../setup/test-app';
 import { resetDb, seedMember, seedRole } from '../helpers/db';
 import {
@@ -8,7 +8,7 @@ import {
   expectUnauthorized,
   describeUnauthorized,
 } from '../helpers/assertions';
-import { ResponseCodes } from '../../src/shared/constants/response-codes';
+import { ResponseCodes } from '@app/shared/constants/response-codes';
 
 // 走真 test DB:beforeEach seed 一個帶 BACKEND:ROLE:VIEW/EDIT 的 admin 並登入取 token；
 // 目標角色以 seedRole 建，斷言查真 DB。列表含 admin 自身的角色，故用「包含」語意。

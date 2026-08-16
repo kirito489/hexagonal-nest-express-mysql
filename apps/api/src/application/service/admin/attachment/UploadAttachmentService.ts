@@ -18,9 +18,9 @@ import {
   extForMime,
   isAllowedMime,
   isUploadFolder,
-} from '../../../../shared/constants/upload';
-import { InvalidUploadException } from '../../../../domain/exception/InvalidUploadException';
-import { getEnv } from '../../../../infrastructure/validate-env';
+} from '@app/shared/constants/upload';
+import { InvalidUploadException } from '@app/domain/exception/InvalidUploadException';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 export { UPLOAD_ATTACHMENT_USE_CASE };
 

@@ -1,4 +1,4 @@
-import { PaginationMeta } from '../../../../../infrastructure/pagination';
+import { PaginationMeta } from '@app/infrastructure/pagination';
 
 export interface ListMembersQuery {
   page?: number;

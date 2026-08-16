@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
-import { Member } from '../../../../../domain/model/Member';
-import { MemberRecordDto } from '../../../../../application/port/out/member/LoadMemberPort';
-import { MemberContextData } from '../../../../../application/port/out/member/LoadMemberContextPort';
+import { Member } from '@app/domain/model/Member';
+import { MemberRecordDto } from '@app/application/port/out/member/LoadMemberPort';
+import { MemberContextData } from '@app/application/port/out/member/LoadMemberContextPort';
 
 // 與 PrismaMemberRepository 各 query 對應的 row 形狀；用 GetPayload 從 include 反推型別，避免重複定義
 type MemberRow = Prisma.MemberRecordGetPayload<true>;

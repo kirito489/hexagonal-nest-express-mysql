@@ -8,7 +8,7 @@ import {
   LOAD_MEMBER_PORT,
   LoadMemberPort,
 } from '../../../port/out/member/LoadMemberPort';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
+import { MemberNotFoundException } from '@app/domain/exception/MemberNotFoundException';
 
 export { GET_MEMBER_USE_CASE };
 

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
+import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 import {
   LoginCommand,
   LoginResult,
@@ -47,7 +47,7 @@ import {
 } from '../../../port/out/auth/SessionActivityPort';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { JwtPayload } from '../../../port/jwt-payload';
-import { getEnv } from '../../../../infrastructure/validate-env';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 @Injectable()
 export class LoginService implements LoginUseCase {

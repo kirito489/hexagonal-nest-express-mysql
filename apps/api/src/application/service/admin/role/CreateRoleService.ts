@@ -13,7 +13,7 @@ import {
   PERMISSION_REPOSITORY_PORT,
   PermissionRepositoryPort,
 } from '../../../port/out/role/PermissionRepositoryPort';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
+import { DuplicateRoleNameException } from '@app/domain/exception/DuplicateRoleNameException';
 import { validatePermissions } from './permission-validator';
 
 export { CREATE_ROLE_USE_CASE };

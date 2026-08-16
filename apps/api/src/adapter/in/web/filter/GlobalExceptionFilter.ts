@@ -12,15 +12,15 @@ import * as Sentry from '@sentry/nestjs';
 import {
   SAVE_SYSTEM_LOG_PORT,
   SaveSystemLogPort,
-} from '../../../../application/port/out/shared/SaveSystemLogPort';
+} from '@app/application/port/out/shared/SaveSystemLogPort';
 import { buildSystemLogData } from '../helper/system-log-helper';
 import { getRequestStartTime } from '../helper/request-start-time';
 import {
   DomainException,
   DomainExceptionKind,
-} from '../../../../domain/exception/DomainException';
-import { ResponseCodes } from '../../../../shared/constants/response-codes';
-import { ResponseMessages } from '../../../../shared/constants/response-messages';
+} from '@app/domain/exception/DomainException';
+import { ResponseCodes } from '@app/shared/constants/response-codes';
+import { ResponseMessages } from '@app/shared/constants/response-messages';
 
 export interface ApiErrorResponse {
   success: false;

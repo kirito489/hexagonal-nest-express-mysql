@@ -4,7 +4,7 @@ import {
   RoleRepositoryPort,
 } from '../../../port/out/role/RoleRepositoryPort';
 import { PermissionRepositoryPort } from '../../../port/out/role/PermissionRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 const ROLE_ID = '00000000-0000-4000-8000-000000000001';
 

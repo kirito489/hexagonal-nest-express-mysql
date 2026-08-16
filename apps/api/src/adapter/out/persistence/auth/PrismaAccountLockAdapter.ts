@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { AccountLockPort } from '../../../../application/port/out/auth/AccountLockPort';
-import { RedisService } from '../../../../infrastructure/redis/redis.service';
-import { buildFailedLoginKey } from '../../../../infrastructure/redis/cache-keys';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
+import { AccountLockPort } from '@app/application/port/out/auth/AccountLockPort';
+import { RedisService } from '@app/infrastructure/redis/redis.service';
+import { buildFailedLoginKey } from '@app/infrastructure/redis/cache-keys';
 
 /**
  * 帳號鎖定 Adapter：

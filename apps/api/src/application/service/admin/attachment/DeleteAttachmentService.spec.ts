@@ -4,7 +4,7 @@ import {
   AttachmentRecord,
   AttachmentRepositoryPort,
 } from '../../../port/out/attachment/AttachmentRepositoryPort';
-import { AttachmentNotFoundException } from '../../../../domain/exception/AttachmentNotFoundException';
+import { AttachmentNotFoundException } from '@app/domain/exception/AttachmentNotFoundException';
 
 describe('DeleteAttachmentService', () => {
   const fileStorage: jest.Mocked<FileStoragePort> = {

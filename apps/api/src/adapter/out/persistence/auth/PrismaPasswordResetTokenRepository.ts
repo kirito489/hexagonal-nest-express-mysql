@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
-import { PasswordResetTokenPort } from '../../../../application/port/out/auth/PasswordResetTokenPort';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
+import { PasswordResetTokenPort } from '@app/application/port/out/auth/PasswordResetTokenPort';
 
 /**
  * 密碼重設 Token 持久化 Adapter。

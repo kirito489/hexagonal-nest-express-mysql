@@ -1,7 +1,7 @@
 import request from 'supertest';
 import type { Response } from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { ResponseCode } from '../../src/shared/constants/response-codes';
+import type { ResponseCode } from '@app/shared/constants/response-codes';
 
 /**
  * 斷言業務錯誤回應。

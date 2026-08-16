@@ -11,8 +11,8 @@ import { IpBlockPort } from '../../../port/out/security/IpBlockPort';
 import { IpListPort } from '../../../port/out/security/IpListPort';
 import { RecaptchaVerifyPort } from '../../../port/out/auth/RecaptchaVerifyPort';
 import { SessionActivityPort } from '../../../port/out/auth/SessionActivityPort';
-import { Member } from '../../../../domain/model/Member';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
+import { Member } from '@app/domain/model/Member';
+import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 
 jest.mock('bcrypt', () => ({ compare: jest.fn() }));
 

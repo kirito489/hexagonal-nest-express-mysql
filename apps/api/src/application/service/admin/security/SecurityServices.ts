@@ -35,10 +35,10 @@ import {
 import {
   buildPaginationMeta,
   getPagination,
-} from '../../../../infrastructure/pagination';
-import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
-import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
-import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+} from '@app/infrastructure/pagination';
+import { EmailNotFoundException } from '@app/domain/exception/EmailNotFoundException';
+import { AccountNotLockedException } from '@app/domain/exception/AccountNotLockedException';
+import { IpListNotFoundException } from '@app/domain/exception/IpListNotFoundException';
 
 // ── IP 白名單 ────────────────────────────────
 

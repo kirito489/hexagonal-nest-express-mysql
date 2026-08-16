@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
   ATTACHMENT_REPOSITORY_PORT,
   AttachmentRecord,
   AttachmentRepositoryPort,
   SaveAttachmentData,
-} from '../../../../application/port/out/attachment/AttachmentRepositoryPort';
+} from '@app/application/port/out/attachment/AttachmentRepositoryPort';
 
 // re-export 方便 module 綁定一處 import
 export { ATTACHMENT_REPOSITORY_PORT };

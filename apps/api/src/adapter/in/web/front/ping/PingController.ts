@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import { PingFacade } from '../../../../../application/facade/front/PingFacade';
-import type { PingResult } from '../../../../../application/port/in/front/ping/PingUseCase';
+import { PingFacade } from '@app/application/facade/front/PingFacade';
+import type { PingResult } from '@app/application/port/in/front/ping/PingUseCase';
 import { Public } from '../../decorator/public.decorator';
 
 /**

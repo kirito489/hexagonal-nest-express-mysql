@@ -13,25 +13,25 @@ import { Request } from 'express';
 import {
   LOAD_MEMBER_CONTEXT_PORT,
   LoadMemberContextPort,
-} from '../../../../application/port/out/member/LoadMemberContextPort';
+} from '@app/application/port/out/member/LoadMemberContextPort';
 import {
   TOKEN_BLACKLIST_PORT,
   TokenBlacklistPort,
-} from '../../../../application/port/out/auth/TokenBlacklistPort';
+} from '@app/application/port/out/auth/TokenBlacklistPort';
 import {
   MEMBER_CONTEXT_CACHE_PORT,
   MemberContextCachePort,
-} from '../../../../application/port/out/member/MemberContextCachePort';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
-import { JwtPayload } from '../../../../application/port/jwt-payload';
-import { getEnv } from '../../../../infrastructure/validate-env';
+} from '@app/application/port/out/member/MemberContextCachePort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
+import { JwtPayload } from '@app/application/port/jwt-payload';
+import { getEnv } from '@app/infrastructure/validate-env';
 import {
   MemberContext,
   MemberContextSchema,
 } from '../decorator/current-member.decorator';
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
-import { PasswordChangeRequiredException } from '../../../../domain/exception/PasswordChangeRequiredException';
+import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
+import { PasswordChangeRequiredException } from '@app/domain/exception/PasswordChangeRequiredException';
 
 /**
  * 全域認證 Guard（APP_GUARD）。

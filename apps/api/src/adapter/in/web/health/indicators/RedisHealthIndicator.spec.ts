@@ -1,6 +1,6 @@
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { RedisHealthIndicator } from './RedisHealthIndicator';
-import { RedisService } from '../../../../../infrastructure/redis/redis.service';
+import { RedisService } from '@app/infrastructure/redis/redis.service';
 
 const upResult = { redis: { status: 'up' } };
 const downResult = { redis: { status: 'down' } };

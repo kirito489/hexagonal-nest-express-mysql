@@ -31,7 +31,7 @@ import {
 } from '../../../port/out/auth/SaveAuthLogPort';
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
-import { getEnv } from '../../../../infrastructure/validate-env';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 /**
  * 重設密碼服務：驗證 token → 驗證密碼策略 → 更新密碼。

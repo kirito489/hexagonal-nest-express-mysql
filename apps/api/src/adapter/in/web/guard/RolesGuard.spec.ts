@@ -1,8 +1,8 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './RolesGuard';
-import { RoleCode } from '../../../../domain/value-object/Role';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { RoleCode } from '@app/domain/value-object/Role';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 
 const makeContext = (roleCode: string): ExecutionContext => {
   const request = { member: { roleCode } };

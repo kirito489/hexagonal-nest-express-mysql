@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
   AuthLogData,
   SaveAuthLogPort,
-} from '../../../../application/port/out/auth/SaveAuthLogPort';
+} from '@app/application/port/out/auth/SaveAuthLogPort';
 
 /**
  * 登入日誌持久化 Adapter，寫入 auth_logs 表。

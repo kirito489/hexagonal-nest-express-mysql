@@ -1,4 +1,4 @@
-import { PaginationMeta } from '../../../../../infrastructure/pagination';
+import { PaginationMeta } from '@app/infrastructure/pagination';
 
 export const LIST_ROLES_USE_CASE = 'LIST_ROLES_USE_CASE';
 

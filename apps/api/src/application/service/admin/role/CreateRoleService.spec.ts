@@ -1,9 +1,9 @@
 import { CreateRoleService } from './CreateRoleService';
 import { RoleRepositoryPort } from '../../../port/out/role/RoleRepositoryPort';
 import { PermissionRepositoryPort } from '../../../port/out/role/PermissionRepositoryPort';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
-import { InvalidPermissionCodeException } from '../../../../domain/exception/InvalidPermissionCodeException';
-import { InvalidPermissionCombinationException } from '../../../../domain/exception/InvalidPermissionCombinationException';
+import { DuplicateRoleNameException } from '@app/domain/exception/DuplicateRoleNameException';
+import { InvalidPermissionCodeException } from '@app/domain/exception/InvalidPermissionCodeException';
+import { InvalidPermissionCombinationException } from '@app/domain/exception/InvalidPermissionCombinationException';
 
 const NEW_ROLE_ID = '00000000-0000-4000-8000-000000000099';
 

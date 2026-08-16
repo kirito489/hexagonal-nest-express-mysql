@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { MemberFacade } from '../../../../../application/facade/admin/MemberFacade';
+import { MemberFacade } from '@app/application/facade/admin/MemberFacade';
 import {
   CurrentMember,
   MemberContext,

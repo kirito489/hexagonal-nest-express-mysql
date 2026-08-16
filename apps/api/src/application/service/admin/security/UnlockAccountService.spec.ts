@@ -1,9 +1,9 @@
 import { UnlockAccountService } from './SecurityServices';
 import { LoadMemberPort } from '../../../port/out/member/LoadMemberPort';
 import { AccountLockPort } from '../../../port/out/auth/AccountLockPort';
-import { Member } from '../../../../domain/model/Member';
-import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
-import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
+import { Member } from '@app/domain/model/Member';
+import { EmailNotFoundException } from '@app/domain/exception/EmailNotFoundException';
+import { AccountNotLockedException } from '@app/domain/exception/AccountNotLockedException';
 
 const MEMBER_ID = '00000000-0000-4000-8000-000000000001';
 const ROLE_ID = '00000000-0000-4000-8000-000000000010';

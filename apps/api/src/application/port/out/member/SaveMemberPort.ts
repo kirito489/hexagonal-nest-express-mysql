@@ -1,4 +1,4 @@
-import { Member } from '../../../../domain/model/Member';
+import { Member } from '@app/domain/model/Member';
 
 export const SAVE_MEMBER_PORT = 'SAVE_MEMBER_PORT';
 

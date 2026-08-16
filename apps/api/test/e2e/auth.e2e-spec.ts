@@ -1,10 +1,10 @@
 import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from '../setup/test-app';
 import { resetDb, seedMember } from '../helpers/db';
 import { expectApiError, expectUnauthorized } from '../helpers/assertions';
-import { ResponseCodes } from '../../src/shared/constants/response-codes';
+import { ResponseCodes } from '@app/shared/constants/response-codes';
 
 // 走真 test DB:login 相關 case seed 真會員;黑名單 / throttle 仍走 Redis mock。
 const TEST_EMAIL = 'test@example.com';

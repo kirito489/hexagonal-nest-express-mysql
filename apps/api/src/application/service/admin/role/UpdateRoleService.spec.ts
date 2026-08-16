@@ -4,9 +4,9 @@ import {
   RoleRepositoryPort,
 } from '../../../port/out/role/RoleRepositoryPort';
 import { PermissionRepositoryPort } from '../../../port/out/role/PermissionRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { DefaultRoleNotEditableException } from '../../../../domain/exception/DefaultRoleNotEditableException';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
+import { DefaultRoleNotEditableException } from '@app/domain/exception/DefaultRoleNotEditableException';
+import { DuplicateRoleNameException } from '@app/domain/exception/DuplicateRoleNameException';
 
 const ROLE_ID = '00000000-0000-4000-8000-000000000001';
 

@@ -3,9 +3,9 @@ import {
   RoleRecord,
   RoleRepositoryPort,
 } from '../../../port/out/role/RoleRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { DefaultRoleNotDeletableException } from '../../../../domain/exception/DefaultRoleNotDeletableException';
-import { RoleHasMembersException } from '../../../../domain/exception/RoleHasMembersException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
+import { DefaultRoleNotDeletableException } from '@app/domain/exception/DefaultRoleNotDeletableException';
+import { RoleHasMembersException } from '@app/domain/exception/RoleHasMembersException';
 
 const ROLE_ID = '00000000-0000-4000-8000-000000000001';
 

@@ -18,7 +18,7 @@ import {
 } from '../../../port/out/auth/SaveAuthLogPort';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { JwtPayload } from '../../../port/jwt-payload';
-import { getEnv } from '../../../../infrastructure/validate-env';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 /**
  * 登出處理：將 access / refresh 同時加入黑名單，並清除 MemberContext 快取

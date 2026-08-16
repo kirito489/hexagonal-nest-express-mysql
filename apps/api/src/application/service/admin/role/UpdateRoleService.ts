@@ -12,9 +12,9 @@ import {
   PERMISSION_REPOSITORY_PORT,
   PermissionRepositoryPort,
 } from '../../../port/out/role/PermissionRepositoryPort';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
-import { DuplicateRoleNameException } from '../../../../domain/exception/DuplicateRoleNameException';
-import { DefaultRoleNotEditableException } from '../../../../domain/exception/DefaultRoleNotEditableException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
+import { DuplicateRoleNameException } from '@app/domain/exception/DuplicateRoleNameException';
+import { DefaultRoleNotEditableException } from '@app/domain/exception/DefaultRoleNotEditableException';
 import { validatePermissions } from './permission-validator';
 
 export { UPDATE_ROLE_USE_CASE };

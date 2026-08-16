@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { SessionIdleGuard } from './SessionIdleGuard';
-import { SessionActivityPort } from '../../../../application/port/out/auth/SessionActivityPort';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { SessionActivityPort } from '@app/application/port/out/auth/SessionActivityPort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({ APPLICATION_SESSION_IDLE_TIMEOUT: 120 }),

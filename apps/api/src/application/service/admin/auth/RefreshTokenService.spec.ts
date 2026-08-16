@@ -5,8 +5,8 @@ import { LoadMemberContextPort } from '../../../port/out/member/LoadMemberContex
 import { SaveAuthLogPort } from '../../../port/out/auth/SaveAuthLogPort';
 import { SaveMemberPort } from '../../../port/out/member/SaveMemberPort';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
-import { InvalidRefreshTokenException } from '../../../../domain/exception/InvalidRefreshTokenException';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
+import { InvalidRefreshTokenException } from '@app/domain/exception/InvalidRefreshTokenException';
+import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({

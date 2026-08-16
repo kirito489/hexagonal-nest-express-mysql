@@ -12,20 +12,20 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { SecurityFacade } from '../../../../../application/facade/admin/SecurityFacade';
+import { SecurityFacade } from '@app/application/facade/admin/SecurityFacade';
 import {
   IpBlacklistItem,
   IpListItem,
-} from '../../../../../application/port/out/security/IpListPort';
-import { ListIpListResult } from '../../../../../application/port/in/admin/security/SecurityUseCases';
+} from '@app/application/port/out/security/IpListPort';
+import { ListIpListResult } from '@app/application/port/in/admin/security/SecurityUseCases';
 import { RolesGuard } from '../../guard/RolesGuard';
 import { Roles } from '../../decorator/roles.decorator';
-import { RoleCode } from '../../../../../domain/value-object/Role';
+import { RoleCode } from '@app/domain/value-object/Role';
 import {
   CurrentMember,
   MemberContext,
 } from '../../decorator/current-member.decorator';
-import { ZodValidationPipe } from '../../../../../infrastructure/zod-validation.pipe';
+import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import { listIpListQuerySchema, ListIpListQuery } from './ListIpListQuery';
 import {
   AddIpWhitelistRequest,

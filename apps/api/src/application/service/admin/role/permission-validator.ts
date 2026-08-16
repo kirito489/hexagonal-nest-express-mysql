@@ -1,5 +1,5 @@
-import { InvalidPermissionCodeException } from '../../../../domain/exception/InvalidPermissionCodeException';
-import { InvalidPermissionCombinationException } from '../../../../domain/exception/InvalidPermissionCombinationException';
+import { InvalidPermissionCodeException } from '@app/domain/exception/InvalidPermissionCodeException';
+import { InvalidPermissionCombinationException } from '@app/domain/exception/InvalidPermissionCombinationException';
 import { PermissionRepositoryPort } from '../../../port/out/role/PermissionRepositoryPort';
 
 /** 共用權限驗證邏輯：檢查 code 存在於 DB，並驗證 EDIT 必須搭配 VIEW */

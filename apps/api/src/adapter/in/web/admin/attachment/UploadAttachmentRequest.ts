@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UPLOAD_FOLDERS } from '../../../../../shared/constants/upload';
+import { UPLOAD_FOLDERS } from '@app/shared/constants/upload';
 
 export const uploadAttachmentSchema = z.object({
   folder: z.enum(UPLOAD_FOLDERS),

@@ -11,8 +11,8 @@ import { Observable, tap } from 'rxjs';
 import {
   SAVE_SYSTEM_LOG_PORT,
   SaveSystemLogPort,
-} from '../../../../application/port/out/shared/SaveSystemLogPort';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+} from '@app/application/port/out/shared/SaveSystemLogPort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 import { buildSystemLogData } from '../helper/system-log-helper';
 import { setRequestStartTime } from '../helper/request-start-time';
 

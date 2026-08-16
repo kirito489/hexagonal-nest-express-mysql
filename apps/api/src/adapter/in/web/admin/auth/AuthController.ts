@@ -6,9 +6,9 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { AuthFacade } from '../../../../../application/facade/admin/AuthFacade';
-import { LoginResult } from '../../../../../application/port/in/admin/auth/LoginUseCase';
-import { RefreshTokenResult } from '../../../../../application/port/in/admin/auth/RefreshTokenUseCase';
+import { AuthFacade } from '@app/application/facade/admin/AuthFacade';
+import { LoginResult } from '@app/application/port/in/admin/auth/LoginUseCase';
+import { RefreshTokenResult } from '@app/application/port/in/admin/auth/RefreshTokenUseCase';
 import { LoginRequest, loginSchema } from './LoginRequest';
 import { LogoutRequest, logoutSchema } from './LogoutRequest';
 import {
@@ -25,7 +25,7 @@ import {
   MemberContext,
 } from '../../decorator/current-member.decorator';
 import { Public } from '../../decorator/public.decorator';
-import { ZodValidationPipe } from '../../../../../infrastructure/zod-validation.pipe';
+import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 

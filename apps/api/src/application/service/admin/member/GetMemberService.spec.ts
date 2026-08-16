@@ -1,6 +1,6 @@
 import { GetMemberService } from './GetMemberService';
 import { LoadMemberPort } from '../../../port/out/member/LoadMemberPort';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
+import { MemberNotFoundException } from '@app/domain/exception/MemberNotFoundException';
 
 const MEMBER_ID = '00000000-0000-4000-8000-000000000001';
 

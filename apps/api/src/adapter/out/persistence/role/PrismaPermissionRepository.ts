@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
   PermissionRecord,
   PermissionRepositoryPort,
-} from '../../../../application/port/out/role/PermissionRepositoryPort';
+} from '@app/application/port/out/role/PermissionRepositoryPort';
 
 @Injectable()
 export class PrismaPermissionRepository implements PermissionRepositoryPort {

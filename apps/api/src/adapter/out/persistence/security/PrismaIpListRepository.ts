@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import {
   IpBlacklistItem,
@@ -7,8 +7,8 @@ import {
   IpListPort,
   ListIpParams,
   ListIpResult,
-} from '../../../../application/port/out/security/IpListPort';
-import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+} from '@app/application/port/out/security/IpListPort';
+import { IpListNotFoundException } from '@app/domain/exception/IpListNotFoundException';
 
 /**
  * IP 黑白名單持久化 Adapter，查詢 ip_whitelist / ip_blacklist 表。

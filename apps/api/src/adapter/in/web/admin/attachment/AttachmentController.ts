@@ -11,10 +11,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { AttachmentFacade } from '../../../../../application/facade/admin/AttachmentFacade';
-import { UploadAttachmentResult } from '../../../../../application/port/in/admin/attachment/UploadAttachmentUseCase';
-import { InvalidUploadException } from '../../../../../domain/exception/InvalidUploadException';
-import { ZodValidationPipe } from '../../../../../infrastructure/zod-validation.pipe';
+import { AttachmentFacade } from '@app/application/facade/admin/AttachmentFacade';
+import { UploadAttachmentResult } from '@app/application/port/in/admin/attachment/UploadAttachmentUseCase';
+import { InvalidUploadException } from '@app/domain/exception/InvalidUploadException';
+import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import {
   CurrentMember,
   MemberContext,

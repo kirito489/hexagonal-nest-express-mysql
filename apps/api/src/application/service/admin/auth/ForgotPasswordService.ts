@@ -15,7 +15,7 @@ import {
   SEND_EMAIL_PORT,
   SendEmailPort,
 } from '../../../port/out/shared/SendEmailPort';
-import { getEnv } from '../../../../infrastructure/validate-env';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 /**
  * 忘記密碼服務：產生重設 token 並寄送信件。

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
-import { PrismaService } from '../../src/infrastructure/prisma/prisma.service';
-import { parsePermissionCode } from '../../src/shared/constants/permissions';
+import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
+import { parsePermissionCode } from '@app/shared/constants/permissions';
 
 /**
  * 依外鍵順序清空所有表（e2e 每個 test 前重置，確保隔離）。

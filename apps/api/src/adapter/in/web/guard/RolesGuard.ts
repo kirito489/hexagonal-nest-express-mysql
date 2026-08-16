@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { RoleCode } from '../../../../domain/value-object/Role';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
+import { RoleCode } from '@app/domain/value-object/Role';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
 import { ROLES_KEY } from '../decorator/roles.decorator';
 
 /**

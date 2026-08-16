@@ -4,8 +4,8 @@ import { LoadMemberPort } from '../../../port/out/member/LoadMemberPort';
 import { SaveMemberPort } from '../../../port/out/member/SaveMemberPort';
 import { LoadRolePort } from '../../../port/out/role/LoadRolePort';
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { EmailAlreadyExistsException } from '@app/domain/exception/EmailAlreadyExistsException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 jest.mock('bcrypt', () => ({ hash: jest.fn() }));
 

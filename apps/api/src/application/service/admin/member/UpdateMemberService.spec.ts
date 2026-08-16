@@ -5,12 +5,12 @@ import { SaveMemberPort } from '../../../port/out/member/SaveMemberPort';
 import { LoadRolePort } from '../../../port/out/role/LoadRolePort';
 import { ClearMemberContextPort } from '../../../port/out/member/ClearMemberContextPort';
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
-import { Member } from '../../../../domain/model/Member';
-import { CannotDisableSelfException } from '../../../../domain/exception/CannotDisableSelfException';
-import { DefaultMemberNotEditableException } from '../../../../domain/exception/DefaultMemberNotEditableException';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
-import { MemberNotFoundException } from '../../../../domain/exception/MemberNotFoundException';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { Member } from '@app/domain/model/Member';
+import { CannotDisableSelfException } from '@app/domain/exception/CannotDisableSelfException';
+import { DefaultMemberNotEditableException } from '@app/domain/exception/DefaultMemberNotEditableException';
+import { EmailAlreadyExistsException } from '@app/domain/exception/EmailAlreadyExistsException';
+import { MemberNotFoundException } from '@app/domain/exception/MemberNotFoundException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 jest.mock('bcrypt', () => ({ hash: jest.fn() }));
 

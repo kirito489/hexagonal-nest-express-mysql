@@ -12,11 +12,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RoleFacade } from '../../../../../application/facade/admin/RoleFacade';
+import { RoleFacade } from '@app/application/facade/admin/RoleFacade';
 import { PermissionsGuard } from '../../guard/PermissionsGuard';
 import { Permissions } from '../../decorator/permissions.decorator';
-import { PermissionCode } from '../../../../../domain/value-object/Role';
-import { ZodValidationPipe } from '../../../../../infrastructure/zod-validation.pipe';
+import { PermissionCode } from '@app/domain/value-object/Role';
+import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import { listRolesQuerySchema, ListRolesQuery } from './ListRolesQuery';
 import { createRoleSchema, CreateRoleRequest } from './CreateRoleRequest';
 import { updateRoleSchema, UpdateRoleRequest } from './UpdateRoleRequest';

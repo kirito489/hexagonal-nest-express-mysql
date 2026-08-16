@@ -8,7 +8,7 @@ import {
   AttachmentRecord,
   AttachmentRepositoryPort,
 } from '../../../port/out/attachment/AttachmentRepositoryPort';
-import { InvalidUploadException } from '../../../../domain/exception/InvalidUploadException';
+import { InvalidUploadException } from '@app/domain/exception/InvalidUploadException';
 import { UploadAttachmentCommand } from '../../../port/in/admin/attachment/UploadAttachmentUseCase';
 
 describe('UploadAttachmentService', () => {

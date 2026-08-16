@@ -5,9 +5,9 @@ import {
 } from '@nestjs/platform-express';
 import { AbstractLoader } from '@nestjs/serve-static/dist/loaders/abstract.loader';
 import { ExpressLoader } from '@nestjs/serve-static/dist/loaders/express.loader';
-import { AppModule } from '../../src/app.module';
-import { RedisService } from '../../src/infrastructure/redis/redis.service';
-import { SAVE_SYSTEM_LOG_PORT } from '../../src/application/port/out/shared/SaveSystemLogPort';
+import { AppModule } from '@app/app.module';
+import { RedisService } from '@app/infrastructure/redis/redis.service';
+import { SAVE_SYSTEM_LOG_PORT } from '@app/application/port/out/shared/SaveSystemLogPort';
 
 export interface TestAppOverrides {
   redis?: ReturnType<typeof createMockRedis>;

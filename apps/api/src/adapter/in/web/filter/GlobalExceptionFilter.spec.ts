@@ -7,10 +7,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { GlobalExceptionFilter } from './GlobalExceptionFilter';
-import { SaveSystemLogPort } from '../../../../application/port/out/shared/SaveSystemLogPort';
-import { EmailNotFoundException } from '../../../../domain/exception/EmailNotFoundException';
-import { AccountNotLockedException } from '../../../../domain/exception/AccountNotLockedException';
-import { IpListNotFoundException } from '../../../../domain/exception/IpListNotFoundException';
+import { SaveSystemLogPort } from '@app/application/port/out/shared/SaveSystemLogPort';
+import { EmailNotFoundException } from '@app/domain/exception/EmailNotFoundException';
+import { AccountNotLockedException } from '@app/domain/exception/AccountNotLockedException';
+import { IpListNotFoundException } from '@app/domain/exception/IpListNotFoundException';
 import * as Sentry from '@sentry/nestjs';
 
 // buildSystemLogData uses getEnv() internally

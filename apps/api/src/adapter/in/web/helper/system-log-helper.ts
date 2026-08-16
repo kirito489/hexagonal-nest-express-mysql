@@ -1,6 +1,6 @@
 import { Request } from 'express';
-import { sanitize, sanitizeUrl } from '../../../../infrastructure/sanitize';
-import { SystemLogData } from '../../../../application/port/out/shared/SaveSystemLogPort';
+import { sanitize, sanitizeUrl } from '@app/infrastructure/sanitize';
+import { SystemLogData } from '@app/application/port/out/shared/SaveSystemLogPort';
 
 /**
  * 從 HTTP request 建立 SystemLogData 的公共欄位，

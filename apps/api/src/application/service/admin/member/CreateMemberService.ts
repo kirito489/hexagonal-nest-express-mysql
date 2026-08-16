@@ -19,10 +19,10 @@ import {
   LoadRolePort,
 } from '../../../port/out/role/LoadRolePort';
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
-import { Member } from '../../../../domain/model/Member';
-import { Email } from '../../../../domain/value-object/Email';
-import { EmailAlreadyExistsException } from '../../../../domain/exception/EmailAlreadyExistsException';
-import { RoleNotFoundException } from '../../../../domain/exception/RoleNotFoundException';
+import { Member } from '@app/domain/model/Member';
+import { Email } from '@app/domain/value-object/Email';
+import { EmailAlreadyExistsException } from '@app/domain/exception/EmailAlreadyExistsException';
+import { RoleNotFoundException } from '@app/domain/exception/RoleNotFoundException';
 
 export const BCRYPT_ROUNDS = 'BCRYPT_ROUNDS';
 export { CREATE_MEMBER_USE_CASE };

@@ -12,7 +12,7 @@ import {
 import {
   buildPaginationMeta,
   getPagination,
-} from '../../../../infrastructure/pagination';
+} from '@app/infrastructure/pagination';
 
 export { LIST_MEMBERS_USE_CASE };
 

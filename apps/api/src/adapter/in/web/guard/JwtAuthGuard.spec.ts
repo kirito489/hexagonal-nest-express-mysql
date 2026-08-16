@@ -6,10 +6,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './JwtAuthGuard';
-import { FeatureFlagService } from '../../../../application/service/shared/FeatureFlagService';
-import { TokenBlacklistPort } from '../../../../application/port/out/auth/TokenBlacklistPort';
-import { MemberContextCachePort } from '../../../../application/port/out/member/MemberContextCachePort';
-import { LoadMemberContextPort } from '../../../../application/port/out/member/LoadMemberContextPort';
+import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
+import { TokenBlacklistPort } from '@app/application/port/out/auth/TokenBlacklistPort';
+import { MemberContextCachePort } from '@app/application/port/out/member/MemberContextCachePort';
+import { LoadMemberContextPort } from '@app/application/port/out/member/LoadMemberContextPort';
 
 jest.mock('../../../../infrastructure/validate-env', () => ({
   getEnv: () => ({

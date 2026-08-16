@@ -28,9 +28,9 @@ import {
 } from '../../../port/out/member/ClearMemberContextPort';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { JwtPayload } from '../../../port/jwt-payload';
-import { getEnv } from '../../../../infrastructure/validate-env';
-import { InvalidRefreshTokenException } from '../../../../domain/exception/InvalidRefreshTokenException';
-import { AccountDisabledException } from '../../../../domain/exception/AccountDisabledException';
+import { getEnv } from '@app/infrastructure/validate-env';
+import { InvalidRefreshTokenException } from '@app/domain/exception/InvalidRefreshTokenException';
+import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 
 /**
  * 使用 Refresh Token 重新發行 Access Token + 新的 Refresh Token（rotation）。
