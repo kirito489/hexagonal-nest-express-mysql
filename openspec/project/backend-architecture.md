@@ -44,6 +44,31 @@ apps/api/src/
 - **時區 / 日期**：見下方「時間處理慣例」。
 - **Repository P2002**：Prisma `unique constraint violation` 在 Repository 層 try/catch 轉成 domain exception，service 層不感知 Prisma。
 
+### Path alias（`@app/*`）
+
+`@app/*` 對應 `apps/api/src/*`。**4 層以上的相對路徑一律改用 alias**，
+由 eslint 的基礎 `no-restricted-imports` 擋（門檻 `../../../../`）。
+
+門檻設在 4 層而非全面 alias 化：2～3 層多半是同模組內的鄰近檔案，
+相對路徑反而更能表達「就在隔壁」；4 層以上已經跨越分層邊界，看不出指向哪裡。
+
+四條解析路徑各自要設定，缺一就是那條路徑靜默失效：
+
+| 路徑 | 機制 |
+| --- | --- |
+| `tsc --noEmit` | `tsconfig.json` 的 `baseUrl` + `paths` |
+| `nest build` → `dist/` | **原生支援**，@nestjs/cli 的 tsc builder 編譯時改寫成相對路徑，`dist/` 內不留 `@app/` |
+| ts-jest（單元 / e2e / 守則） | 三份 jest 設定各自的 `moduleNameMapper`。注意 `<rootDir>` 不同：單元測試是 `src`，e2e 與守則是 `apps/api`（要補 `src/`） |
+| ts-node（9 支 script） | `-r tsconfig-paths/register` |
+
+**不需要 `tsc-alias`，也不需要換 SWC。** 這點與早期評估相反——曾因「`nest build` 不改寫 alias、
+`tsc-alias -w` 與 `nest start --watch` 兩個 watch 賽跑」而延後導入，實測 @nestjs/cli 11
+編譯時就會改寫，`node dist/main` 可完整啟動，那個賽跑問題根本不存在。
+
+改用 alias **不影響架構守則**：`layering` 比對 `prisma.service` / `Repository$` 等子字串、
+`side-isolation` 比對路徑是否含 `/admin/` `/front/`，這些片段在 `@app/` 形式下都還在
+（已用探針逐一驗證變紅）。
+
 ### 命名規範
 
 | 對象                  | 慣例                 | 範例                                          |

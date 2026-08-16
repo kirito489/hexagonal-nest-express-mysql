@@ -27,15 +27,27 @@
 
 ### 技術債（外部相依卡住，延後）
 
-> **處理原則**：兩項都卡在上游生態，不是本專案能單方面解決的。改動範圍大且會動搖 build baseline，要動請另開 change 並先確認條件已滿足，不要夾帶在功能開發裡。
-
-- **path alias（`@app/*`）導入**：專案有 187 處 4 層以上的相對 import，alias 可提升可讀性與重構安全。**延後原因（2026-07-15）**：`nest build` 走 tsc builder 不自動改寫 alias，三種機制皆有硬傷——tsc-alias 讓 dev（`nest start --watch` + `tsc-alias -w` 兩個 watch 賽跑）偶發「找不到 @app/x」；換 SWC 則踩 Hard Rule 的 cascade（decorator metadata / 與 ts-jest 並存）。純可讀性改善不值得動搖 build baseline。**條件**：改用 SWC / webpack builder，或有大重構痛點時再一起上。
+> **處理原則**：卡在上游生態，不是本專案能單方面解決的。改動範圍大且會動搖 build baseline，要動請另開 change 並先確認條件已滿足，不要夾帶在功能開發裡。
 
 - **`moduleResolution: node`（node10）遷移 `nodenext`**：TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已對齊到 TS 6.0.2（與 web / 編輯器同版），`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音 + `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**——NestJS 裝飾器 metadata 要求 `@Body()` DTO 用 `import type`，但注入的 service 不能改否則 DI 壞掉，與 TS 版本無關、卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時消音會失效，屆時強制處理。
 
 ---
 
 ## 已完成
+
+### 2026-08-16 — openspec 慣例整頓與 path alias 導入
+
+**openspec 格式與命名**：fork 出專案本地 schema（`openspec/schemas/spec-driven-custom/`），把 spec / tasks 的格式規範放進 `instruction`，由 `openspec instructions` 直接餵給 AI，而不是寫在文件裡等自律。能力名稱定為 `api-` / `ui-` / `platform-` 三類前綴，13 支 spec 依此改名（`frontend-admin` → `platform-frontend-conventions`，因原名對不上內容；`member-role-options-api` 併入 `api-member-management`）。
+
+**spec 從紀錄變成契約**：`CLAUDE.md` 早就要求 API spec 要寫請求 / 回應，但實際 13 支 spec **一個 JSON 區塊都沒有**——規則沒有執行路徑。補齊後 5 支 `api-*` 涵蓋全部 32 個 admin endpoint；其中 auth（6 支）與 attachment（2 支）原本零覆蓋。
+
+**path alias 導入**：舊結論（2026-07-15）說 `nest build` 不改寫 alias、必須靠 tsc-alias 或 SWC，兩者都有硬傷。**實測相反**——@nestjs/cli 11 的 tsc builder 編譯時就改寫，`dist/` 內零 `@app/`、`node dist/main` 完整啟動。tsc-alias 與 SWC 都不需要，那個「兩個 watch 賽跑」的延後理由整個不存在。實際成本只有 13 行設定（tsconfig `paths`、三份 jest `moduleNameMapper`、9 支 ts-node 加 `-r tsconfig-paths/register`）。183 處 4 層以上的 import 已轉換，eslint 擋新增。
+
+**文件與目錄**：`project.md` 905 行拆成索引 118 行 + `openspec/project/` 七支主題檔；`apps/api/test/` 由 16 項平鋪整成 `e2e` / `setup` / `helpers` / `architecture` 四目錄。
+
+**順帶修掉三處實作與文件不一致**：`forgot-password` / `reset-password` 的 swagger 寫 `200` + `data.message`，實作是 `204` 無 body，且 401 用了根本不存在於 `ResponseCodes` 的 `INVALID_RESET_TOKEN`（錯的型別已流進 api-client）；舊 security spec 誤述新增 IP 為唯一鍵衝突，實作是 upsert；`testing.md` 的規則表停在 5 條（實際 14 支）且列了不存在的 `global-teardown.ts`。
+
+**護欄 11 支 / 32 項 → 14 支 / 48 項**，新增：openspec schema 執行路徑、spec 命名與格式、`project.md` 連結完整性、swagger 成功狀態碼、e2e spec 位置、opsx 指令維持薄殼。
 
 ### 2026-08-16 — 補守剩餘的 Hard Rules
 
