@@ -5,7 +5,26 @@
 
 ## 進行中
 
-（目前無）
+### 從 nexus-nest-backend 回補模板（2026-09-04 起）
+
+`/Users/alantsai/side_projects/nexus-nest-backend` 是本模板的衍生專案（87 commits），已改為 PostgreSQL + 聊天/WebSocket。
+盤點後確認可回補的部分切成 10 支 change，依風險與相依排序：
+
+- [x] **C1 `platform-ai-workflow-backport`** — `.claude/skills/`（grill-me / pr-body / tidy-todo）、`.husky/pre-push`、PR/MR 模板（GitLab 側改 symlink）、`openspec/config.yaml`、lessons 合併 22 條（288 → 473 行）。守則 19 支 / 68 → 69 項。**待封存**
+- [ ] **C2 `platform-security-hardening`** — 帳號鎖定時效（現況是無復原路徑的死結）、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天、`normalize-email`
+- [ ] **C3 `platform-guardrail-backport`** — guardrail-inventory / permission-catalog-sync / public-surface + infra-endpoint / role-permission-cache + `MemberContextCachePort` / session-revocation
+- [ ] **C4 `platform-container-single-entry`** — `verify-ci.sh` 的 `down -v` 誤刪全專案 volume、nginx 單一入口 + `TRUST_PROXY`、容器吃本機 `.env`、`e2e-docker.sh`
+      ⚠️ **`down -v` 這條在 C1 已寫進 `lessons.md` 並標明「現在正踩著」**——在 C4 落地前，跑 `pnpm verify:ci` 會清掉開發用的 `mysql-data` / `redis-data` 與五個 `node_modules` volume，事後要重跑 `pnpm install` 與 `pnpm docker:init`
+- [ ] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions **兩份並存**（fork 的人自己刪一份），job 前置抽共用、版號取自 `.nvmrc` / `packageManager`
+- [ ] **C6a `api-account-lock-management`** — 見下方「功能」段既有條目
+- [ ] **C6b `ui-route-permission-guard`** — 路由依權限守衛，sidebar 隱藏不再是唯一防線
+- [ ] **C6c `ui-permission-tree-legibility`** — 權限樹中文化、不可指派的安全管理改純說明列表
+- [ ] **C6d `ui-admin-orientation`** — 後台導覽依管理對象分組、首頁改營運摘要
+- [ ] **C6e `api-front-auth`** — 前台註冊 / 信箱驗證 / 密碼重設（模板 front 端目前只有 `ping`，唯一從零到有的一支，最後做）
+
+**共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。
+
+**刻意不搬**：PostgreSQL 遷移、聊天/WebSocket、Redis io adapter、moderation / front-users 後台頁、metrics + chat audit 可觀測性、`gen:comments`（Postgres `COMMENT ON` 專屬）。
 
 ## 待辦
 
@@ -23,7 +42,7 @@
 
 ### 功能
 
-- **帳號鎖定管理 CRUD（`add-account-lock-management`）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。
+- **帳號鎖定管理 CRUD（`api-account-lock-management`，即上方 C6a）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。**衍生專案已實作，回補時以其為藍本**，但要等 C2 的鎖定時效先落地——沒有時效的話這支端點是唯一解鎖途徑，而它自己需要能登入的管理員。
 
 ### 技術債（外部相依卡住，延後）
 

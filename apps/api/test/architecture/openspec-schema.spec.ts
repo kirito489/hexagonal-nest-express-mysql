@@ -14,9 +14,18 @@ const CHANGES_DIR = join(OPENSPEC_ROOT, 'changes');
  * 專案的 spec / tasks 格式規範放在 fork 出來的 openspec schema，
  * 由 `openspec instructions` 在產出 artifact 時餵給 AI。
  *
- * 這裡守的是**執行路徑**而非格式本身：`openspec config` 只支援 global scope，
- * 專案預設 schema 進不了版控，`openspec new change` 沒帶 `--schema` 就會靜默落回
- * 內建 schema，規範等於不存在——這正是本專案已經踩過多次的「設定寫了但沒有執行路徑」。
+ * 這裡守的是**執行路徑**而非格式本身：`openspec new change` 若落回內建 schema，
+ * 規範等於不存在——這正是本專案已經踩過多次的「設定寫了但沒有執行路徑」。
+ *
+ * 執行路徑有兩道，**並存而非擇一**，因為兩者的失效方式相反：
+ * `openspec/config.yaml`（專案預設）被刪或值改錯是**靜默**落回內建 schema；
+ * `--schema` 旗標漏帶則由下方的掃描**顯性**擋下。
+ * 只留旗標的話，在終端機手打 `openspec new change` 完全沒有防線。
+ *
+ * ⚠️ 早期這裡寫著「`openspec config` 只支援 global scope，專案預設進不了版控」——
+ * 那個限制屬於 **CLI 指令**（`config --scope` 只接受 `global`），設定檔本身是專案層的
+ * （1.3.1 的 `dist/core/project-config.js` 會從專案根讀 `openspec/config.yaml`）。
+ * 把指令的限制誤述成整體限制，讓一個可以進版控的預設值長期沒被設。
  */
 describe('架構守則：openspec 自訂 schema 的執行路徑', () => {
   it('自訂 schema 與三份模板都存在', () => {
@@ -59,6 +68,36 @@ describe('架構守則：openspec 自訂 schema 的執行路徑', () => {
       .sort();
 
     expect(ids).toEqual(['design', 'proposal', 'specs', 'tasks']);
+  });
+
+  it('openspec/config.yaml 必須把專案預設 schema 指向自訂 schema', () => {
+    // 這道守的是「沒帶旗標」那條路徑——人在終端機手打 `openspec new change`
+    // 不會經過 .claude/ 底下的任何一份文件，下一則檢查掃不到他。
+    const configPath = join(OPENSPEC_ROOT, 'config.yaml');
+
+    expect(
+      existsSync(configPath)
+        ? ''
+        : 'openspec/config.yaml 不存在——手打的 `openspec new change` 會靜默落回內建 schema，' +
+            `應建立該檔並寫入 \`schema: ${SCHEMA_NAME}\``,
+    ).toBe('');
+
+    const parsed: unknown = load(readFileSync(configPath, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('openspec/config.yaml 不是物件');
+    }
+
+    const schema =
+      'schema' in parsed && typeof parsed.schema === 'string'
+        ? parsed.schema
+        : '';
+
+    expect(
+      schema === SCHEMA_NAME
+        ? ''
+        : `openspec/config.yaml 的 schema 是 ${schema || '(未設定)'}，應為 ${SCHEMA_NAME}——` +
+            '值不對等於沒設，而落回內建 schema 不會有任何錯誤訊息',
+    ).toBe('');
   });
 
   it('所有教 AI 建立 change 的指令都必須帶 --schema', () => {

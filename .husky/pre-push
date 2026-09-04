@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+
+# nvm 用戶在某些 git / 終端組合下 PATH 不含 nvm 路徑，找不到 pnpm
+# 若 pnpm 不在 PATH，主動載入 nvm.sh 補上
+if ! command -v pnpm >/dev/null 2>&1; then
+  [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
+fi
+
+# 與 CI 品質檢查同一條鏈——push 前先在本機跑一次，
+# 免得推上去才發現，而 review 已經開始了。
+#
+# **這是 commit 之外的第二層，不是取代 pre-commit**：
+# pre-commit 只 lint 改到的檔（快，每次 commit 都跑得起），
+# 這裡跑完整驗證鏈（約一分鐘），擋的是「本機沒跑就推」。
+#
+# 完整鏈刻意不放進 pre-commit：一分鐘乘上一天的 commit 次數，
+# 結果是所有人開始用 --no-verify，連 lint 都跟著失效——
+# 把關太嚴會讓整道關卡被繞過，比只擋一半更糟。
+#
+# ⚠️ 它擋得住手滑，擋不住 `git push --no-verify`。git hook 本來就不是安全邊界，
+# 真正的強制在 CI。
+#
+# ⚠️ hook 沒被觸發時 git **不會報錯**——診斷看 `git config --get core.hooksPath`
+# 有沒有值（husky 由 package.json 的 prepare 在 pnpm install 時註冊），
+# 不是看這個檔案在不在。
+pnpm typecheck && pnpm lint && pnpm test:cov

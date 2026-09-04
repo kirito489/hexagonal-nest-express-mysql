@@ -95,7 +95,32 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 - `quality-check` 與 `e2e-test` 同 stage 平行執行；前者不需外部服務，多數問題數十秒內回報。
 - e2e 的 DB 連線走 **job variables**，不在 CI 偽造 `.env`：`applyE2EDbEnv()` 以 dotenv 載入 `.env`，而 **dotenv 不覆寫既有 `process.env`**，因此 CI 供應的變數優先生效。
 - `DB_TEST_DATABASE` 必須含 `test`，否則 e2e 的 globalSetup 守門會中止（防誤連 dev / prod）。
-- `git commit --no-verify` 可繞過 husky pre-commit，但繞不過 CI —— 這是把關的最後一道。
+- `--no-verify` 可繞過兩支 husky hook，但繞不過 CI —— 這是把關的最後一道。
+
+### 本機的兩層 git hook
+
+| Hook | 執行內容 | 大約耗時 | 擋的是 |
+| --- | --- | --- | --- |
+| `.husky/pre-commit` | `lint-staged`（只檢查改動的檔） | 秒級 | 明顯的格式 / lint 問題 |
+| `.husky/pre-push` | `pnpm typecheck && pnpm lint && pnpm test:cov` | 約一分鐘 | 「本機沒跑就推」 |
+
+`pre-push` 與 CI 品質 job 跑同一條鏈，讓問題在推之前就紅，而不是等 review 開始後才由 CI 報錯。
+
+**完整鏈刻意不放進 `pre-commit`**：一分鐘乘上一天的 commit 次數，結果是所有人開始用
+`--no-verify`，連 lint 都跟著失效。把關太嚴會讓整道關卡被繞過，比只擋一半更糟。
+
+兩支都以同一段 nvm PATH 補救開頭（`pnpm` 不在 PATH 時載入 `nvm.sh`）——
+nvm 用戶在某些 git / 終端組合下 PATH 不含 nvm 路徑。
+
+> ⚠️ **hook 沒被觸發時 git 不會報錯，commit / push 照常成功、只是什麼都沒檢查。**
+> husky v9 是把 git 的 hook 目錄指向 `.husky/_`（由 `package.json` 的 `prepare` 在
+> `pnpm install` 時設定），而 `.husky/_/` 整個不進版控。診斷依據是
+> `git config --get core.hooksPath` **有沒有值**，不是 `.husky/` 有沒有檔案；
+> 沒有值就跑一次 `pnpm install`。`--ignore-scripts` 安裝或 `CI=true` 環境都會讓它沒被註冊。
+>
+> 這一點沒有守則擋著，也擋不了——失效狀態在本機的 `.git/config` 裡，版控看不到。
+> 曾考慮把 `hook-scripts.spec.ts` 的 `bash -n` 擴到 `.husky/*`，**否決**：
+> 那守的是語法，而實際的失效模式是根本沒被觸發，加了只會製造「有被守著」的錯覺。
 - **覆蓋率門檻只有 `test:cov` 會執行**（`test` 不帶 coverage，供開發時快速回饋）。兩個 workspace 都設有門檻：api 70/60/70/70、web 75/75/60/75；新增設有門檻的 workspace 時**必須提供 `test:cov`**，否則會被 `pnpm -r test:cov` 靜默略過。
 - `apps/api` 的 `test:cov` 刻意串接架構測試（`jest --coverage && jest --config test/jest.arch.config.js`）—— 只寫 `jest --coverage` 會讓 CI 換用 `test:cov` 後靜默漏掉整組架構守則。
 

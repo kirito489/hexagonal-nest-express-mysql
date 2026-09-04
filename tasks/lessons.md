@@ -52,9 +52,11 @@
 
 **踩到什麼**：插探針驗證規則會不會紅，之後用 `cp backup.js target.js` 還原，指令跑完顯示 `overwrite? (y/n [n]) not overwritten`——**檔案根本沒還原**，是後續跑測試才發現。
 
-**Why**：多數環境把 `cp` alias 成 `cp -i`，非互動情境下互動提示會靜默變成「不覆寫」。
+**Why**：多數環境把 `cp` alias 成 `cp -i`，非互動情境下互動提示會靜默變成「不覆寫」。**`mv` 與 `rm` 同樣中招**（2026-09-04 的 `platform-ai-workflow-backport` 一次踩到兩支：`mv` 讓 `config.yaml` 停在壞掉的值上、`rm` 讓舊的 MR 模板沒被刪掉），而它們的提示混在其他輸出裡很容易看漏。
 
-**How to apply**：還原一律用 python 字串替換或 `git checkout --`，還原後**實際驗證**（跑一次該檔的載入或測試）。反向驗證的完整循環是「插探針 → 親眼看它紅 → 還原 → **確認 `git status` 乾淨**」，最後一步不能省。
+**How to apply**：還原一律用 python 字串替換、`git checkout --`，或在腳本裡用 `command mv -f` / `command cp -f` / `rm -f` 繞過 alias。還原後**實際驗證**（跑一次該檔的載入或測試，或直接 `grep` 那一行）。
+
+反向驗證的完整循環是「插探針 → 親眼看它紅 → 還原 → **親眼看它綠** → 確認 `git status` 乾淨」。**「破壞後會紅」單獨不成立**——那個條件對假測試也成立；要連「還原後會綠」一起看到，兩個 exit code 都要出現過。最後一步不能省。
 
 ### 2026-08-16 — 「測試全綠」不等於「改動被驗證過」，要先確認有測試載入那段程式碼
 
@@ -95,6 +97,58 @@
 
 **How to apply**：任何用字串比對找裝飾器 / 關鍵字的守則，比對前一律 `stripComments`。判斷 class 層級時再進一步只取 `@Controller(` 到 `export class` 之間——那段不可能夾註解。另外兩個同批踩到的切割錯誤：(1) handler 切塊要**往前**吃掉連續的裝飾器行，否則寫在 `@Post()` 上方的 `@Public()` 會被歸給前一個 handler，造成前一支漏報、本支誤報；(2) 守則本身要有**合成輸入的自我測試**——守則出錯是靜默的，而給偽陰性的守則比沒有守則更危險，它會讓人停止人工檢查。
 
+### 2026-09-02 — 反向驗證只看整體 exit code，會被「別支守則的紅燈」冒名頂替
+
+**踩到什麼**：新寫了一支守則斷言某個 controller 仍有 `@Roles(RoleCode.SUPERADMIN)`。反向驗證時把該裝飾器註解掉、跑 `test:arch`、得到 `exit=1`，就判定守則有效。實際上紅的是既有的 `authorization-coverage.spec.ts`（它也在檢查同一個裝飾器），**新寫的那支從頭到尾都是綠的**——因為正規式沒去註解，`// @Roles(...)` 照樣被比中。
+
+**Why**：一次破壞可能同時踩到多支守則，而 exit code 是整包的。「破壞後紅」這個條件對假守則也成立，所以它證明不了任何事。
+
+**How to apply**：反向驗證要看**失敗的測試名稱**，不是 exit code——用 `pnpm --filter @app/api test:arch 2>&1 | grep -E "✓|✕"` 之類的方式看清單，確認變紅的正是你剛寫的那一支、而且**其餘的仍然是綠的**。另外**每支新守則至少要試兩種破壞方式**（如「註解掉」與「整行刪掉」）：只試一種時，正好避開自己實作缺陷的機率不低。
+
+（去註解本身的規則見上一條，`stripComments` 目前實作在 `test/architecture/authorization-coverage.spec.ts`。本條記的是**驗證方法**的缺陷，不是規則寫法。）
+
+### 2026-08-20 — 描述規則的 spec 會被自己的規則抓出來
+
+**踩到什麼**：新增「某類 spec 不得使用某個區塊標籤」的守則後，封存時把該規則寫進 `platform-engineering-guardrails` 的 spec，守則立刻紅——**被抓出來的正是那份描述規則的 spec**。因為它的 scenario 寫著「WHEN … 出現 `**Success Response**`」，而判斷式是 `body.includes('**Success Response**')`。
+
+**Why**：與「註解冒充裝飾器」同型但不同處——那次是註解，這次是**規則自身的文件**。而且這個缺陷早就存在（`includes` 一直是這樣寫的），只是先前沒有任何 spec 提到過那個字串，所以從未觸發。**規則越是被完整記載，越容易踩到自己。**
+
+**How to apply**：字串比對要能區分「使用」與「提及」。Markdown 的區塊標籤在**實際使用時一律在行首**，在行文中提及則是夾在句子裡的行內程式碼。改用 `/^\s*<escaped>/m` 判斷即可分開兩者。凡是「規則本身會被寫進 spec / 文件」的檢查，都要先問一句：**這條規則描述自己的時候會不會違反自己？**
+
+### 2026-09 — 靠自律維護的清單一定會漂移，即使寫它的人就是加東西的人
+
+**踩到什麼**（衍生專案案例）：`openspec/project/testing.md` 有一張「每支守則守住什麼」的表，列 19 支而實際 29 支。**漏掉的 10 支裡有好幾支是同一個人前幾個 change 剛加的**——加的時候完全沒想到要回頭補表。
+
+**Why**：那張表沒有任何機制檢查完整性，而「新增守則」與「更新那張表」是兩個分開的動作，中間沒有東西把它們綁在一起。
+
+**How to apply**：清單型的文件要由機器檢查完整性——例如一條「每一支 `test/architecture/*.spec.ts` 都必須出現在 `testing.md` 裡」的守則，沒補就紅。判準：**如果一份文件的正確性取決於「有人記得更新」，那它遲早會錯**，而唯一會被記得的時機是 CI 變紅的那一刻。同理，文件裡寫死的規模數字（「N 支規則檔 / M 項斷言」）也是這類清單。
+
+> 本專案的 `guardrail-inventory.spec.ts` 排在 `platform-guardrail-backport`（C3）。在它落地之前，`CLAUDE.md` 與 `README.md` 寫的守則數量都是過期的（實測 19 支 / 69 項，文件寫 11 支 / 32 項）。
+
+### 2026-09 — design 裡列為「風險」的東西，實作後要回頭確認它發生了沒
+
+**踩到什麼**（衍生專案案例）：首頁設計了一張「快速入口」卡，design 的 Risks 有一條「快速入口與 Sidebar 顯示同一批東西，可能顯得重複」，緩解寫的是「真的覺得吵時該調的是呈現密度」。實作完看畫面——**它就是重複的**，正確答案是整張拿掉，不是調密度。
+
+**Why**：版面的重複**只有看到畫面才判斷得出來**。寫 design 時能想到那個風險，但想不出它的嚴重程度；而「緩解措施」是在還沒看到東西時寫的，所以它猜錯了方向。
+
+**How to apply**：Risks 不是寫完就結案的清單。**實作完要逐條回去問「這個發生了嗎」**，發生了就處理，並把結論寫回 design——那比原本的預測有價值得多。順帶：功能拿掉之後，**為它抽出的抽象也要收回**，沒有第二個呼叫端的抽象不該存在。
+
+### 2026-09-02 — 寫「實測 N 秒」之前要真的量，否則那個數字會被後人當成依據
+
+**踩到什麼**（衍生專案案例）：給 api 容器加 healthcheck 時，在註解裡寫「實測容器內首次 `nest build` 約 40–60 秒」並據此設 `start_period: 90s`。**那個數字是憑印象寫的。** 實際量（刪掉 `dist/` 與 `.tsbuildinfo` 後重啟）是 **6 秒**。
+
+**Why**：帶「實測」兩個字的數字會被下一個人當成不必再驗證的事實，於是錯誤的依據會一直傳下去——而且它擋住了「這個值是不是太保守」這個該被問的問題（`start_period` 太長時，應用真的壞掉也要等滿才會失敗）。
+
+**How to apply**：註解裡的數字要分兩種寫法——**量到的**要寫出量測條件（「熱機器、映像已建好、node_modules volume 已填充」），**沒量到的**要明說是餘裕並寫出代價。反向驗證同理：若試著改壞某個值想看它變紅、結果沒紅，那代表**沒能構造出失敗案例**，就該照實記，而不是當成驗過了。
+
+### 2026-09 — 人工驗收步驟如果每次都要重跑，就該寫成測試
+
+**踩到什麼**（衍生專案案例）：tasks 寫「用兩種權限的帳號各登入一次看畫面」。實際做的時候發現 seed 只有一個 SUPERADMIN——要驗低權限得先開帳號、指派角色、再登入一次，**而那個流程每次驗證都要重跑一遍**。
+
+**Why**：把驗證寫成人工步驟時，很容易只想到「這次怎麼驗」，沒想到「每次都要這樣驗」。一個需要五分鐘前置的人工步驟，第二次就不會有人做了。
+
+**How to apply**：人工驗收留給**只有人眼判斷得出來的東西**（版面、文案、體感）。「有權限看得到、沒權限看不到」是**邏輯**，寫成元件測試每次 `pnpm test` 都跑，比點兩次可靠。
+
 ## Prisma / 資料庫
 
 - **軟刪除 model 的所有 read path 都要加 `deletedAt: null`**：`findUnique` 只接受 unique 欄位，要過濾軟刪得改用 `findFirst({ where: { id, deletedAt: null } })`。`count` 用於「是否還有相關紀錄」判斷時（如阻擋刪除有成員的角色）也要排除軟刪，否則永遠刪不掉。例外是「恢復」場景才用 `loadIncludingDeleted` 顯式 opt-in。
@@ -107,6 +161,22 @@
 
 - **Docker MySQL 剛啟動的前幾秒會 pool timeout**：容器要 5–30 秒才完整 ready，這段期間 Prisma adapter 建不起連線（`pool timeout after 10000ms`），但 mysql2 直連正常。等 10 秒重試即可。
 
+### 2026-08-20 — Prisma 的 `///` 註解不會進資料庫，只進 Client 的 JSDoc
+
+**踩到什麼**：以為在 `schema.prisma` 的欄位上加 `///` 描述、重跑 `prisma migrate dev` 就會把描述寫進資料庫。實際上 migration 的 SQL **一個字都不會變**，直接查資料庫什麼也看不到。
+
+**Why**：`///` 是 Prisma 的 documentation comment，只流向產生的 Prisma Client `.d.ts`（成為 JSDoc）與 DMMF。Prisma **從不產生資料庫端的欄位註解**，那完全不在它的職責範圍內。兩者是各自獨立的機制，不是同一份資料的兩種呈現。
+
+**How to apply**：先確認你要的是哪一層——只要 IDE hover 看得到就 `///` 就夠了。若要資料庫端也看得到（`SHOW FULL COLUMNS`、DBeaver、直接查庫的人），得在 migration 裡手寫 MySQL 的 `ALTER TABLE … MODIFY COLUMN … COMMENT '…'`，而那是**第二份需要同步維護的真相**——沒有工具會告訴你兩邊不一致。除非真的有人直接查庫，否則不建議開這個坑。
+
+### 2026-08-20 — Prisma 7 的 CLI 移除了數個常用旗標，且非 TTY 下會靜默卡住
+
+**踩到什麼**：`prisma migrate dev --skip-generate` 報 `unknown or unexpected option`；`prisma migrate reset --force --skip-seed` 直接以 status 130 結束，錯誤輸出被 ts-node 的堆疊蓋掉，看起來像當掉。
+
+**Why**：Prisma 7 精簡了 migrate 子指令的旗標（`--skip-generate` 已不存在）。而偵測到 drift 時 `migrate dev` 會要求互動確認，在非 TTY（腳本、CI、agent）環境下拿不到輸入就以 130 收場——那是 SIGINT 的退出碼，不是「壞掉」。
+
+**How to apply**：先用 `prisma <cmd> --help` 確認旗標存在。要在非互動環境重建資料庫，與其跟 `migrate reset` 的提示搏鬥，不如用專案既有的 `scripts/drop-database.ts` + `create-database.ts` 砍掉重建再 `migrate dev`——沒有 drift 就不會有提示。管線加 `< /dev/null` 可讓它立刻失敗而不是掛著等輸入。
+
 ## JWT / 認證
 
 - **簽 token 時必須帶 `type: 'access'`**：`JwtAuthGuard` 有 `payload.type !== 'access'` 檢查，缺這個欄位會拒絕所有請求。`JwtPayload.type` 設為必填 union。
@@ -116,8 +186,6 @@
 - **`@nestjs/jwt` 的 `sign`/`verify` 會 merge module 的 options**：`issuer`/`audience` 在 `jwt.module` 設一次即可，各呼叫點即使帶 per-call options（`secret`、`expiresIn`）也會套用同一組 iss/aud。注意**改 iss/aud 屬破壞性變更**——既有 token 全部失效，部署後所有人要重新登入。
 
 - **`JwtAuthGuard` 的快取命中與 DB 查詢兩條路徑都要檢查 `member.status`**：只檢查一條的話，停用帳號的舊 JWT 在自然過期前仍可通行。
-
-- **改動 member context 後必須清快取**：`status` / `roleId` / 密碼變更後要呼叫 `clearMemberContext(memberId)`，否則最長延遲 `PERMISSION_CACHE_TTL`（預設 300 秒）才生效。
 
 - **`/auth/forgot-password` 的時間差列舉是已知殘留風險**：email 不存在立刻 return（~10ms），存在則要寫 DB + 寄信（~100ms-1s），可被用來列舉註冊 email。已緩解：per-route `@Throttle({ limit: 3, ttl: 60s })`、回 204 不帶 message、log 不寫 email。要根除得引入 queue 或固定 delay，成本不划算。
 
@@ -141,6 +209,14 @@ export {};
 ```
 
 - **Express 5 下 literal 路由會被 `:id` 吃掉**：`@Patch('bulk-status')` 即使宣告在 `@Patch(':id')` 之前仍可能被後者先匹配。解法：用兩段式路徑（`bulk/status`），`:id` 只匹配單一 segment。
+
+### 2026-08 — DI 接線壞掉時，typecheck / lint / test / build 四個全綠，只有 e2e 抓得到
+
+**踩到什麼**（衍生專案案例，兩次同型）：(1) 替既有 adapter 加了一個 `@Inject(SOME_PORT)` 相依，四個指令全綠，跑 e2e 才炸 `Nest can't resolve dependencies ... at index [2]`，10 支 suite 一起紅。(2) 把一個 token 搬到新模組後，原模組改成 `imports: [NewModule]` 但 `exports` 還留著那個 token，同樣四綠，e2e **409 支全紅**：`Nest cannot export a provider/module that is not a part of the currently processed module`。
+
+**Why**：DI 的接線在**執行期**才解析。單元測試是自己 `new` 出來的（繞過容器），`nest build` 只做編譯與 emit，兩者都碰不到 module graph。第二種還有個額外規則：`exports` 只能列「本模組自己 provide 的 token」或「自己 import 的 module」——要把 import 來的 token 傳下去必須 re-export **模組**而不是 token。
+
+**How to apply**：**動到 module 接線或替既有 provider 加注入相依，一定要跑 e2e**，`pnpm build` 不算數——它只證明編譯得出來，不證明 DI 組得起來。加相依前先確認提供該 token 的模組是不是 `@Global()`；不是的話，找出所有 provide 該 class 的模組逐一補 `imports`。搬移 provider 時先問「還有誰需要從這裡拿？」——答案常常是沒有，`exports` 直接清空比 re-export 模組更乾淨。
 
 ## Domain Exception / 錯誤處理
 
@@ -198,11 +274,65 @@ export {};
 - **e2e 跑完 Jest worker 卡住 → `forceExit: true`**：Nest app 關閉後仍有 handle 未釋放（Redis mock、Prisma 連線池）。
 - **Redis 仍 mock 時，限流與黑名單在真 DB e2e 中不會誤觸**：`throttleIncrement` 回固定值，序列連跑不會累計到 429；改成真 Redis 時要重新評估。
 
+### 2026-09-02 — 驗競態的測試如果是循序呼叫的，它驗不到競態
+
+**踩到什麼**（衍生專案案例）：修一個 TOCTOU（改成「寫入後回讀 + 決定性排名」），寫了三支測試，反向驗證時**三種破壞方式全部仍然綠**。三次都是**測試的問題不是程式的問題**，而三個各自不同的原因根因同一個——測試建構出來的狀態不是那條規則要處理的狀態：
+
+- 「只比較總數」驗不到：測試寫成 `await f(A); await f(B);` 是**循序**的，而 TOCTOU 是交錯的（兩條都先寫入、才各自回讀）。循序時正確與錯誤的判定式給出同樣的答案。
+- 「拿掉排序次鍵」驗不到：mock 依插入順序回傳，而 **JS 的 `sort` 是穩定的**，於是次鍵永遠不會被用到。真實情況是 Redis hash 的欄位順序不保證。
+- 「拿掉回滾」驗不到：那支測試的狀態已達上限，被**快路徑**（寫入前的預先檢查）攔下，需要回滾的那段根本沒跑。
+
+**How to apply**：**要驗的規則若只在某個中間狀態下才生效，就直接建構那個狀態**，不要指望走完整流程會經過它——走完整流程時它多半被更早的檢查攔掉了，或被語言的實作細節（穩定排序）遮蔽。解法是把判定抽成可直接呼叫的函式、餵進交錯後的輸入。另外還有一次是**測試設錯而非程式錯**——反向驗證變紅時，先確認紅的原因是不是自己預期的那個。
+
+### 2026-08 — 無狀態的 Redis mock 會讓「快取過時了嗎」的測試變成空的
+
+**踩到什麼**（衍生專案案例）：要驗「改完角色權限，既有 token 的下一個請求就被擋」，照既有 e2e 的寫法用 `createMockRedis()`——測試綠了，但**把修正整段拿掉它照樣綠**。
+
+**Why**：`createMockRedis()` 的 `get` 永遠 `mockResolvedValue(null)`，MemberContext 快取因此**永遠不命中**，每個請求都重新查 DB。「快取有沒有被清掉」在這個 mock 之下沒有可觀察的差別——測的其實只有「DB 寫進去了嗎」，而那本來就會過。
+
+**How to apply**：驗快取失效行為時必須讓寫進去的值讀得回來——另開一個 Map-backed 的 stateful mock，**不要改 `createMockRedis()`**，其他 spec 依賴它「每次都重查 DB」的無狀態行為。判準通用：**mock 掉的東西如果正是被測行為的載體，測試就是空的**——寫完先把修正拿掉跑一次，紅了才算數。
+
+### 2026-08 — 用「極大值」mock 限流計數器，驗不到額度是多少
+
+**踩到什麼**（衍生專案案例）：既有 e2e 驗節流的寫法是 `throttleIncrement.mockResolvedValue(1_000_000)`。那能驗「有沒有套節流」，但**把額度改成 200（大於全域的 100）照樣會被擋**——測試不會紅，而「端點額度必須明顯小於全域」這個真正的要求沒有被守住。
+
+**Why**：計數大到任何額度都擋得住時，斷言就與額度無關了。
+
+**How to apply**：取一個**介於端點額度與全域額度之間**的計數，「額度小於全域」才變成可驗證的。再加一條**對照組**——同樣的計數打一支只受全域保護的端點，它必須**不**被擋；沒有對照組的話，你分不出擋下來的是哪一層。另外**mock 一個被多處共用的底層操作時要依 key 分流**，不要一律回同一個值——否則斷言寫的是 A 限流、實際擋下來的是共用同一支計數器的 B 限流。通用判準：**問「這個斷言在功能被拿掉之後還會綠嗎」**，而唯一可靠的回答方式是真的把它拿掉跑一次。
+
+### 2026-08 — `createE2EApp` 不套 `main.ts` 的原生中介層，header 斷言會是空的
+
+**踩到什麼**（衍生專案案例）：要驗安全標頭，照既有 e2e 的寫法直接斷言回應 header——但 `createE2EApp` 只做 `setGlobalPrefix('api')` + `init()`，**`main.ts` 裡 `app.use(helmet(...))` 那一整段根本沒跑**。測試會全紅（或改成斷言「不存在」時全綠），兩種都不是在驗真的東西。
+
+**Why**：`bootstrap()` 與 `createE2EApp()` 是兩條各自組裝 app 的路徑。`app.use()` 掛的原生 middleware 只存在於前者；Nest 層的 guard / filter / interceptor 則因為在 `AppModule` 裡而兩邊都有——**差異只在原生中介層**，而那正是安全標頭所在的地方。
+
+**How to apply**：要驗原生中介層的行為，先把它抽成一支共用函式，`main.ts` 與 `createE2EApp` 都呼叫它。**不要在測試裡自己再掛一次 helmet**——那驗的是測試自己掛的那份，不是產品程式碼。同一個判準適用於 CORS、cookie-parser、static 的 `setHeaders`。
+
+### 2026-08 — characterization test 要寫成「機制無關」才擋得住重構
+
+**踩到什麼**（衍生專案案例）：要把逐條呼叫改成批次呼叫，第一版安全網直接斷言批次那支被呼叫——那不是 characterization test，是對著還沒寫的實作寫的測試，改壞了照樣綠。
+
+**Why**：characterization test 的用途是「重構前後行為不變」。斷言綁在**機制**（呼叫哪一支）上時，機制一換測試就得改，而改測試的同時就失去了它要提供的保護。
+
+**How to apply**：斷言寫在**行為**上（「哪些東西被處理了」而非「哪支方法被呼叫」），用一個 helper 同時從新舊兩支 mock 收集結果。這樣同一組測試在改動前後都成立，反向驗證把實作改回舊寫法時它們照樣綠，證明守住的是行為而不是寫法。
+
+- **測 `setInterval` 一律用 `await jest.advanceTimersByTimeAsync(ms)` 一支就好**：`jest.advanceTimersByTime(ms)` 後面再接 `await jest.runOnlyPendingTimersAsync()` 會讓每次觸發跑兩輪——前者先燒掉一次計時器而 interval **會立刻重新排程**，後者看到那個剛排好的又燒一次。疊在 `setTimeout` 上則不會翻倍，所以很容易誤判成程式的問題。
+
 ## 建置 / 工具鏈
 
 - **`tsBuildInfoFile` 必須放在 dist 內**：`nest-cli.json` 的 `deleteOutDir: true` 每次 build 刪整個 dist，但 `.tsbuildinfo` 預設在 root 不會被清 → TS 以為「沒變動 = 不用 emit」→ build 完 dist 是空的、啟動失敗。設 `"tsBuildInfoFile": "./dist/.tsbuildinfo"`；遇到「改了 code 卻沒重編」先刪它。
 - **`preserveWatchOutput: true`**：否則 `tsc --watch`（含 `nest start --watch`）用 alternate screen buffer，每次重建會吃掉終端 scrollback，先前的 Vite ready URL 等輸出全消失。
-- **Husky pre-commit 在 nvm 環境找不到 pnpm**：nvm 的 node/pnpm 只在互動 shell 載入後才進 PATH，git commit 的子 shell 不一定繼承。`.husky/pre-commit` 開頭加 `command -v pnpm || . "$HOME/.nvm/nvm.sh"`。
+- **Husky hook 在 nvm 環境找不到 pnpm**：nvm 的 node/pnpm 只在互動 shell 載入後才進 PATH，git 的子 shell 不一定繼承。`.husky/pre-commit` 與 `.husky/pre-push` 開頭都要加 `command -v pnpm || . "$HOME/.nvm/nvm.sh"`。
+
+### 2026-09-03 — husky 壞掉時不會報錯，commit 照常成功、只是什麼都沒檢查
+
+**踩到什麼**：以為 commit 前有 lint 把關，實際上 `.husky/pre-commit`（跑 `lint-staged`）**根本沒有被觸發**。檔案在、`package.json` 的 `prepare: husky` 在、`lint-staged` 設定也在——斷的是 `.git/config` 裡的 `core.hooksPath`，它不見了。
+
+**Why**：husky v9 的運作方式是把 git 的 hook 目錄指向 `.husky/_`（由 `prepare` 在 `pnpm install` 時設定），而 `.husky/_/` 整個不進版控。那一行消失之後 git 只看 `.git/hooks/`，那裡沒有 `pre-commit`——**git 找不到 hook 不是錯誤，是正常情況**，所以 commit 一路成功。最可能的成因是某次 `pnpm install --ignore-scripts`，或在 `CI=true` 的環境下裝過（husky 會自動跳過註冊）。
+
+**How to apply**：要確認 hook 活著，看的是 `git config --get core.hooksPath` **有沒有值**，不是看 `.husky/` 有沒有檔案。修法就是 `pnpm install`（`prepare` 會重設）。另外**本機 `.git/hooks/` 裡的 hook 不進版控**，換機器或重 clone 就沒了——要跨機器就得放進 `.husky/`。**同一個 hook 名稱不要兩邊都放**：`core.hooksPath` 一設，`.git/hooks/` 整個被忽略，留著的那份會在 hooksPath 又斷掉時悄悄復活，而兩份內容早就漂移了。
+
+這一點**沒有守則擋著，也擋不了**——失效狀態在本機的 `.git/config` 裡，版控看不到。曾考慮把 `hook-scripts.spec.ts` 的 `bash -n` 擴到 `.husky/*`，否決了：那守的是語法，而實際的失效模式是根本沒被觸發，加了只會製造「有被守著」的錯覺。
 - **api 的 `lint` 必須先 `db:generate`**：client 未生成時 Prisma 回傳被推成 `any`，`recommendedTypeChecked` 會噴大量假陽性（`no-unsafe-call`、`require-await`）。加 `"prelint": "pnpm db:generate"`。注意 lint-staged 直接呼叫 `eslint --fix` 不走 pre 腳本。
 - **Monorepo 共用 ESLint 基底不能含 tseslint 預設集**：api 走 `recommendedTypeChecked`、web 走 `recommended`，兩者都會註冊 `@typescript-eslint` 外掛；基底再帶一組會觸發 `ConfigError: Cannot redefine plugin`。基底只放 `ignores` + `js.configs.recommended` + 家規（家規以 named export 交由各 workspace **在自己的 tseslint 預設之後**最後套用，否則 `no-explicit-any` 會被蓋回 error）。
 - **type-aware lint 對 ORM 邊界 / jest mock / seed 腳本要分區關掉 `no-unsafe-*`**：這些地方天生 `any`，全開會爆數百個假訊號淹沒真發現（本專案 524 → 9）。核心層（application / domain / infrastructure）維持全嚴格，floating-promise 這類真問題才浮得出來。
@@ -215,6 +345,34 @@ export {};
 **Why**：同時匹配多個區塊的檔案，該規則只吃**最後一個**區塊的設定，先前的整包被覆蓋。
 
 **How to apply**：重疊的檔案範圍必須各自列齊**完整**限制——用 `ignores` 切成互不重疊，重疊者（如 `src/adapter/in/**/admin/**/*Controller.ts`）一次列出所有 pattern。另外用 `@typescript-eslint/no-restricted-imports` 而非 base 版，才涵蓋 `import type`。每加一條邊界規則都要用探針實測「該擋的每一種都真的擋」。
+
+## 容器 / Docker
+
+### 2026-09 — `docker compose down -v` 的 `-v` 是「專案的所有 volume」
+
+**踩到什麼**（衍生專案案例）：容器化 e2e 的收尾寫成 `docker compose --profile e2e down -v`，跑完一次之後開發環境整個消失——五個 `node_modules` volume、資料庫 volume、redis volume 全沒。下一次跑 e2e 的症狀是整批 spec `Cannot find module '.prisma/client/default'`，**完全指不到是收尾那一行造成的**。
+
+**Why**：`--profile X` 只影響「哪些服務被視為啟用」，**不限制 `down` 的作用範圍**。`down` 移除專案的所有容器，`-v` 移除 compose 檔裡宣告的**所有 named volume**。
+
+**How to apply**：只想收自己起的服務就用 `rm -fsv <服務名>`（`-f` 不問、`-s` 先停、`-v` 只移除**該容器的匿名 volume**）。`down -v` 保留給「我真的要重置整個專案」——那正是 `pnpm docker:reset` 的定位。
+
+> ⚠️ **本專案的 `scripts/verify-ci.sh` 目前正踩著這個坑**（`docker compose --profile verify down -v`），也就是說**每跑一次 `pnpm verify:ci` 就清掉開發用的 `mysql-data`、`redis-data` 與五個 `node_modules` volume**。修復排在 `platform-container-single-entry`（C4）；在那之前跑 `verify:ci` 要有心理準備，事後得重跑 `pnpm install` 與 `pnpm docker:init`。
+
+### 2026-09 — 容器跑著的時候在 host 跑 `pnpm build`，會把容器打死
+
+**踩到什麼**（衍生專案案例）：容器全部 healthy，但請求全部 502 / connection refused。api 容器狀態顯示 `Up 33 minutes`，看起來完全正常。真正的錯誤埋在日誌裡：`Cannot find module '/app/apps/api/dist/main'`。
+
+**Why**：`apps/api` 有兩份 nest 設定——`nest-cli.json`（`deleteOutDir: true`）與容器專用的 `nest-cli.docker.json`（`false`）。容器的 watch 用後者，所以 rebuild 不會清空 `dist/`。但**在 host 跑 `pnpm build` 用的是前者**，它會先刪掉整個 `dist/`，而那個目錄是 bind mount——容器裡的 watch 行程在那個空窗期重啟、`MODULE_NOT_FOUND`、然後**放棄不再重試**（"Waiting for file changes before restarting..."）。
+
+**How to apply**：**容器跑著的時候不要在 host 跑 `pnpm build`。** 需要驗證 build 就先 `pnpm docker:down`，或跑完之後 `docker compose restart api` 讓它重新產生 `dist/`。判準通用：**bind mount 的產出目錄有兩個寫入者時，兩邊的清空行為必須一致**——不一致的那一邊會在對方最不預期的時候把它的檔案抽走。
+
+### 2026-09-02 — 「埠關掉了沒」不能用 curl 判斷，要看 `docker compose ps` 的 PORTS 欄
+
+**踩到什麼**（衍生專案案例）：確認 api 的對外埠已移除，`curl http://127.0.0.1:3000/api/health` 預期得到 connection refused，實際回 **404**。差點下結論說「埠沒關成功」。真相是 host 上另一個專案綁在 `*:3000`，回的是它的 404。
+
+**Why**：curl 測的是「這個位址有沒有人應答」，不是「這個容器有沒有發布這個埠」。兩者在單一專案的機器上恰好等價，在同時開好幾個專案的機器上就不等價了——而後者才是常態。macOS 的 IPv6 優先解析讓這件事更容易發生：另一個服務綁 `*:3000`（IPv6 wildcard）與容器綁 `127.0.0.1:3000` 可以並存。
+
+**How to apply**：驗「有沒有對外發布」看 `docker compose ps` 的 PORTS 欄（權威來源，空的就是沒發布）。curl 只能當輔助，而且**得到非預期回應時先查誰在聽**（`lsof -nP -iTCP:<埠> -sTCP:LISTEN` 再 `ps -o command= -p <pid>`），不要直接推論成自己的改動失敗。同理，得到 connection refused 也不保證是自己關的——可能那個服務根本沒起來。
 
 ## Monorepo / pnpm
 
@@ -262,6 +420,17 @@ export {};
 - **`useInfiniteQuery` 不會走 `useApiQuery` 的 envelope unwrap**：自寫 `queryFn` 用 `apiClient.GET` 不經過 unwrap，`lastPage.list` 會是 undefined（實際是 `{ success, data: { list, meta } }`）。從 `@app/api-client` export `unwrapEnvelope` 手動呼叫。
 - **shadcn nova preset 的 registry 沒有 `form`**：`shadcn add form` 會 silent fail（只印 "Checking registry"），其他元件正常。自寫 `components/ui/form.tsx`（標準 Controller + Slot + FormItemContext pattern）。
 - **TypeScript 6 把 `baseUrl` 標為 deprecated**：tsconfig 只需要 `paths`，其中的相對路徑以 tsconfig 所在位置為基準。shadcn CLI 看的是 `components.json` 的 aliases，不依賴 baseUrl。
+- **jsdom 缺的 DOM API 統一補在 `src/test/setup.ts`**：Radix 的 Select / DropdownMenu 依賴 pointer capture 與 `scrollIntoView`，jsdom 都沒有實作，缺了會讓下拉在測試中**永遠打不開**，而錯誤訊息是「找不到 role=option」——指不到真正的原因。
+
+### 2026-09-02 — UI 驗收只看一種資料，等於沒驗到那個元件
+
+**踩到什麼**（衍生專案案例）：權限樹加了「不可指派」區塊，用恆為未勾的 disabled checkbox 呈現。單元測試全綠、守則全綠、也開瀏覽器看過——**但只看了「新增角色」**。合併後使用者第一次打開**超級管理者的唯讀檢視**就發現三項顯示未勾選，而那個角色恰恰做得到那三件事。畫面在陳述假訊息。
+
+**Why**：同一個元件在不同資料下是不同的畫面。「新增角色」的資料是空的，恆為未勾看起來完全正常；「檢視既有角色」才把「這個值是寫死的」暴露出來。只驗一種資料時，驗到的是「元件會渲染」，不是「元件說的話是對的」。
+
+**How to apply**：驗收會依資料改變外觀的元件時，**至少走兩種資料**——空的與滿的、無權限與全權限、新建與既有。挑選的原則是「哪一種資料會讓我寫死的那個值變成錯的」。另外這次的根因不只是驗收不足：**用 checkbox 表達一個不是「勾選狀態」的東西**，本身就保證了某種資料下會說謊。看到「這個 checkbox 永遠 disabled 且永遠不變」時，該問的是它為什麼是 checkbox。
+
+- **功能有 feature flag 時，讀那份資料的畫面要能分辨「沒有」與「不會有」**：「查不到資料」在兩種情況下長得一模一樣——**真的沒有**（好消息），跟**根本不會有**（旗標沒開，壞消息）。畫面不分辨的話，管理員會把後者讀成前者，而那正好是最需要他知道的事。單元測試與 e2e 都不會抓到：它們驗的是「列表正確反映資料」，那是對的；錯的是「資料從哪來」這個前提。作法：讀資料的端點把開關狀態一起回傳，畫面在關閉時明講；**不要為此另建一套 feature flag 的前端基礎設施**，把旗標塞進那支本來就要呼叫的端點就好。
 
 ## Zod / 驗證
 
@@ -285,4 +454,19 @@ export {};
 
 - **propose 階段先核對 API contract，不要假設「list 有的欄位 update 也支援」**：例如 role 的 GET 回應有 `status`，但 `PATCH /roles/:id` 的 DTO 沒處理它，誤判成「純前端 change」會在動工後才發現要連動改後端 + Swagger + api-client + spec + e2e。寫 proposal 前先讀 `{Create,Update}*Request.ts` 與對應 service，把每個前端互動點對應到實際 DTO 欄位。
 - **archive 前先把 swagger / api-client / 前端同步完**：這些屬 feat 的尾巴，混進 archive commit 會讓未來 cherry-pick / revert 歸檔時連帶動到 swagger。順序：`swagger:bundle` → `api-client generate` → 驗證鏈 → commit feat → 才 archive。archive 後若 `git status` 還有 swagger / schema.ts 變動，是前面沒做乾淨。
+
+### 2026-08-20 — openspec 的 MODIFIED 靠「標題字串」比對，改標題會讓封存整個中止
+
+**踩到什麼**：delta spec 用 `## MODIFIED Requirements`，把需求標題從「品質檢查必須在 Merge Request 階段執行」改成「…Pull Request…」，內容也一併更新。`openspec validate` **通過**，但 `openspec archive` 失敗：
+
+```
+platform-ci-quality-gate MODIFIED failed for header "### Requirement: 品質檢查必須在 Pull Request 階段執行" - not found
+Aborted. No files were changed.
+```
+
+**Why**：MODIFIED 是拿 delta 的 `### Requirement:` 標題去 master spec 裡找同名那塊來取代。標題一改就找不到目標。而 `validate` 只檢查 delta 自身的格式合不合法，**不會拿去跟 master spec 對照**——所以「validate 綠 + archive 紅」是這個工具的正常行為，不是壞掉。
+
+**How to apply**：需求要改名就用 `## RENAMED Requirements`（`- FROM:` / `- TO:` 各一行，值是完整的 `### Requirement: <名稱>`）。改名**又**改內容時兩段都要寫，MODIFIED 那段用**改名後**的標題。archive 輸出會顯示 `→ 1 renamed` 確認生效。順帶注意改名後的需求會被移到 master spec 的**末尾**，不留在原位置。
+
+**還好的一點**：archive 失敗時是 `Aborted. No files were changed.`——它不會做到一半留下半套的 master spec。
 - **archive commit body 要列出新建 / 修改的 master spec**：只有標題的話，未來 `git log` 追不到「某 capability 何時定義 / reqs 何時變動」。reqs 數量用 `grep -c "^### Requirement:" openspec/specs/<spec>/spec.md` 取得。

@@ -25,9 +25,18 @@ openspec/schemas/spec-driven-custom/
 openspec new change "<name>" --schema spec-driven-custom
 ```
 
-`openspec config` 只支援 global scope，專案預設 schema 進不了版控——少帶旗標就會靜默
-落回內建 schema，本節所有規範一條都不會生效。`openspec-propose` skill 已內建此旗標，
-`openspec-schema.spec.ts` 會在旗標消失或 change 用錯 schema 時失敗。
+落回內建 schema 的話，本節所有規範一條都不會生效。防線有**兩道，並存而非擇一**：
+
+| 防線 | 涵蓋 | 失效方式 |
+| --- | --- | --- |
+| `openspec/config.yaml`（`schema: spec-driven-custom`） | **所有**建立途徑，含在終端機手打 | 被刪或值改錯就**靜默**落回內建 schema |
+| `--schema` 旗標 | `.claude/` 底下的 skill 與指令 | 漏帶時 `openspec-schema.spec.ts` **顯性**變紅 |
+
+只留旗標的話，手打的那條路徑完全沒有防線；只留設定檔的話，就失去那道會出聲的檢查。
+`openspec-propose` skill 已內建旗標，守則同時檢查設定檔與旗標。
+
+> ⚠️ **`openspec config` 指令只支援 global scope，但設定檔是專案層的**——兩者是不同的東西。
+> 早期把指令的限制誤述成「專案預設進不了版控」，導致 `config.yaml` 長期沒被建立。
 
 ### 能力（capability）命名
 

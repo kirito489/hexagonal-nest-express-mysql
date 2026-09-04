@@ -8,9 +8,7 @@
 
 分工判準：單檔即可判定的 import 邊界交給 eslint（lint 期 + IDE 即時），跨檔語意交給架構測試；
 型別能表達的完整性（如常數是否存在）不另寫檢查，交給 TypeScript。
-
 ## Requirements
-
 ### Requirement: 分層邊界檢查
 
 系統 SHALL 以自動化檢查確保 controller 不直接相依持久層。任何 `src/adapter/in/**/*.controller.ts` 檔案 MUST NOT import `PrismaService`、`PrismaClient` 或任何以 `Repository` 結尾的型別。
@@ -419,12 +417,23 @@ MUST 排除。
 ### Requirement: openspec 自訂 schema 的執行路徑檢查
 
 系統 SHALL 確保專案的 openspec 格式規範真的會生效：自訂 schema 與四份模板存在、
-`schema.yaml` 可解析且四個 artifact 齊全、建立 change 的指令一律帶
-`--schema spec-driven-custom`、進行中的 change 皆使用該 schema、
+`schema.yaml` 可解析且四個 artifact 齊全、`openspec/config.yaml` 存在且指定該 schema、
+建立 change 的指令一律帶 `--schema spec-driven-custom`、進行中的 change 皆使用該 schema、
 且 `.claude/commands/opsx/*` 維持轉呼叫 skill 的薄殼。
 
-`openspec config` 只支援 global scope，專案預設 schema 進不了版控——少帶旗標就會
-靜默落回內建 schema，所有格式規範一條都不生效。
+專案預設 schema 由**進版控的 `openspec/config.yaml`** 承載（`schema: spec-driven-custom`）。
+CLI 的 `openspec config` 指令只支援 global scope，但設定檔本身是專案層的——
+兩者是不同的東西，早期把指令的限制誤述為整體限制，導致這個可以進版控的預設值一直沒被設。
+
+設定檔與旗標 SHALL **並存**，不擇一。兩者失效的方式不同：設定檔失效是靜默的
+（被刪或值改錯就落回內建 schema），旗標失效是顯性的（守則紅）。
+只留旗標會讓終端機手打 `openspec new change` 完全沒有防線；
+只留設定檔則失去那道會出聲的檢查。
+
+#### Scenario: 專案設定檔缺失或指向別的 schema
+
+- **WHEN** `openspec/config.yaml` 不存在，或其 `schema:` 不是 `spec-driven-custom`
+- **THEN** 檢查失敗——手打的建立指令會靜默落回內建 schema
 
 #### Scenario: 建立指令漏帶旗標
 
@@ -517,3 +526,4 @@ script 名稱檢查 MUST 只比對含冒號的名稱——散文中的「`.pnpm 
 
 - **WHEN** `docker/` 底下的註解仍寫著已不存在的 `pnpm <script>`
 - **THEN** 檢查失敗並指出該檔案與指令
+

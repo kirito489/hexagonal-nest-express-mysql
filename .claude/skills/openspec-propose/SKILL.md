@@ -42,9 +42,13 @@ When ready to implement, run /opsx:apply
    **The `--schema spec-driven-custom` flag is mandatory.** The project's format rules —
    capability naming (`api-` / `ui-` / `platform-`), the API request/response shape, and the
    independently-verifiable task blocks — live in `openspec/schemas/spec-driven-custom/`.
-   `openspec config` only supports global scope, so the project default cannot be committed;
-   omitting the flag silently falls back to the built-in schema and loses every one of those
-   rules. A guardrail test (`openspec-schema.spec.ts`) fails if any change is created without it.
+   Falling back to the built-in schema loses every one of those rules, silently.
+
+   `openspec/config.yaml` also pins the project default, so the flag is **not** the only thing
+   standing between you and the built-in schema — but keep passing it anyway. The two fail
+   differently: the config file fails silently when deleted or mis-set, the flag is what
+   `openspec-schema.spec.ts` can see and go red on. Dropping the flag because "the config
+   handles it" removes the only failure mode anyone notices.
 
 3. **Get the artifact build order**
    ```bash
