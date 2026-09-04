@@ -8,6 +8,7 @@ import { ExpressLoader } from '@nestjs/serve-static/dist/loaders/express.loader'
 import { AppModule } from '@app/app.module';
 import { RedisService } from '@app/infrastructure/redis/redis.service';
 import { SAVE_SYSTEM_LOG_PORT } from '@app/application/port/out/shared/SaveSystemLogPort';
+import { applySecurityHeaders } from '@app/infrastructure/security-headers';
 
 export interface TestAppOverrides {
   redis?: ReturnType<typeof createMockRedis>;
@@ -84,6 +85,12 @@ export async function createE2EApp(overrides: TestAppOverrides = {}): Promise<{
     { forceCloseConnections: true },
   );
   app.setGlobalPrefix('api');
+
+  // 與 main.ts 共用同一支。`app.use()` 掛的原生中介層只存在於 bootstrap()，
+  // 不在這裡呼叫的話，e2e 跑的是一組沒有安全標頭的 app——
+  // 任何 header 斷言不是全紅就是「斷言不存在」的全綠，兩種都不是在驗真的東西。
+  applySecurityHeaders(app);
+
   await app.init();
 
   return { app, moduleRef };

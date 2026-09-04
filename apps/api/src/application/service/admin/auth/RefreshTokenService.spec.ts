@@ -13,7 +13,7 @@ jest.mock('../../../../infrastructure/validate-env', () => ({
     ACCESS_SECRET: 'a'.repeat(32),
     REFRESH_SECRET: 'b'.repeat(32),
     ACCESS_TOKEN_EXPIRES_IN: 7200,
-    REFRESH_TOKEN_EXPIRES_IN: 604800,
+    REFRESH_TOKEN_EXPIRES_IN: 86400,
   }),
 }));
 
@@ -80,7 +80,7 @@ describe('RefreshTokenService', () => {
     expect(result.accessToken).toBe('signed:access');
     expect(result.refreshToken).toBe('signed:refresh');
     expect(result.accessTokenExpiresIn).toBe(7200);
-    expect(result.refreshTokenExpiresIn).toBe(604800);
+    expect(result.refreshTokenExpiresIn).toBe(86400);
     expect(blacklist.addToBlacklist).toHaveBeenCalledWith(
       'old-refresh',
       expect.any(Number),

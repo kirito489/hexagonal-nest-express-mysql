@@ -59,7 +59,7 @@ responses:
             accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
             accessTokenExpiresIn: 7200
             refreshToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-            refreshTokenExpiresIn: 604800
+            refreshTokenExpiresIn: 86400
           timestamp: '2024-01-01T00:00:00.000Z'
 
   '401':

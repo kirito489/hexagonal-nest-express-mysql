@@ -27,8 +27,18 @@ const envSchema = z.object({
   //預設 2 小時
   ACCESS_TOKEN_EXPIRES_IN: z.coerce.number().default(7200),
   REFRESH_SECRET: z.string().min(32),
-  //預設 7 天
-  REFRESH_TOKEN_EXPIRES_IN: z.coerce.number().default(604800),
+  /**
+   * Refresh Token 效期（秒），預設 1 天。
+   *
+   * **效期與儲存位置是綁在一起的一組決定，不是可以單獨調的參數。**
+   * 目前前端把 access 與 refresh 兩枚都放 `localStorage`，任何 XSS 都能一次帶走，
+   * 而 refresh 輪替會讓偷到的那枚一直續命——判準是「被偷走之後攻擊者能用多久」。
+   *
+   * 要調長，先把它改成 `httpOnly` + `SameSite=Strict` cookie
+   * （`cookieParser` 與 `COOKIE_SECRET` 都已就緒，卡在前端換發流程要一起改）。
+   * 在那之前調回 604800 是把已知風險放大，不是參數微調。
+   */
+  REFRESH_TOKEN_EXPIRES_IN: z.coerce.number().default(86400),
   // JWT issuer/audience：簽發與驗證一致，避免 token 被共用同 secret 的其他服務重放
   JWT_ISSUER: z.string().default('hexagonal-api'),
   JWT_AUDIENCE: z.string().default('hexagonal-web'),
@@ -227,6 +237,27 @@ const envSchema = z.object({
 
   // ─── 帳號鎖定 ───
   APPLICATION_ACCOUNT_LOCK_THRESHOLD: z.coerce.number().int().min(1).default(3),
+  /**
+   * 鎖定的時效（分鐘），逾時自動解除。預設 15 分鐘。
+   *
+   * **沒有時效的版本是一個沒有復原路徑的死結。** 鎖定檢查排在密碼驗證之前，
+   * 被鎖的帳號連「密碼打對」都到不了清除計數那條路；而手動解鎖
+   * （`POST /api/admin/security/unlock-account`）需要一個已登入且具 SUPERADMIN
+   * 的管理員——把已知的管理員 email 全鎖一輪就沒有人能登入解鎖，
+   * 而觸發鎖定完全不需要認證、也不需要猜對密碼。
+   *
+   * 時效**不解決**「持續攻擊者每 N 分鐘重鎖一次」，那是 `APPLICATION_IP_BLOCK_THRESHOLD`
+   * 的職責。它解決的是「永久且無復原路徑」——兩者是不同的問題。
+   *
+   * ⚠️ 調大時注意它與失敗計數的存活時間（`PrismaAccountLockAdapter.COUNTER_TTL`，
+   * 30 分鐘）的關係：時效若超過計數 TTL，到期清計數那步會變成沒事做（計數早就過期了），
+   * 行為仍正確但那條路徑就不再被實際走到。
+   */
+  APPLICATION_ACCOUNT_LOCK_DURATION_MIN: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(15),
   APPLICATION_IP_BLOCK_THRESHOLD: z.coerce.number().int().min(1).default(5),
 
   // ─── Google reCAPTCHA ───
@@ -284,9 +315,60 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   /** 範例排程 cron（@nestjs/schedule 6 欄位含秒），預設每分鐘第 0 秒 */
   SCHEDULE_EXAMPLE_CRON: z.string().default('0 * * * * *'),
+
+  // ─── API 文件 ───
+  /**
+   * 是否掛載 Swagger UI 與 OpenAPI spec。
+   *
+   * **未設定時的預設值依 `NODE_ENV`**（見 `resolveSwaggerEnabled`）：production 為 false、
+   * 其餘為 true。固定預設 true 會讓忘記設定的 production 裸奔——
+   * `/api/admin/docs-json` 是一份完整的後台地圖（所有端點、參數 schema、錯誤碼、權限碼命名），
+   * 而它掛在 `app.use()` 上，**全域 `JwtAuthGuard` 根本碰不到**（Nest 的 guard 只作用於 Nest 路由）。
+   * 固定預設 false 則會讓開發者第一次跑起來就找不到文件。
+   *
+   * 預設值唯一該有的性質是「什麼都不設就是對的」，而這裡的「對」在兩種環境下不同。
+   *
+   * ⚠️ **必須接受空字串並轉成 undefined**：`.env` 裡寫 `SWAGGER_ENABLED=` 時，
+   * dotenv 解析出來的是 `''` 而不是 `undefined`，純 `.optional()` 會判定
+   * 「有值但不合法」而讓整個應用啟動失敗——而範例檔正是留空的。
+   * 同一個處理見 `SESSION_SECRET`。
+   */
+  SWAGGER_ENABLED: z
+    .enum(['true', 'false'])
+    .or(z.literal(''))
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Swagger 文件是否該掛載。
+ *
+ * 明確設定永遠優先於依 `NODE_ENV` 的推導。
+ *
+ * 判定拆成純函式而不是寫在 `isSwaggerEnabled()` 內部：測試要 mock `getEnv` 時，
+ * 模組內部的呼叫仍然指向真正的實作（partial mock 蓋不到自己人），
+ * 而純函式沒有這個問題——直接餵兩個參數就能驗完四種組合。
+ *
+ * @param nodeEnv - 執行環境
+ * @param explicit - `SWAGGER_ENABLED` 的值，未設定為 undefined
+ * @returns true 代表 `/docs` 與 `/docs-json` 都該掛載
+ */
+export const resolveSwaggerEnabled = (
+  nodeEnv: string,
+  explicit: 'true' | 'false' | undefined,
+): boolean =>
+  explicit === undefined ? nodeEnv !== 'production' : explicit === 'true';
+
+/**
+ * 依目前環境判斷 Swagger 文件是否該掛載
+ * @returns true 代表 `/docs` 與 `/docs-json` 都該掛載
+ */
+export const isSwaggerEnabled = (): boolean => {
+  const env = getEnv();
+  return resolveSwaggerEnabled(env.NODE_ENV, env.SWAGGER_ENABLED);
+};
 
 let _env: Env | null = null;
 

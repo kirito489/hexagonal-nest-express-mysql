@@ -10,7 +10,7 @@ jest.mock('../../../../infrastructure/validate-env', () => ({
     ACCESS_SECRET: 'test-access-secret',
     REFRESH_SECRET: 'test-refresh-secret',
     ACCESS_TOKEN_EXPIRES_IN: 7200,
-    REFRESH_TOKEN_EXPIRES_IN: 604800,
+    REFRESH_TOKEN_EXPIRES_IN: 86400,
   }),
 }));
 

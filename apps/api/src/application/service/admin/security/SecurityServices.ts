@@ -182,8 +182,13 @@ export class UnlockAccountService implements UnlockAccountUseCase {
     if (!member) throw new EmailNotFoundException();
 
     // 2. 確認帳號真的鎖著（避免靜默通過正常帳號的解鎖請求）
-    const locked = await this.accountLock.isLocked(email);
-    if (!locked) throw new AccountNotLockedException();
+    //
+    // EXPIRED 也要放行去解鎖：`lockedAt` 仍有值、Redis 的失敗計數也可能還在，
+    // 而清掉那些殘留正是管理員按下解鎖時的意圖。只認 LOCKED 的話，
+    // 一個「已逾時但沒人碰過」的帳號會回 409，訊息說它沒被鎖——
+    // 但列表與 `lockedAt` 都顯示它鎖著，兩邊互相矛盾。
+    const status = await this.accountLock.checkLock(email);
+    if (status === 'NONE') throw new AccountNotLockedException();
 
     // 3. 解鎖（同時重置 failedLoginCount）
     await this.accountLock.unlockAccount(email);

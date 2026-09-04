@@ -210,7 +210,45 @@ if (this.featureFlags.isEnabled('accountLockEnabled')) { ... }
 
 ### 安全功能細節
 
-- **帳號鎖定**：連續登入失敗達 `APPLICATION_ACCOUNT_LOCK_THRESHOLD` 次後，帳號自動鎖定（DB `lockedAt` 欄位）。失敗計數使用 Redis INCR（30 分鐘 TTL），Redis 不可用時 graceful degradation（不計數，但 DB 鎖定仍有效）。登入成功自動重置計數。
+- **帳號鎖定**：連續登入失敗達 `APPLICATION_ACCOUNT_LOCK_THRESHOLD` 次後，帳號自動鎖定（DB `lockedAt` 欄位），回 `423` / `ACCOUNT_LOCKED`。失敗計數使用 Redis INCR（30 分鐘 TTL），Redis 不可用時 graceful degradation（不計數，但 DB 鎖定仍有效）。登入成功自動重置計數。
+
+  **鎖定有時效**（`APPLICATION_ACCOUNT_LOCK_DURATION_MIN`，預設 15 分鐘），逾時自動解除。
+  沒有時效的版本是一個**沒有復原路徑的死結**：鎖定的檢查排在密碼驗證之前，
+  被鎖的帳號連「密碼打對」都到不了清除計數那條路；而人工解鎖的端點需要一個
+  已登入且具 SUPERADMIN 的管理員——把已知的管理員 email 全鎖一輪就沒有人能登入解鎖，
+  而觸發鎖定完全不需要認證、也不需要猜對密碼。
+
+  時效由 `lockedAt` + 設定值**即時算出，不另存欄位**——存到期時間的話，調整設定不會影響
+  既有紀錄，會出現「設定顯示 15 分鐘、實際 60 分鐘」的不一致直到那批紀錄自然消失。
+
+  **到期時必須一併清除失敗計數**（`LoginService` 收到 `EXPIRED` 時呼叫 `resetFailedLogin`）。
+  Redis 計數的 TTL（30 分鐘）比時效長，不清的話使用者在到期後第一次打錯就會
+  因為「計數還在閾值上」立刻重新被鎖，實際鎖定時間變成計數的 TTL 而非設定的時效——
+  而設定的那個數字看起來完全正常。`AccountLockPort.checkLock()` 因此回三態
+  （`NONE` / `LOCKED` / `EXPIRED`）而非布林：布林分不出「從未鎖定」與「鎖過但已到期」。
+
+  時效**不解決**「持續攻擊者可以每 N 分鐘重鎖一次」，那是 per-IP 限制的職責
+  （`APPLICATION_IP_BLOCK_THRESHOLD`）。它解決的是「永久且無復原路徑」。
+
+  **email 一律以正規化後的值（去空白 + 轉小寫）比對**。Redis 的鍵是字串比對（區分大小寫），
+  而 MySQL 的 `utf8mb4_unicode_ci` 定序不分大小寫——兩邊不一致時，
+  攻擊者交替變換大小寫就能讓每種寫法各自累積一份永遠到不了閾值的計數，
+  而每次嘗試都命中同一個帳號，**鎖定形同不存在**。正規化涵蓋
+  `PrismaAccountLockAdapter` 的全部五支方法。
+
+- **API 文件的暴露**：Swagger UI 與 OpenAPI spec 由 `SWAGGER_ENABLED` 控制，
+  **未設定時依 `NODE_ENV`**（production 關、其餘開）。關閉時 `/docs` 與 `/docs-json`
+  兩者都不掛載——`docs-json` 才是有價值的那份（完整的後台地圖：所有端點、參數 schema、
+  錯誤碼、權限碼命名），而它沒有介面所以容易被漏掉。
+  這兩條路徑用 `app.use()` 掛原生 Express middleware，**全域 `JwtAuthGuard` 碰不到**
+  （Nest 的 guard 只作用於 Nest 路由），所以暴露與否只能由掛載時機決定。
+  關掉不影響開發流程：`swagger:check` 與 api-client codegen 走的是本機檔案而非 HTTP 端點。
+
+- **安全標頭與 CSP**：由 `infrastructure/security-headers.ts` 的 `applySecurityHeaders(app)`
+  統一套用，`main.ts` 與 `createE2EApp` **共用同一支**（不共用的話 e2e 驗的是一組
+  沒有安全標頭的 app，任何 header 斷言都是空的）。CSP **只在 Swagger UI 的路徑放寬**，
+  豁免範圍由 `SWAGGER_SIDES` 單一來源決定。先前是全域關閉，理由寫「純 API + 獨立前端」——
+  那個前提在單一埠部署模式加入時就失效了，該模式下後台 SPA 由同一個 Express 吐出。
 - **IP 黑白名單**：`IpBlacklistGuard` / `IpWhitelistGuard` 全域攔截。IP 連續登入失敗達 `APPLICATION_IP_BLOCK_THRESHOLD` 次自動加入黑名單。資料表：`ip_whitelist`、`ip_blacklist`（後者含 `isAutoBlock` 標記）。
 - **密碼策略**：`PasswordPolicyService` 依角色套用不同複雜度（**0–4**，累加式）：0 只檢查長度、1 加英文字母與數字、2 加大小寫各一、3 加特殊符號、4 加禁止 18 組常見弱密碼。**系統管理員預設 4、其他角色預設 1**（`APPLICATION_SYSTEM_ADMIN_PASSWORD_COMPLEXITY` / `APPLICATION_OTHER_ADMIN_PASSWORD_COMPLEXITY`）。
 - **密碼定期更換**：`passwordChangeEnabled` + `APPLICATION_PASSWORD_CHANGE_PERIOD > 0` 時，`JwtAuthGuard` 檢查 `lastPasswordChange`；超期回 `403 { code: 'PASSWORD_CHANGE_REQUIRED' }`。

@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -8,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
+import { AccountLockedException } from '@app/domain/exception/AccountLockedException';
 import {
   LoginCommand,
   LoginResult,
@@ -105,16 +105,32 @@ export class LoginService implements LoginUseCase {
 
     // 帳號鎖定檢查
     if (this.featureFlags.isEnabled('accountLockEnabled')) {
-      if (await this.accountLock.isLocked(email)) {
-        await this.logAuth(
-          email,
-          undefined,
-          'LOGIN_FAILURE',
-          ip,
-          userAgent,
-          '帳號已鎖定',
-        );
-        throw new ForbiddenException('帳號已被鎖定，請聯繫管理員解鎖');
+      const lockStatus = await this.accountLock.checkLock(email);
+
+      switch (lockStatus) {
+        case 'LOCKED':
+          await this.logAuth(
+            email,
+            undefined,
+            'LOGIN_FAILURE',
+            ip,
+            userAgent,
+            '帳號已鎖定',
+          );
+          // 用 domain exception 而非 ForbiddenException：契約寫的是 423 / ACCOUNT_LOCKED，
+          // 而 NestJS 的 HttpException 由 class 名推導錯誤碼，會回成 403 / FORBIDDEN。
+          // 訊息由 response-messages.ts 提供，不在此內嵌。
+          throw new AccountLockedException();
+
+        case 'EXPIRED':
+          // 到期必須清計數再放行。Redis 計數的 TTL（30 分鐘）比鎖定時效（預設 15 分鐘）長，
+          // 少了這一步，使用者在到期後第一次打錯就會因為「計數還在閾值上」立刻重新被鎖，
+          // 實際鎖定時間變成計數的 TTL 而非設定的時效——而設定的那個數字看起來完全正常。
+          await this.accountLock.resetFailedLogin(email);
+          break;
+
+        case 'NONE':
+          break;
       }
     }
 

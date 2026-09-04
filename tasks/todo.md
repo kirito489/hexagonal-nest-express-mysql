@@ -11,7 +11,9 @@
 盤點後確認可回補的部分切成 10 支 change，依風險與相依排序：
 
 - [x] **C1 `platform-ai-workflow-backport`** — `.claude/skills/`（grill-me / pr-body / tidy-todo）、`.husky/pre-push`、PR/MR 模板（GitLab 側改 symlink）、`openspec/config.yaml`、lessons 合併 22 條（288 → 473 行）。守則 19 支 / 68 → 69 項。**待封存**
-- [ ] **C2 `platform-security-hardening`** — 帳號鎖定時效（現況是無復原路徑的死結）、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天、`normalize-email`
+- [x] **C2 `platform-security-hardening`** — 帳號鎖定時效 + 三態 `checkLock`、大小寫繞過修補、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天。
+      **實作途中另外修掉三個既有缺陷**：鎖定回應 403/`FORBIDDEN` 與 spec 寫的 423/`ACCOUNT_LOCKED` 不符（**對外契約變更**）、`AccountLockedException` 是零呼叫端的死碼、`LoginService` 內嵌使用者文案違反 Hard Rule。
+      單元 330 條 / 守則 69 條 / e2e 160 條（151 → 160）。**待封存**
 - [ ] **C3 `platform-guardrail-backport`** — guardrail-inventory / permission-catalog-sync / public-surface + infra-endpoint / role-permission-cache + `MemberContextCachePort` / session-revocation
 - [ ] **C4 `platform-container-single-entry`** — `verify-ci.sh` 的 `down -v` 誤刪全專案 volume、nginx 單一入口 + `TRUST_PROXY`、容器吃本機 `.env`、`e2e-docker.sh`
       ⚠️ **`down -v` 這條在 C1 已寫進 `lessons.md` 並標明「現在正踩著」**——在 C4 落地前，跑 `pnpm verify:ci` 會清掉開發用的 `mysql-data` / `redis-data` 與五個 `node_modules` volume，事後要重跑 `pnpm install` 與 `pnpm docker:init`
@@ -28,9 +30,16 @@
 
 ## 待辦
 
+### 從 C2 分出來的後續
+
+- **守則應涵蓋「`.env.example` 真的能通過 `envSchema`」**：目前 `env-schema.spec.ts` 只檢查「程式用到的變數有沒有宣告」，**沒有任何東西把範例檔餵進 `envSchema` 跑一次**。這個缺口在 C2 收尾時親自踩到——`SWAGGER_ENABLED=`（留空）會被 `.optional()` 判定為不合法，任何照抄範例檔的新部署都會啟動失敗，而開發機因為本機 `.env` 沒有那一行所以完全無感。同一次比對還抓出四個長期缺漏的變數（`LOG_PURGE_ENABLED` / `LOG_RETENTION_DAYS` / `LOG_PURGE_CRON` / `THROTTLE_FAIL_OPEN`）。**新守則要做兩件事**：(1) `envSchema` 宣告的變數與範例檔的鍵集合完全相等；(2) 把範例檔 parse 後（必填項補假值）餵進 `envSchema`，必須通過。建議併進 C3。
+
+- **guard 層 5 處內嵌使用者文案**（`IpBlacklistGuard` ×2、`IpWhitelistGuard`、`PermissionsGuard`、`RolesGuard`）：與 C2 修掉的 `LoginService` 同型，違反 Hard Rule「訊息只能住在 `response-messages.ts`」。**`no-inline-message.spec.ts` 只掃 `domain/exception/`，掃不到 guard 與 service**——所以真正該做的不只是改那 5 處，而是把守則的掃描範圍擴到會拋例外的所有層。C2 刻意不夾帶：那 5 處不在 C2 的路徑上，且擴大守則範圍可能掃出更多既有違規，屬獨立的清理 change。
+
 ### 需人工處理（AI 做不到）
 
-- **`.env.example` 補 `ALLOW_PROD_SEED`**：`envSchema` 已補宣告（2026-08-14），但 `.env.example` 尚未加。此檔在 AI 的權限設定中被拒絕存取，需開發者手動加一行 `ALLOW_PROD_SEED=`（註明僅正式環境用）。
+- **環境變數範例檔的同步**：AI 讀不到 `.env.example`（權限拒絕），改由 `apps/api/env.example`（無點號）作為可編輯的工作副本。**AI 改完後需開發者覆蓋回 `.env.example`**。
+  （2026-09-05 清掉一條過期待辦：原本掛著「`.env.example` 補 `ALLOW_PROD_SEED`」，實際上該行早就在檔案裡了。）
 
 - **首次 CI pipeline 需人工觀察**：`pnpm verify:ci` 已能在本機以容器重現 e2e 測試環境（2026-08-16 加入），**測試層面的驗證範圍縮小到剩下 runner 專屬行為**：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) cache 是否命中；(3) pipeline 總時長可否接受，過慢可把 `e2e-test` 限縮為只在 MR 跑。GitLab 的 services 不支援 compose 的 healthcheck，CI 端沿用手動等待迴圈（30 次 × 2 秒）—— 首跑時留意是否足夠。
 
@@ -42,7 +51,8 @@
 
 ### 功能
 
-- **帳號鎖定管理 CRUD（`api-account-lock-management`，即上方 C6a）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。**衍生專案已實作，回補時以其為藍本**，但要等 C2 的鎖定時效先落地——沒有時效的話這支端點是唯一解鎖途徑，而它自己需要能登入的管理員。
+- **帳號鎖定管理 CRUD（`api-account-lock-management`，即上方 C6a）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。**衍生專案已實作，回補時以其為藍本**。
+  **前置條件已滿足**（C2 已落地時效，手動解鎖不再是唯一途徑）。實作時注意兩點：(1) 列表的到期判定必須與 `AccountLockPort.checkLock()` 用同一份規則，自己再算一次會漂移成「列表說鎖著、但那個人登得進去」；(2) `APPLICATION_ACCOUNT_LOCK_ENABLED` **預設 false**，關閉時系統永遠不會產生鎖定紀錄，那一頁會永遠是空的——端點要把開關狀態一起回傳，畫面在關閉時明講「不會有」而非「目前沒有」。
 
 ### 技術債（外部相依卡住，延後）
 

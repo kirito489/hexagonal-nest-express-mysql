@@ -1,4 +1,4 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginService } from './LoginService';
@@ -13,6 +13,7 @@ import { RecaptchaVerifyPort } from '../../../port/out/auth/RecaptchaVerifyPort'
 import { SessionActivityPort } from '../../../port/out/auth/SessionActivityPort';
 import { Member } from '@app/domain/model/Member';
 import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
+import { AccountLockedException } from '@app/domain/exception/AccountLockedException';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -25,9 +26,10 @@ jest.mock('../../../../infrastructure/validate-env', () => ({
     ACCESS_SECRET: 'test-access-secret',
     ACCESS_TOKEN_EXPIRES_IN: 7200,
     REFRESH_SECRET: 'test-refresh-secret',
-    REFRESH_TOKEN_EXPIRES_IN: 604800,
+    REFRESH_TOKEN_EXPIRES_IN: 86400,
     APPLICATION_SESSION_IDLE_TIMEOUT: 120,
     APPLICATION_ACCOUNT_LOCK_THRESHOLD: 3,
+    APPLICATION_ACCOUNT_LOCK_DURATION_MIN: 15,
     APPLICATION_IP_BLOCK_THRESHOLD: 5,
   }),
 }));
@@ -72,11 +74,29 @@ const mockSaveMember = {
 
 const mockAccountLock = {
   isLocked: jest.fn().mockResolvedValue(false),
+  checkLock: jest.fn().mockResolvedValue('NONE'),
   lockAccount: jest.fn(),
   recordFailedLogin: jest.fn().mockResolvedValue(0),
   resetFailedLogin: jest.fn(),
   unlockAccount: jest.fn(),
 } as unknown as jest.Mocked<AccountLockPort>;
+
+/**
+ * 設定「這個帳號目前的鎖定狀態」，不指定 service 用哪支 port 方法去問。
+ *
+ * 同時餵新舊兩支（布林的 `isLocked` 與三態的 `checkLock`），
+ * 讓斷言只依賴**行為**——鎖定狀態的查詢方式改變時，這裡改一處即可，
+ * 各個測試不必跟著動。綁在單一機制上的測試在重構當下就得改寫，
+ * 而那正好是最需要它保持不變的時刻。
+ */
+const givenLockState = (state: 'none' | 'locked' | 'expired'): void => {
+  const mock = mockAccountLock as unknown as {
+    isLocked: jest.Mock;
+    checkLock: jest.Mock;
+  };
+  mock.isLocked.mockResolvedValue(state === 'locked');
+  mock.checkLock.mockResolvedValue(state.toUpperCase());
+};
 
 const mockIpBlock = {
   recordFailedIpAttempt: jest.fn().mockResolvedValue(0),
@@ -232,12 +252,114 @@ describe('LoginService', () => {
   });
 
   it('帳號鎖定功能啟用且帳號已鎖定 → 拋出 ForbiddenException', async () => {
-    (mockAccountLock.isLocked as jest.Mock).mockResolvedValue(true);
+    givenLockState('locked');
     const service = makeService(makeFeatureFlags({ accountLockEnabled: true }));
 
     await expect(
       service.execute({ email: 'admin@test.com', password: 'pw' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(AccountLockedException);
     expect(mockLoadMember.loadMemberByEmail).not.toHaveBeenCalled();
+  });
+
+  // ── characterization：釘住現行的鎖定行為，供 platform-security-hardening 重構時比對 ──
+  //
+  // 斷言一律寫在**行為**（被拒絕 / 放行）上，不寫在機制（呼叫了哪支 port 方法）上。
+  // 鎖定狀態的查詢即將由布林的 isLocked 換成三態的 checkLock，綁在機制上的測試
+  // 屆時得跟著改，而改測試的同時就失去了它要提供的保護。
+  describe('characterization：鎖定行為', () => {
+    it('已鎖定 + 密碼正確 → 仍然被拒絕', async () => {
+      givenLockState('locked');
+      (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(
+        makeService(makeFeatureFlags({ accountLockEnabled: true })).execute({
+          email: 'admin@test.com',
+          password: 'Password1!',
+        }),
+      ).rejects.toThrow(AccountLockedException);
+    });
+
+    it('已鎖定 + 密碼錯誤 → 被拒絕，且不是密碼錯誤的那種拒絕', async () => {
+      givenLockState('locked');
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        makeService(makeFeatureFlags({ accountLockEnabled: true })).execute({
+          email: 'admin@test.com',
+          password: 'wrong',
+        }),
+      ).rejects.toThrow(AccountLockedException);
+    });
+
+    it('未鎖定 + 密碼正確 → 放行', async () => {
+      givenLockState('none');
+      (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await makeService(
+        makeFeatureFlags({ accountLockEnabled: true }),
+      ).execute({ email: 'admin@test.com', password: 'Password1!' });
+
+      expect(result.accessToken).toBe('mock-token');
+    });
+
+    it('鎖定已逾時 + 密碼正確 → 放行', async () => {
+      givenLockState('expired');
+      (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await makeService(
+        makeFeatureFlags({ accountLockEnabled: true }),
+      ).execute({ email: 'admin@test.com', password: 'Password1!' });
+
+      expect(result.accessToken).toBe('mock-token');
+    });
+
+    // 「到期要清計數」只能在**登入失敗**的情境驗。
+    // 成功路徑本來就會呼叫 resetFailedLogin，在那裡斷言的話，
+    // 把 EXPIRED 分支的清除整段拿掉測試照樣綠——斷言被成功路徑餵飽了。
+    // 這裡密碼是錯的，走不到成功路徑，resetFailedLogin 只可能來自 EXPIRED 分支。
+    it('鎖定已逾時 + 密碼錯誤 → 回 401，且殘留的失敗計數已被清掉', async () => {
+      givenLockState('expired');
+      (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        makeService(makeFeatureFlags({ accountLockEnabled: true })).execute({
+          email: 'admin@test.com',
+          password: 'wrong',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      // 不清的話，Redis 計數的 TTL（30 分）比時效（15 分）長，
+      // 使用者到期後第一次打錯就會因為「計數還在閾值上」立刻重新被鎖
+      expect(mockAccountLock.resetFailedLogin).toHaveBeenCalledWith(
+        'admin@test.com',
+      );
+    });
+
+    it('鎖定功能關閉 → 即使處於鎖定狀態也放行', async () => {
+      givenLockState('locked');
+      (mockLoadMember.loadMemberByEmail as jest.Mock).mockResolvedValue(
+        makeMember(),
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await makeService().execute({
+        email: 'admin@test.com',
+        password: 'Password1!',
+      });
+
+      expect(result.accessToken).toBe('mock-token');
+    });
   });
 });

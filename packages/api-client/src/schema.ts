@@ -56,7 +56,7 @@ export interface paths {
                          *         "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                          *         "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                          *         "accessTokenExpiresIn": 900,
-                         *         "refreshTokenExpiresIn": 604800,
+                         *         "refreshTokenExpiresIn": 86400,
                          *         "member": {
                          *           "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                          *           "email": "test@example.com",
@@ -225,7 +225,7 @@ export interface paths {
                          *         "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                          *         "accessTokenExpiresIn": 7200,
                          *         "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                         *         "refreshTokenExpiresIn": 604800
+                         *         "refreshTokenExpiresIn": 86400
                          *       },
                          *       "timestamp": "2024-01-01T00:00:00.000Z"
                          *     }
