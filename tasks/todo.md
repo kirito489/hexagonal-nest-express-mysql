@@ -37,7 +37,8 @@
 ### 從衍生專案再撈的（2026-09-06 盤點，nexus 多出三支 commit）
 
 - [x] **C2b `fix-viewless-module-permission`** — `BACKEND:ATTACHMENT:EDIT` 對任何角色都存不進去（前後端各有一個獨立的擋路者）。已修並封存。
-- [ ] **PageHeader 共用元件**（nexus `43e2fc4`）：列表頁的頁首抽成 `components/PageHeader.tsx` + 測試，模板有 4 支列表頁適用（members / roles / security/ip-blacklist / ip-whitelist）。附 `platform-frontend-conventions` 的 spec delta。純前端重構，風險低。
+- [x] **PageHeader 共用元件**（nexus `43e2fc4`）：四支列表頁的頁首抽成 `components/PageHeader.tsx` + 5 條測試。純重構，DOM 與 class 零變化。
+      刻意**不加守則**擋「頁首必須用它」——明細頁與登入頁沒有這層結構，規則放寬到能容納它們就抓不到真正的偏差，而會誤報的守則會被繞過。判準寫進 `frontend.md`。**待封存**
 - [ ] **帳號鎖定頁版面**（nexus `e674a2a`）：**不單獨搬**，回補 C6a（`api-account-lock-management`）時直接以修正後的版本為藍本。
 
 ### 從 C2 分出來的後續
@@ -82,7 +83,9 @@
 ### 功能
 
 - **帳號鎖定管理 CRUD（`api-account-lock-management`，即上方 C6a）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。**衍生專案已實作，回補時以其為藍本**。
-  **前置條件已滿足**（C2 已落地時效，手動解鎖不再是唯一途徑）。實作時注意兩點：(1) 列表的到期判定必須與 `AccountLockPort.checkLock()` 用同一份規則，自己再算一次會漂移成「列表說鎖著、但那個人登得進去」；(2) `APPLICATION_ACCOUNT_LOCK_ENABLED` **預設 false**，關閉時系統永遠不會產生鎖定紀錄，那一頁會永遠是空的——端點要把開關狀態一起回傳，畫面在關閉時明講「不會有」而非「目前沒有」。
+  **前置條件已滿足**（C2 已落地時效，手動解鎖不再是唯一途徑）。
+  **新頁面用 `@/components/PageHeader`，不要照抄既有頁面的頁首**——衍生專案的帳號鎖定頁正是照抄抄歪的那一頁（三處偏差、測試全綠）。
+  另注意兩點：(1) 列表的到期判定必須與 `AccountLockPort.checkLock()` 用同一份規則，自己再算一次會漂移成「列表說鎖著、但那個人登得進去」；(2) `APPLICATION_ACCOUNT_LOCK_ENABLED` **預設 false**，關閉時系統永遠不會產生鎖定紀錄，那一頁會永遠是空的——端點要把開關狀態一起回傳，畫面在關閉時明講「不會有」而非「目前沒有」。
 
 ### 技術債（外部相依卡住，延後）
 

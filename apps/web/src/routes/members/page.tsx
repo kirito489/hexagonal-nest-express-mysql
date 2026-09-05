@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import type { paths } from '@app/api-client';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/PageHeader';
 import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useApiQuery } from '@/api/client';
 import { useCurrentMember } from '@/lib/use-current-member';
@@ -165,18 +166,12 @@ export const MembersPage = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">會員管理</h1>
-          <p className="text-muted-foreground text-sm">
-            管理後台帳號、角色指派與啟用狀態
-          </p>
-        </div>
+      <PageHeader title="會員管理" description="管理後台帳號、角色指派與啟用狀態">
         <Button disabled={!canEdit} onClick={() => setCreateOpen(true)}>
           <Plus />
           新增會員
         </Button>
-      </header>
+      </PageHeader>
 
       <MembersSearchBar
         initialName={url.name}

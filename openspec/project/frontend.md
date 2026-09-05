@@ -36,6 +36,16 @@ apps/web/src/
 - **shadcn 元件**：執行 `cd apps/web && pnpm dlx shadcn@latest add <name>` 加入。`form` 元件目前 nova preset 缺貨，**已自寫**於 `src/components/ui/form.tsx`（標準 shadcn 模板），更新 shadcn 時注意保留。
 - **UI 文字**：一律繁體中文 hardcode，**不導入 i18n 框架**。註解亦只用繁體中文。
 - **Lint exception**：`src/components/ui/**` 與 `src/hooks/use-mobile.ts` 是 shadcn 直接 copy 的官方範本，與專案 lint 規則不同的部分（hook 與元件同檔、effect 內 setState）在 `eslint.config.js` 集中 disable。
+- **列表頁的頁首一律用 `@/components/PageHeader`**，不要照抄既有頁面的結構。有無動作區的排版差異由元件自己決定（沒有 `children` 就不套 flex）——留給呼叫端決定的話，「這一頁忘了加 flex」沒有任何東西擋得住。明細頁 / 登入頁 / 首頁不適用，它們沒有這層結構。
+
+> **能用結構消除的偏差，不要寫成守則。** 頁首這件事考慮過寫成架構規則
+> （「所有 `page.tsx` 的頁首都必須用 `PageHeader`」），**否決**：明細頁與登入頁本來就沒有
+> 這層結構，規則要放寬到能容納它們，放寬之後就抓不到真正的偏差了——
+> 而**會誤報的守則會被繞過**（把檔案加進白名單，規則從此空轉）。
+>
+> 判準是：**沒有可以寫歪的地方，就不需要有人記得寫對。**
+> 守則的定位是「無法用結構消除的約束」（跨層相依、契約同步、清單完整性），
+> 不是「凡是重複的都盯著」。
 
 ### localStorage token 的取捨（已收斂一半）
 
