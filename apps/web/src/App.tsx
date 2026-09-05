@@ -7,6 +7,8 @@ import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RequireAuth } from '@/components/RequireAuth';
 import { RequireRole } from '@/components/RequireRole';
+import { RequirePermission } from '@/components/RequirePermission';
+import { PERMISSION_CODE } from '@/lib/permission-codes';
 import { Layout } from '@/routes/_layout';
 import { LoginPage } from '@/routes/login/page';
 import { HomePage } from '@/routes/home/page';
@@ -37,8 +39,22 @@ export const App = () => {
                 }
               >
                 <Route path="/" element={<HomePage />} />
-                <Route path="/members" element={<MembersPage />} />
-                <Route path="/roles" element={<RolesPage />} />
+                <Route
+                  path="/members"
+                  element={
+                    <RequirePermission code={PERMISSION_CODE.ACCOUNT_VIEW}>
+                      <MembersPage />
+                    </RequirePermission>
+                  }
+                />
+                <Route
+                  path="/roles"
+                  element={
+                    <RequirePermission code={PERMISSION_CODE.ROLE_VIEW}>
+                      <RolesPage />
+                    </RequirePermission>
+                  }
+                />
                 <Route
                   path="/security/ip-whitelist"
                   element={

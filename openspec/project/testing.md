@@ -105,6 +105,7 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `sanitize-coverage.spec.ts` | 2 | request DTO 中看起來敏感的欄位，實際餵進 `sanitize()` 驗證真被遮蔽 |
 | `traditional-chinese.spec.ts` | 2 | 全專案不得混入日文假名或非繁體漢字 |
 | `authorization-coverage.spec.ts` | 9 | 收外部輸入的 handler 必須有 `@Permissions` / `@Roles` / `@Public`——本專案第一條「檢查應存在而不存在」的規則。**自帶合成輸入的自我測試**（註解冒充裝飾器、識別碼走 body、裝飾器寫在 method 上方等七個判定） |
+| `permission-codes-sync.spec.ts` | 3 | 前端 `permission-codes.ts` 的碼必須存在於後端 `PERMISSION_CATALOG`；路由與 sidebar 對同一 path 的權限宣告必須一致，且 sidebar 藏了的 path 不得沒有守衛。**放 api 側**：前端守則用 `import.meta.glob` 讀不到 `apps/api` |
 | `guardrail-inventory.spec.ts` | 12 | 守則檔數量不得低於基準（只擋變少）；**文件不得寫死守則數量**；本表必須涵蓋每一支守則 |
 | `env-example-sync.spec.ts` | 4 | `envSchema` 與 `.env.example` 的鍵集合相等，**且範例檔實際餵進 schema 必須通過**——後者才是重點，只比對鍵名抓不到「留空但 schema 不接受空字串」 |
 | `public-surface.spec.ts` | 10 | `main.ts` 帶路徑的 `app.use()` 掛載必須申報並寫理由（它們繞過全域 `JwtAuthGuard`）；豁免清單不得有失效項目 |

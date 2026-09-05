@@ -16,14 +16,16 @@
       單元 330 條 / 守則 69 條 / e2e 160 條（151 → 160）。**待封存**
 - [x] **C3 `platform-guardrail-backport`** — 回補四支守則（`guardrail-inventory` / `env-example-sync` / `public-surface` / `role-permission-cache`），守則 19 支 / 69 項 → **23 支 / 102 項**。
       **順帶修掉一個活的 bug**：`UpdateRoleService` 改完角色權限不清成員快取，撤銷的權限最多 5 分鐘後才生效。
-      刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
+      刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b——**C6b 已完成，其中「權限碼同步」那半已回補為 `permission-codes-sync.spec.ts`；權限樹中文對照那半屬 C6c**）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
 - [x] **C4 `platform-container-single-entry`** — 修掉 `verify-ci.sh` 的 `down -v`（**修前實測證實會移除 `mysql-data` / `redis-data`**）、nginx 單一入口（api / web 不發布埠）+ `TRUST_PROXY: '1'`、容器個人覆寫改走 `.env.container` + 連線類在 compose 釘死、容器化 e2e（`pnpm test:e2e:docker`）。守則 23 支 / 102 → 106 項。
       **實作中一個設計因實測而改**：原訂 `env_file` 指向 `apps/api/.env`，實際會讓**整個 compose 無法使用**（它的 env 解析器比 dotenv 嚴格），改用獨立的 `.env.container`。**待封存**
 - [x] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions 兩份並存（fork 的人刪一份），前置抽 composite action、版號取自 `.nvmrc` / `packageManager`。
       新增 `ci-parity.spec.ts` 守住「兩份跑同一組檢查 + 同一條資料庫版本線」，**只剩一份時自動放行**。
       **順帶修掉**：GitLab 的 `prepare-production` 原本只在推分支時才建置，改為 MR 也跑——`tsc --noEmit` 抓不到 build 階段的錯誤，只在 push 跑等於「PR 綠、合併完才紅」。守則 23 支 / 106 → 24 支 / 110 項。**待封存**
 - [x] ~~**C6a `api-account-lock-management`**~~ —— 已完成（**範圍比原記載小，見下**）
-- [ ] **C6b `ui-route-permission-guard`** — 路由依權限守衛，sidebar 隱藏不再是唯一防線
+- [x] ~~**C6b `ui-route-permission-guard`**~~ —— 已完成。`/members` 與 `/roles` 掛上 `RequirePermission`（先前完全沒守衛，只靠 sidebar 隱藏）；權限碼型別化為 `apps/web/src/lib/permission-codes.ts`；新增 `permission-codes-sync.spec.ts`（前端碼須存在於後端目錄、路由與 sidebar 宣告須一致）。
+  ⚠️ **`RequireRole` 有行為變更**：非 SUPERADMIN 存取 `/security/*` 從「靜默導回首頁」改為「就地顯示『沒有存取權限』並標出缺少的角色碼」。代價是洩漏了「這個頁面存在」，是知情取捨（design D3）——sidebar 本來就藏著它，而會手動輸入該網址的人已經知道它存在了。
+  ⏸ **待實機確認**：以非 SUPERADMIN 手動輸入 `/security/*` 與 `/members`，確認顯示說明而非彈回首頁（需 `pnpm dev`）。
 - [ ] **C6c `ui-permission-tree-legibility`** — 權限樹中文化、不可指派的安全管理改純說明列表
 - [ ] **C6d `ui-admin-orientation`** — 後台導覽依管理對象分組、首頁改營運摘要
 - [ ] **C6e `api-front-auth`** — 前台註冊 / 信箱驗證 / 密碼重設（模板 front 端目前只有 `ping`，唯一從零到有的一支，最後做）

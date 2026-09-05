@@ -11,6 +11,7 @@ import { useApiQuery } from '@/api/client';
 import { useHasPermission } from '@/lib/use-has-permission';
 import { useCurrentMember } from '@/lib/use-current-member';
 import { useDetailDialog } from '@/lib/use-detail-dialog';
+import { PERMISSION_CODE } from '@/lib/permission-codes';
 import { usePermissionOptionsQuery } from './hooks/use-permission-options-query';
 import { useRolesQuery } from './hooks/use-roles-query';
 import { useRolesUrlState } from './hooks/use-roles-url-state';
@@ -25,8 +26,8 @@ import {
   type RoleFormValues,
 } from './lib/role-form-schema';
 
-const PERM_VIEW = 'BACKEND:ROLE:VIEW';
-const PERM_EDIT = 'BACKEND:ROLE:EDIT';
+const PERM_VIEW = PERMISSION_CODE.ROLE_VIEW;
+const PERM_EDIT = PERMISSION_CODE.ROLE_EDIT;
 
 // 從 generated schema 推出 GET /roles 的 data 形狀，optimistic update 不走 escape hatch
 type RolesData = NonNullable<

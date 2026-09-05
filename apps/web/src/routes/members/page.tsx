@@ -11,6 +11,7 @@ import { useApiQuery } from '@/api/client';
 import { useCurrentMember } from '@/lib/use-current-member';
 import { useHasPermission } from '@/lib/use-has-permission';
 import { useDetailDialog } from '@/lib/use-detail-dialog';
+import { PERMISSION_CODE } from '@/lib/permission-codes';
 import { useMembersQuery } from './hooks/use-members-query';
 import { useMembersUrlState } from './hooks/use-members-url-state';
 import { useMemberMutations } from './hooks/use-member-mutations';
@@ -21,8 +22,8 @@ import { MemberViewDialog } from './components/MemberViewDialog';
 import { DeleteMemberDialog } from './components/DeleteMemberDialog';
 import type { CreateMemberForm } from './lib/member-form-schema';
 
-const PERM_VIEW = 'BACKEND:ACCOUNT:VIEW';
-const PERM_EDIT = 'BACKEND:ACCOUNT:EDIT';
+const PERM_VIEW = PERMISSION_CODE.ACCOUNT_VIEW;
+const PERM_EDIT = PERMISSION_CODE.ACCOUNT_EDIT;
 
 // 從 generated schema 推出 GET /members 的 data 形狀，optimistic update 不再走 escape hatch
 type MembersData = NonNullable<
