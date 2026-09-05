@@ -37,4 +37,14 @@ export interface LoadMemberPort {
   loadMemberDomainById(id: string): Promise<Member | null>;
   listMembers(params: ListMembersParams): Promise<ListMembersPage>;
   existsByEmail(email: string, excludeId?: string): Promise<boolean>;
+  /**
+   * 取得指定角色底下所有未軟刪除成員的 ID。
+   *
+   * 供「角色授權變了要清這些人的 MemberContext 快取」使用。
+   * 只回 ID 不回整筆：呼叫端唯一需要的就是快取鍵，
+   * 多帶欄位會讓一個純粹的查詢看起來像可以拿來做別的事。
+   * @param roleId - 角色 ID
+   * @returns 成員 ID 陣列；該角色沒有成員時為空陣列
+   */
+  findMemberIdsByRoleId(roleId: string): Promise<string[]>;
 }

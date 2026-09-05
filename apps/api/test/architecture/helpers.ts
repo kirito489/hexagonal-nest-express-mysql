@@ -143,3 +143,21 @@ export const violationReport = (
   violations.length === 0
     ? ''
     : `${guidance}（共 ${violations.length} 處）\n${formatViolations(violations)}`;
+
+/**
+ * 去掉註解再比對。
+ *
+ * **不做這件事，說明文字就會把規則餵飽**：`SecurityController` 的檔頭寫著
+ * 「刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate」，只要用字串比對，
+ * 這行註解就讓整個 class 被判定為已授權——即使真裝飾器被重構移除也不會紅。
+ * 實測過：拿掉真的 `@Roles` 只留註解，那支守則照樣全綠。
+ *
+ * 集中在此而非各守則各自實作：這是所有字串比對型守則的共同前置步驟，
+ * 而**漏做的後果是靜默的偽陰性**——給偽陰性的守則比沒有守則更危險，
+ * 它會讓人停止人工檢查。
+ *
+ * @param code - 原始碼
+ * @returns 去除區塊註解與行註解後的內容
+ */
+export const stripComments = (code: string): string =>
+  code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');

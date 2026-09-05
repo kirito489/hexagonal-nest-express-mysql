@@ -14,7 +14,9 @@
 - [x] **C2 `platform-security-hardening`** — 帳號鎖定時效 + 三態 `checkLock`、大小寫繞過修補、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天。
       **實作途中另外修掉三個既有缺陷**：鎖定回應 403/`FORBIDDEN` 與 spec 寫的 423/`ACCOUNT_LOCKED` 不符（**對外契約變更**）、`AccountLockedException` 是零呼叫端的死碼、`LoginService` 內嵌使用者文案違反 Hard Rule。
       單元 330 條 / 守則 69 條 / e2e 160 條（151 → 160）。**待封存**
-- [ ] **C3 `platform-guardrail-backport`** — guardrail-inventory / permission-catalog-sync / public-surface + infra-endpoint / role-permission-cache + `MemberContextCachePort` / session-revocation
+- [x] **C3 `platform-guardrail-backport`** — 回補四支守則（`guardrail-inventory` / `env-example-sync` / `public-surface` / `role-permission-cache`），守則 19 支 / 69 項 → **23 支 / 102 項**。
+      **順帶修掉一個活的 bug**：`UpdateRoleService` 改完角色權限不清成員快取，撤銷的權限最多 5 分鐘後才生效。
+      刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
 - [ ] **C4 `platform-container-single-entry`** — `verify-ci.sh` 的 `down -v` 誤刪全專案 volume、nginx 單一入口 + `TRUST_PROXY`、容器吃本機 `.env`、`e2e-docker.sh`
       ⚠️ **`down -v` 這條在 C1 已寫進 `lessons.md` 並標明「現在正踩著」**——在 C4 落地前，跑 `pnpm verify:ci` 會清掉開發用的 `mysql-data` / `redis-data` 與五個 `node_modules` volume，事後要重跑 `pnpm install` 與 `pnpm docker:init`
 - [ ] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions **兩份並存**（fork 的人自己刪一份），job 前置抽共用、版號取自 `.nvmrc` / `packageManager`
@@ -38,13 +40,14 @@
 
 ### 從 C2 分出來的後續
 
-- **守則應涵蓋「`.env.example` 真的能通過 `envSchema`」**：目前 `env-schema.spec.ts` 只檢查「程式用到的變數有沒有宣告」，**沒有任何東西把範例檔餵進 `envSchema` 跑一次**。這個缺口在 C2 收尾時親自踩到——`SWAGGER_ENABLED=`（留空）會被 `.optional()` 判定為不合法，任何照抄範例檔的新部署都會啟動失敗，而開發機因為本機 `.env` 沒有那一行所以完全無感。同一次比對還抓出四個長期缺漏的變數（`LOG_PURGE_ENABLED` / `LOG_RETENTION_DAYS` / `LOG_PURGE_CRON` / `THROTTLE_FAIL_OPEN`）。**新守則要做兩件事**：(1) `envSchema` 宣告的變數與範例檔的鍵集合完全相等；(2) 把範例檔 parse 後（必填項補假值）餵進 `envSchema`，必須通過。建議併進 C3。
+- [x] ~~**守則應涵蓋「`.env.example` 真的能通過 `envSchema`」**~~ —— **C3 已完成**（`env-example-sync.spec.ts`）。反向驗證確認它會抓到 C2 那個缺陷：把 `SWAGGER_ENABLED` 改回純 `.optional()` 時，訊息直接指出該變數。原始說明：目前 `env-schema.spec.ts` 只檢查「程式用到的變數有沒有宣告」，**沒有任何東西把範例檔餵進 `envSchema` 跑一次**。這個缺口在 C2 收尾時親自踩到——`SWAGGER_ENABLED=`（留空）會被 `.optional()` 判定為不合法，任何照抄範例檔的新部署都會啟動失敗，而開發機因為本機 `.env` 沒有那一行所以完全無感。同一次比對還抓出四個長期缺漏的變數（`LOG_PURGE_ENABLED` / `LOG_RETENTION_DAYS` / `LOG_PURGE_CRON` / `THROTTLE_FAIL_OPEN`）。**新守則要做兩件事**：(1) `envSchema` 宣告的變數與範例檔的鍵集合完全相等；(2) 把範例檔 parse 後（必填項補假值）餵進 `envSchema`，必須通過。建議併進 C3。
 
 - **guard 層 5 處內嵌使用者文案**（`IpBlacklistGuard` ×2、`IpWhitelistGuard`、`PermissionsGuard`、`RolesGuard`）：與 C2 修掉的 `LoginService` 同型，違反 Hard Rule「訊息只能住在 `response-messages.ts`」。**`no-inline-message.spec.ts` 只掃 `domain/exception/`，掃不到 guard 與 service**——所以真正該做的不只是改那 5 處，而是把守則的掃描範圍擴到會拋例外的所有層。C2 刻意不夾帶：那 5 處不在 C2 的路徑上，且擴大守則範圍可能掃出更多既有違規，屬獨立的清理 change。
 
 ### 需人工處理（AI 做不到）
 
-- **環境變數範例檔的同步**：AI 讀不到 `.env.example`（權限拒絕），改由 `apps/api/env.example`（無點號）作為可編輯的工作副本。**AI 改完後需開發者覆蓋回 `.env.example`**。
+- **環境變數範例檔的修改**：AI 的工具權限讀不到 `.env.example`，需要改它時的流程是——AI 在 `apps/api/env.example`（無點號）寫好，開發者覆蓋回去後刪掉工作副本。
+  **守則盯的是真檔**（`env-example-sync.spec.ts` 跑在 jest 的 Node 行程裡，不受工具權限限制），所以違規一定會被抓到，只是修正需要人手。
   （2026-09-05 清掉一條過期待辦：原本掛著「`.env.example` 補 `ALLOW_PROD_SEED`」，實際上該行早就在檔案裡了。）
 
 - **首次 CI pipeline 需人工觀察**：`pnpm verify:ci` 已能在本機以容器重現 e2e 測試環境（2026-08-16 加入），**測試層面的驗證範圍縮小到剩下 runner 專屬行為**：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) cache 是否命中；(3) pipeline 總時長可否接受，過慢可把 `e2e-test` 限縮為只在 MR 跑。GitLab 的 services 不支援 compose 的 healthcheck，CI 端沿用手動等待迴圈（30 次 × 2 秒）—— 首跑時留意是否足夠。

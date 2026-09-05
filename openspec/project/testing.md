@@ -82,7 +82,7 @@ pnpm --filter @app/api test:arch   # 只跑架構守則
 pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行）
 ```
 
-現有規則（19 支 / 68 項斷言）：
+現有規則（數量由 `guardrail-inventory.spec.ts` 自己斷言，此處刻意不寫死）：
 
 | 檔案 | 項 | 守住的規則 |
 | --- | --- | --- |
@@ -105,6 +105,10 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `sanitize-coverage.spec.ts` | 2 | request DTO 中看起來敏感的欄位，實際餵進 `sanitize()` 驗證真被遮蔽 |
 | `traditional-chinese.spec.ts` | 2 | 全專案不得混入日文假名或非繁體漢字 |
 | `authorization-coverage.spec.ts` | 9 | 收外部輸入的 handler 必須有 `@Permissions` / `@Roles` / `@Public`——本專案第一條「檢查應存在而不存在」的規則。**自帶合成輸入的自我測試**（註解冒充裝飾器、識別碼走 body、裝飾器寫在 method 上方等七個判定） |
+| `guardrail-inventory.spec.ts` | 12 | 守則檔數量不得低於基準（只擋變少）；**文件不得寫死守則數量**；本表必須涵蓋每一支守則 |
+| `env-example-sync.spec.ts` | 4 | `envSchema` 與 `.env.example` 的鍵集合相等，**且範例檔實際餵進 schema 必須通過**——後者才是重點，只比對鍵名抓不到「留空但 schema 不接受空字串」 |
+| `public-surface.spec.ts` | 10 | `main.ts` 帶路徑的 `app.use()` 掛載必須申報並寫理由（它們繞過全域 `JwtAuthGuard`）；豁免清單不得有失效項目 |
+| `role-permission-cache.spec.ts` | 7 | 改了角色授權的 service 必須清成員的 `MemberContext` 快取；**只注入不呼叫不算** |
 
 **新增一條規則的作法**（三步缺一不可）：
 

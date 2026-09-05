@@ -1,4 +1,4 @@
-import { collectSourceFiles, readSource } from './helpers';
+import { collectSourceFiles, readSource, stripComments } from './helpers';
 
 /** 授權相關的裝飾器；三者任一即算已表態 */
 const AUTHZ_DECORATORS = ['@Permissions(', '@Roles(', '@Public('];
@@ -10,17 +10,6 @@ const AUTHZ_DECORATORS = ['@Permissions(', '@Roles(', '@Public('];
  * `POST /xxx { ids: [] }` 這類 body 帶識別碼的端點同樣需要授權表態。
  */
 const INPUT_DECORATORS = ['@Param(', '@Body(', '@Query('];
-
-/**
- * 去掉註解再比對。
- *
- * **不做這件事，說明文字就會把規則餵飽**：`SecurityController` 的檔頭寫著
- * 「刻意用 RolesGuard + @Roles(SUPERADMIN) 粗粒度 role gate」，只要用字串比對，
- * 這行註解就讓整個 class 被判定為已授權——即使真裝飾器被重構移除也不會紅。
- * 實測過：拿掉真的 `@Roles` 只留註解，這支守則照樣全綠。
- */
-const stripComments = (code: string): string =>
-  code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 /**
  * 取 class 層級的裝飾器區段：`@Controller(` 起至 `export class` 為止。

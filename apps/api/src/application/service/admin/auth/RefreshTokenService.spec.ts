@@ -36,7 +36,10 @@ describe('RefreshTokenService', () => {
   let saveAuthLog: jest.Mocked<SaveAuthLogPort>;
   let featureFlags: { isEnabled: jest.Mock };
   let saveMember: { incrementTokenVersion: jest.Mock };
-  let clearMemberContext: { clearMemberContext: jest.Mock };
+  let clearMemberContext: {
+    clearMemberContext: jest.Mock;
+    clearMany: jest.Mock;
+  };
 
   beforeEach(() => {
     jwt = {
@@ -54,7 +57,10 @@ describe('RefreshTokenService', () => {
     saveAuthLog = { saveAuthLog: jest.fn() };
     featureFlags = { isEnabled: jest.fn().mockReturnValue(false) };
     saveMember = { incrementTokenVersion: jest.fn() };
-    clearMemberContext = { clearMemberContext: jest.fn() };
+    clearMemberContext = {
+      clearMemberContext: jest.fn(),
+      clearMany: jest.fn(),
+    };
 
     service = new RefreshTokenService(
       jwt as unknown as JwtService,

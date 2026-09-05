@@ -49,4 +49,19 @@ export class RedisTokenBlacklistAdapter
   async clearMemberContext(memberId: string): Promise<void> {
     await this.redis.del(buildMemberContextKey(this.keyPrefix, memberId));
   }
+
+  async clearMany(memberIds: string[]): Promise<void> {
+    if (memberIds.length === 0) return;
+
+    // 逐筆 del 而非一次刪整個命名空間：後者要用 KEYS / SCAN 掃描，
+    // 而那會連沒受影響的人一起清掉，一次角色調整造成全站回頭查 DB。
+    //
+    // 不 catch：清除失敗的語意是「權限改了但沒有生效」，
+    // 讓它往上冒才不會回報一個呼叫端不知道的狀態。
+    await Promise.all(
+      memberIds.map((memberId) =>
+        this.redis.del(buildMemberContextKey(this.keyPrefix, memberId)),
+      ),
+    );
+  }
 }

@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { log } from './logger';
 
-const envSchema = z.object({
+/**
+ * 環境變數的驗證 schema。
+ *
+ * **匯出是為了讓守則能真的跑它一次**（`env-example-sync.spec.ts`）：
+ * 只比對 `.env.example` 的鍵名抓不到「值的形狀不被接受」這種缺陷，
+ * 而那正是會讓照抄範例檔的部署啟動失敗的那一類。
+ * 執行期請一律用 `getEnv()`（有快取與失敗即退出的處理），不要直接 parse。
+ */
+export const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),

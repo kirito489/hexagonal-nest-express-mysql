@@ -84,6 +84,16 @@ export class PrismaMemberRepository
     return count > 0;
   }
 
+  async findMemberIdsByRoleId(roleId: string): Promise<string[]> {
+    // 軟刪 model 的 read path 一律加 deletedAt: null——
+    // 已刪除的成員不會有活著的 token，清他們的快取只是白費
+    const rows = await this.prisma.memberRecord.findMany({
+      where: { roleId, deletedAt: null },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async createMember(member: Member): Promise<void> {
     try {
       await this.prisma.memberRecord.create({

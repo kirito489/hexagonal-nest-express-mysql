@@ -68,6 +68,7 @@ const mockLoadRole = {
 
 const mockClearMemberContext = {
   clearMemberContext: jest.fn(),
+  clearMany: jest.fn(),
 } as jest.Mocked<ClearMemberContextPort>;
 
 const makePasswordPolicy = () => {

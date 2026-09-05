@@ -94,3 +94,42 @@ export const SWAGGER_EXEMPT_ROUTES: Array<{ route: string; reason: string }> = [
     reason: '就緒探測用途，不屬對外 API 契約',
   },
 ];
+
+/**
+ * `main.ts` 中帶路徑的 `app.use()` 掛載。
+ *
+ * 這類掛載是**原生 Express middleware，全域 `JwtAuthGuard` 碰不到**
+ * （Nest 的 guard 只作用於 Nest 路由），因此「有登入才看得到」這個假設
+ * 在它們身上從來就不成立。
+ *
+ * 實際發生過：兩份 OpenAPI spec（完整的後台地圖——所有端點、參數 schema、
+ * 錯誤碼、權限碼命名）長期無條件公開，而沒有任何東西提醒。
+ *
+ * **鍵是第一個引數的原始碼文字，不是解析後的路徑**——`main.ts` 的路徑多半是
+ * 運算出來的（樣板字串、env 變數），靜態解析不出字面值。用原始碼文字當鍵
+ * 是精確的：改了那個表達式就會需要重新申報，而那正是該重新想一次的時機。
+ *
+ * 每一筆都要寫理由。這份清單的作用不是「批准」，
+ * 而是讓下一個掛載必須經過一次「這條路徑真的可以公開嗎」的自問。
+ */
+export const PUBLIC_MOUNT_EXEMPTIONS: Array<{
+  expression: string;
+  reason: string;
+}> = [
+  {
+    expression: 'env.LOCAL_MEDIA_BASE_URL',
+    reason:
+      'STORAGE_DRIVER=local 時的媒體檔 static 服務（預設 /media）。' +
+      '上傳的檔案本來就要能被瀏覽器直接載入；已加 nosniff 與嚴格 CSP 防內容嗅探',
+  },
+  {
+    expression: '`${basePath}/docs-json`',
+    reason:
+      'OpenAPI spec 本身，餵 api-client codegen。由 SWAGGER_ENABLED 控制掛載與否' +
+      '（未設定時 production 關閉），見 platform-http-security 的「API 文件的暴露條件」',
+  },
+  {
+    expression: '`${basePath}/docs`',
+    reason: 'Swagger UI，開關與 docs-json 同一個；CSP 於此路徑放寬',
+  },
+];
