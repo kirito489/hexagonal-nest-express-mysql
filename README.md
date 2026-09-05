@@ -193,9 +193,18 @@ pnpm --filter @app/api gen:module <name> --front    # 前台模組 → /api/fron
 | eslint import 邊界 | controller 不得碰持久層、前後台不得互穿、前端下層不得反向相依 routes | `pnpm lint` |
 | 架構守則測試 | 不得用原生 `Error`、錯誤碼單一真相、env 必進 schema、API 契約同步、授權 guard 全域註冊… | `pnpm test` |
 | 覆蓋率門檻 | api 70/60/70/70、web 75/75/60/75 | `pnpm test:cov` |
-| GitLab CI | 上述全部 + e2e（MySQL service container） | Merge Request 與 develop / master 推送 |
+| CI | 上述全部 + e2e（MySQL service container）+ build | MR / PR 與 develop / master 推送 |
 
 `git commit --no-verify` 繞得過 husky，繞不過 CI。規則細節見 `openspec/specs/platform-engineering-guardrails/spec.md`。
+
+**兩套 CI 並存**：`.gitlab-ci.yml` 與 `.github/workflows/ci.yml`。
+**fork 之後刪掉不用的那一份**——`ci-parity.spec.ts` 在只剩一份時自動放行，
+兩份都在時則要求它們跑同一組檢查（CI 設定的錯誤方式全是靜默的，
+漏了 `test:cov` 只是覆蓋率門檻不執行，不會有人發現）。
+
+> ⚠️ 要讓 CI 失敗真的**擋住合併**，需要平台端的設定，而那不在版控內：
+> GitHub 要把 `quality` 與 `e2e` 設為 required status checks
+> （免費方案的私有 repo 設不了，會回 403）。
 
 ## 單一埠部署（選用）
 
@@ -263,7 +272,7 @@ openssl rand -hex 32
 | 後端 RBAC、認證、API 回應格式   | `openspec/project/backend-runtime.md`           |
 | 前端 API 呼叫、表單、shadcn     | `openspec/project/frontend.md`                  |
 | 架構守則有哪些、怎麼加新規則    | `openspec/specs/platform-engineering-guardrails/spec.md`、`openspec/project/testing.md` 之「架構守則測試」 |
-| CI 各 job 職責與對應的本機指令  | `openspec/project/tooling.md` 之「CI（GitLab）」 |
+| CI 各 job 職責與對應的本機指令  | `openspec/project/tooling.md` 之「CI（兩套並存…）」 |
 | 已踩過的坑（非顯而易見的雷）    | `tasks/lessons.md`                              |
 | 待辦、觀察中事項、技術債        | `tasks/todo.md`                                 |
 | 開發中 / 已封存的 change        | `openspec/changes/`、`openspec/changes/archive/` |

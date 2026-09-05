@@ -213,8 +213,12 @@ prepare-production:
     #（e2e 失敗仍會使整體 pipeline 失敗）
     - npm-install
     - quality-check
-  rules:
-    - if: $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "master"
+  # MR 階段也要跑，不能只認 $CI_COMMIT_BRANCH。
+  # nest build / vite build 會抓到 path alias 解析、decorator metadata 與 emit 階段
+  # 的錯誤，而 tsc --noEmit 抓不到——只在推分支時建置等於「PR 是綠的，
+  # 合併完 develop 才紅」，把問題推到最不該爆的地方。
+  # 拉長的只有「品質已經通過」那條路徑（needs 讓它在 quality-check 之後才開始）。
+  rules: *quality_rules
 
 # 清除 artifacts cache
 cleanup:

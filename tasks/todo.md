@@ -19,7 +19,9 @@
       刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
 - [x] **C4 `platform-container-single-entry`** — 修掉 `verify-ci.sh` 的 `down -v`（**修前實測證實會移除 `mysql-data` / `redis-data`**）、nginx 單一入口（api / web 不發布埠）+ `TRUST_PROXY: '1'`、容器個人覆寫改走 `.env.container` + 連線類在 compose 釘死、容器化 e2e（`pnpm test:e2e:docker`）。守則 23 支 / 102 → 106 項。
       **實作中一個設計因實測而改**：原訂 `env_file` 指向 `apps/api/.env`，實際會讓**整個 compose 無法使用**（它的 env 解析器比 dotenv 嚴格），改用獨立的 `.env.container`。**待封存**
-- [ ] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions **兩份並存**（fork 的人自己刪一份），job 前置抽共用、版號取自 `.nvmrc` / `packageManager`
+- [x] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions 兩份並存（fork 的人刪一份），前置抽 composite action、版號取自 `.nvmrc` / `packageManager`。
+      新增 `ci-parity.spec.ts` 守住「兩份跑同一組檢查 + 同一條資料庫版本線」，**只剩一份時自動放行**。
+      **順帶修掉**：GitLab 的 `prepare-production` 原本只在推分支時才建置，改為 MR 也跑——`tsc --noEmit` 抓不到 build 階段的錯誤，只在 push 跑等於「PR 綠、合併完才紅」。守則 23 支 / 106 → 24 支 / 110 項。**待封存**
 - [ ] **C6a `api-account-lock-management`** — 見下方「功能」段既有條目
 - [ ] **C6b `ui-route-permission-guard`** — 路由依權限守衛，sidebar 隱藏不再是唯一防線
 - [ ] **C6c `ui-permission-tree-legibility`** — 權限樹中文化、不可指派的安全管理改純說明列表
@@ -50,7 +52,11 @@
   **守則盯的是真檔**（`env-example-sync.spec.ts` 跑在 jest 的 Node 行程裡，不受工具權限限制），所以違規一定會被抓到，只是修正需要人手。
   （2026-09-05 清掉一條過期待辦：原本掛著「`.env.example` 補 `ALLOW_PROD_SEED`」，實際上該行早就在檔案裡了。）
 
-- **首次 CI pipeline 需人工觀察**：`pnpm verify:ci` 已能在本機以容器重現 e2e 測試環境（2026-08-16 加入），**測試層面的驗證範圍縮小到剩下 runner 專屬行為**：(1) `quality-check` 與 `e2e-test` 是否在 MR 觸發；(2) cache 是否命中；(3) pipeline 總時長可否接受，過慢可把 `e2e-test` 限縮為只在 MR 跑。GitLab 的 services 不支援 compose 的 healthcheck，CI 端沿用手動等待迴圈（30 次 × 2 秒）—— 首跑時留意是否足夠。
+- **首次 CI pipeline 需人工觀察（兩個平台各一次）**：`pnpm verify:ci` 與 `pnpm test:e2e:docker` 已能在本機以容器重現 e2e 環境，**測試層面的驗證範圍縮小到剩下 runner 專屬行為**：(1) 品質與 e2e job 是否在 MR / PR 觸發；(2) cache 是否命中；(3) pipeline 總時長可否接受。
+
+  - **GitLab**：services 不支援 compose 的 healthcheck，CI 端沿用手動等待迴圈（30 次 × 2 秒）——首跑時留意是否足夠。另外 `prepare-production` 現在 MR 也會跑（C5 改的），留意總時長。
+  - **GitHub（C5 新增，完全沒跑過）**：`.github/workflows/ci.yml` 的語法與指令集合已由 `js-yaml` 解析與 `ci-parity.spec.ts` 驗過，但 **runner 行為、`actions/cache` 命中、MySQL service container 的啟動時序都沒有實際觀察過**。首跑時特別留意：`mysqladmin ping` 的 healthcheck 是否足夠（MySQL 容器要 5–30 秒才完整 ready）、以及平行 job 共用 cache key 時的 `Failed to save` 是否如預期只是警告而非失敗。
+  - **要讓 CI 擋住合併需平台端設定，不在版控內**：GitHub 要把 `quality` 與 `e2e` 設為 required status checks（免費方案的私有 repo 會回 403 設不了）。
 
 ### 觀察中
 

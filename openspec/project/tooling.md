@@ -1,6 +1,6 @@
 # AI 工具、CI 與指令參考
 
-> .agents/hooks 的設計、GitLab CI 各 job 職責，以及完整的 per-workspace 指令參考。
+> .agents/hooks 的設計、兩套 CI（GitLab / GitHub Actions）各 job 職責，以及完整的 per-workspace 指令參考。
 
 > 本檔為 `openspec/project.md` 的一部分，導覽見該檔。
 
@@ -28,16 +28,52 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 
 ---
 
-## CI（GitLab）
+## CI（兩套並存，fork 後刪掉不用的那份）
+
+模板同時提供 `.gitlab-ci.yml` 與 `.github/workflows/ci.yml`。**兩份跑同一組檢查**，
+由 `ci-parity.spec.ts` 守著——**CI 設定的錯誤方式全是靜默的**：
+
+| 漏掉什麼 | 症狀 |
+| --- | --- |
+| 用 `pnpm test` 而非 `test:cov` | 覆蓋率門檻**不執行**，數字掉了沒人知道 |
+| 建置 job | path alias / decorator metadata 的錯誤延到合併後才爆 |
+| e2e 的庫名不含 `test` | `globalSetup` 守門中止，job 紅得莫名其妙 |
+| 資料庫大版本不同 | 「本機過、CI 掛」，而差異在版本不在程式碼 |
+
+沒有一項會在設定寫錯的當下出聲，所以一致性交給機器。
+**只留一份時守則自動放行**——那是 fork 後的預期行為。
+
+刻意不做「單一真相 + 產生器」：兩個平台的表達力差異太大（GitLab 的 anchor 與
+`extends`、GitHub 的 composite action），中介層要嘛表達力不足要嘛更複雜，
+**而且多出一個沒有人熟悉的東西**——出事時要先看懂產生器。
+
+### Job 對照
+
+| 做什麼 | GitLab | GitHub | 對應本機指令 |
+| --- | --- | --- | --- |
+| 裝依賴 | `npm-install`（prepare stage） | composite action | `pnpm install` |
+| 型別 / lint / 單元測試 + **覆蓋率門檻** + 架構守則 | `quality-check` | `quality` | `pnpm typecheck && pnpm lint && pnpm test:cov` |
+| 對 `mysql:9` 跑完整 e2e | `e2e-test` | `e2e` | `pnpm --filter @app/api test:e2e` |
+| Prisma generate + build（**需品質檢查通過**） | `prepare-production` | `build` | `pnpm build` |
+| 清 cache | `cleanup` | 不需要（runner 一次性） | — |
+
+GitHub 不需要獨立的裝依賴 job——`actions/cache` 加 composite action 已涵蓋；
+GitLab 那個 job 存在是因為它的 cache 模型需要一個明確的產生者（`policy: pull-push`）。
+
+**建置在 MR / PR 階段就跑**（兩邊皆然）：`nest build` / `vite build` 會抓到 path alias
+解析、decorator metadata 與 emit 階段的錯誤，而 `tsc --noEmit` 抓不到。
+只在推分支時建置等於「PR 是綠的，合併完 develop 才紅」。
+它 `needs` 品質檢查，所以拉長的只有「品質已經通過」那條路徑。
+
+> ⚠️ **CI 通過與否要擋住合併，需要平台端的設定，而那不在版控內。**
+> GitLab 走 Merge Request 的 approval / pipeline 必須成功；
+> GitHub 要在 Settings → Branches 把 `quality` 與 `e2e` 設為 required status checks。
+> **GitHub 免費方案的私有 repo 甚至設不了**（branch protection 與 ruleset 皆回 403），
+> 那時只有 job 相依（`build` needs `quality`）那一半成立，人為 merge 的那一半不成立。
+
+### GitLab 的 stage 細節
 
 `.gitlab-ci.yml` 的 stages：`prepare → quality → optimize → cleanup → pr_agent`。
-
-| Job | Stage | 做什麼 | 對應本機指令 |
-| --- | --- | --- | --- |
-| `npm-install` | prepare | `pnpm install --frozen-lockfile` | `pnpm install` |
-| `quality-check` | quality | 型別 / lint / 單元測試 + **覆蓋率門檻** + 架構守則 | `pnpm typecheck && pnpm lint && pnpm test:cov` |
-| `e2e-test` | quality | 對 `mysql:9` service container 跑完整 e2e | `pnpm --filter @app/api test:e2e` |
-| `prepare-production` | optimize | Prisma generate + build（**需 `quality-check` 通過**） | `pnpm build` |
 
 **本機重現 CI 的測試環境**：`pnpm verify:ci` 以 `docker compose --profile verify` 起一個 MySQL 9 容器（healthcheck 等就緒、`tmpfs` 跑在記憶體）並執行 e2e，實測約 60 秒。定位是「測試環境重現」而非「pipeline 模擬」——runner 行為與 cache 命中仍只能在實際 pipeline 觀察。
 
@@ -193,7 +229,7 @@ nvm 用戶在某些 git / 終端組合下 PATH 不含 nvm 路徑。
 - **覆蓋率門檻只有 `test:cov` 會執行**（`test` 不帶 coverage，供開發時快速回饋）。兩個 workspace 都設有門檻：api 70/60/70/70、web 75/75/60/75；新增設有門檻的 workspace 時**必須提供 `test:cov`**，否則會被 `pnpm -r test:cov` 靜默略過。
 - `apps/api` 的 `test:cov` 刻意串接架構測試（`jest --coverage && jest --config test/jest.arch.config.js`）—— 只寫 `jest --coverage` 會讓 CI 換用 `test:cov` 後靜默漏掉整組架構守則。
 
-> **不使用 GitLab CI 的專案**：上表「對應本機指令」欄即為等價檢查，請在自己的 CI 平台上照樣執行；否則所有架構守則與測試都只在開發者本機生效。
+> **用第三個平台的專案**（不是 GitLab 也不是 GitHub）：上方「Job 對照」表的「對應本機指令」欄即為等價檢查，請在自己的平台上照樣執行；否則所有架構守則與測試都只在開發者本機生效。此時把兩份設定都刪掉即可，`ci-parity.spec.ts` 在找不到任何 CI 設定時會失敗並提醒你——那是刻意的，「完全沒有 CI」與「刪掉一份」是兩回事。
 
 ---
 

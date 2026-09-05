@@ -422,6 +422,21 @@ z.enum(['true', 'false']).or(z.literal('')).optional().transform((v) => (v === '
 
 ## 容器 / Docker
 
+### 2026-09-06 — openspec 的需求要求「第一行」就有 SHALL / MUST
+
+**踩到什麼**：寫了一條需求，第一行是條件子句、第二行才有 `SHALL`：
+
+```markdown
+同時提供多份 CI 平台設定時，
+它們 SHALL 執行同一組檢查：…
+```
+
+`openspec validate --strict` 報 `must contain SHALL or MUST`——**而那條需求裡明明有 SHALL**。
+
+**Why**：validator 取的是需求標題之後的第一行（或第一段的開頭）做規範性語句檢查，換行之後的內容不算。訊息說的是「must contain」，讀起來像整條需求都沒有，實際上是位置問題。
+
+**How to apply**：規範性語句寫在**標題後的第一行**，條件與補充放後面。像 `多份設定並存時 SHALL 執行同一組檢查。專案 MAY 只提供其中一份。` 這樣一行寫完。**排版換行不是自由的**——這類工具的解析常以行為單位，而錯誤訊息不會告訴你是位置的問題。
+
 ### 2026-09-06 — compose 的 `env_file` 解析比 dotenv 嚴格，一行壞掉整個 compose 就不能用
 
 **踩到什麼**：為了讓容器能讀本機的個人設定，在 compose 的 api 服務加 `env_file: ./apps/api/.env`。結果**所有** `docker compose` 指令直接失效——連 `config` / `ps` / `down` 都跑不了：

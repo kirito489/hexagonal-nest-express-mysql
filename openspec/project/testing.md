@@ -109,6 +109,7 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `env-example-sync.spec.ts` | 4 | `envSchema` 與 `.env.example` 的鍵集合相等，**且範例檔實際餵進 schema 必須通過**——後者才是重點，只比對鍵名抓不到「留空但 schema 不接受空字串」 |
 | `public-surface.spec.ts` | 10 | `main.ts` 帶路徑的 `app.use()` 掛載必須申報並寫理由（它們繞過全域 `JwtAuthGuard`）；豁免清單不得有失效項目 |
 | `role-permission-cache.spec.ts` | 7 | 改了角色授權的 service 必須清成員的 `MemberContext` 快取；**只注入不呼叫不算** |
+| `ci-parity.spec.ts` | 4 | 兩份 CI 設定（GitLab / GitHub）必須跑同一組檢查、同一條資料庫版本線、測試庫名含 `test`；**只剩一份時自動放行**（fork 後刪掉是預期行為） |
 
 **新增一條規則的作法**（三步缺一不可）：
 
