@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 import {
   IP_LIST_PORT,
   IpListPort,
@@ -30,7 +31,7 @@ export class IpWhitelistGuard implements CanActivate {
     const ip = request.ip;
 
     if (!ip || !(await this.ipList.isWhitelisted(ip))) {
-      throw new ForbiddenException('IP 位址不在白名單中');
+      throw new ForbiddenException(HttpMessages.IP_NOT_WHITELISTED);
     }
 
     return true;

@@ -33,6 +33,7 @@ import {
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
 import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 import { PasswordChangeRequiredException } from '@app/domain/exception/PasswordChangeRequiredException';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 
 /**
  * 全域認證 Guard（APP_GUARD）。
@@ -80,24 +81,24 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
 
     const token = this.extractToken(request);
     if (!token) {
-      throw new UnauthorizedException('缺少授權憑證，請先登入');
+      throw new UnauthorizedException(HttpMessages.MISSING_CREDENTIALS);
     }
 
     if (await this.tokenBlacklist.isBlacklisted(token)) {
       this.logger.warn('Token 已在黑名單中');
-      throw new UnauthorizedException('Token 已登出或失效');
+      throw new UnauthorizedException(HttpMessages.TOKEN_REVOKED);
     }
 
     let payload: JwtPayload;
     try {
       payload = this.jwtService.verify<JwtPayload>(token);
     } catch {
-      throw new UnauthorizedException('Token 驗證失敗');
+      throw new UnauthorizedException(HttpMessages.TOKEN_VERIFY_FAILED);
     }
 
     // 防止 refresh token 被當 access token 使用
     if (payload.type !== 'access') {
-      throw new UnauthorizedException('Token 類型不正確');
+      throw new UnauthorizedException(HttpMessages.TOKEN_WRONG_TYPE);
     }
 
     const cached = await this.memberContextCache.getByMemberId(payload.sub);
@@ -121,7 +122,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
     // 所以這裡不需要、也不可能是「Redis 掛掉的降級路徑」。
     const data = await this.loadMemberContext.loadMemberContext(payload.sub);
     if (!data) {
-      throw new UnauthorizedException('會員不存在');
+      throw new UnauthorizedException(HttpMessages.TOKEN_MEMBER_NOT_FOUND);
     }
     if (!data.status) throw new AccountDisabledException();
     this.assertTokenVersion(payload, data.tokenVersion);
@@ -181,7 +182,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
     current: number | undefined,
   ): void {
     if ((payload.tokenVersion ?? 0) !== (current ?? 0)) {
-      throw new UnauthorizedException('Token 已失效，請重新登入');
+      throw new UnauthorizedException(HttpMessages.TOKEN_SUPERSEDED);
     }
   }
 

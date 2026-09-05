@@ -45,7 +45,9 @@
 
 - [x] ~~**守則應涵蓋「`.env.example` 真的能通過 `envSchema`」**~~ —— **C3 已完成**（`env-example-sync.spec.ts`）。反向驗證確認它會抓到 C2 那個缺陷：把 `SWAGGER_ENABLED` 改回純 `.optional()` 時，訊息直接指出該變數。原始說明：目前 `env-schema.spec.ts` 只檢查「程式用到的變數有沒有宣告」，**沒有任何東西把範例檔餵進 `envSchema` 跑一次**。這個缺口在 C2 收尾時親自踩到——`SWAGGER_ENABLED=`（留空）會被 `.optional()` 判定為不合法，任何照抄範例檔的新部署都會啟動失敗，而開發機因為本機 `.env` 沒有那一行所以完全無感。同一次比對還抓出四個長期缺漏的變數（`LOG_PURGE_ENABLED` / `LOG_RETENTION_DAYS` / `LOG_PURGE_CRON` / `THROTTLE_FAIL_OPEN`）。**新守則要做兩件事**：(1) `envSchema` 宣告的變數與範例檔的鍵集合完全相等；(2) 把範例檔 parse 後（必填項補假值）餵進 `envSchema`，必須通過。建議併進 C3。
 
-- **guard 層 5 處內嵌使用者文案**（`IpBlacklistGuard` ×2、`IpWhitelistGuard`、`PermissionsGuard`、`RolesGuard`）：與 C2 修掉的 `LoginService` 同型，違反 Hard Rule「訊息只能住在 `response-messages.ts`」。**`no-inline-message.spec.ts` 只掃 `domain/exception/`，掃不到 guard 與 service**——所以真正該做的不只是改那 5 處，而是把守則的掃描範圍擴到會拋例外的所有層。C2 刻意不夾帶：那 5 處不在 C2 的路徑上，且擴大守則範圍可能掃出更多既有違規，屬獨立的清理 change。
+- [x] ~~**guard 層 5 處內嵌使用者文案**~~ —— **`centralize-exception-messages` 已完成，但實際是 24 處不是 5 處**。這條當初寫「5 處」是照著眼前看到的 guard 數，沒有實際掃過；真正盤點後是 19 處框架層 `HttpException`（六支 guard 12 處 + `LoginService` 4 + `ResetPasswordService` 1 + `redis.service` 2）加 5 處上傳訊息。**估算寫進 todo 時要標明是不是掃過的**，否則下一個人會拿它當範圍上限。
+
+  處置：新增第二張表 `HttpMessages`（框架層 `HttpException` 用；`ResponseMessages` 的完整性由 `satisfies Record<ResponseCode, …>` 保證，混入非 `ResponseCode` 的鍵會破壞它），另加 `UploadRejectReasons` 收掉 `INVALID_UPLOAD: (reason) => reason` 這個恆等函式——它讓五個呼叫端各自寫文案而表裡什麼都沒記錄。守則掃描範圍擴到 `adapter/in/web` / `application/service` / `infrastructure`。對外行為零變更，e2e 165 條全綠。
 
 ### 需人工處理（AI 做不到）
 

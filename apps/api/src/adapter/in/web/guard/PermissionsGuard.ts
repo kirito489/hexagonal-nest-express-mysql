@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { PERMISSIONS_KEY } from '../decorator/permissions.decorator';
 import { MemberContext } from '../decorator/current-member.decorator';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 
 /**
  * 權限守衛：必須搭配 JwtAuthGuard 一起使用（JwtAuthGuard 先跑，permissions 才存在）。
@@ -36,7 +37,7 @@ export class PermissionsGuard implements CanActivate {
     const hasAll = required.every((code) => memberPermissions.includes(code));
 
     if (!hasAll) {
-      throw new ForbiddenException('權限不足');
+      throw new ForbiddenException(HttpMessages.INSUFFICIENT_PERMISSION);
     }
 
     return true;

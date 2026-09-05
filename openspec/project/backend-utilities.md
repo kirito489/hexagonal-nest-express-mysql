@@ -153,6 +153,33 @@ export default async function seed(prisma: PrismaClient): Promise<void> {
 （`20260816200000_add_log_indexes`），不必再補。測試環境於 `setup-env*.ts`
 強制關閉此排程——cron job 會留下 open handle。
 
+### 對外錯誤訊息
+
+全部對外錯誤文案集中在 `shared/constants/response-messages.ts`。同一個檔案裡有**兩張表**，
+因為兩類 exception 的錯誤碼來源不同：
+
+| 表 | 用於 | 鍵 | 完整性保證 |
+| --- | --- | --- | --- |
+| `ResponseMessages` | `DomainException` 子類（業務錯誤） | `ResponseCode` | `satisfies Record<…>`，少一條當場編譯失敗 |
+| `HttpMessages` | 框架 `HttpException`（guard / service / infrastructure 拋的） | 語意名 | 無 |
+
+**新增訊息時該進哪張表**，判準只有一個：拋 `DomainException` 進 `ResponseMessages`，
+拋框架 `HttpException`（`UnauthorizedException`、`ForbiddenException`…）進 `HttpMessages`。
+
+`HttpMessages` 沒有型別層的完整性保證是**事實而非疏漏**：框架層的錯誤碼由 class 名推導，
+同一個 `UNAUTHORIZED` 對應多種不同的失敗原因，不存在「每個碼一條訊息」的對應關係。
+它的價值只在集中，不在完整性。
+
+**框架層的訊息同樣是對外用詞**——`GlobalExceptionFilter` 對 `HttpException` 的處理是
+`message: exception.message`，字串原樣送給客戶端。這是兩張表都必須存在的理由，
+也是守則的掃描範圍要涵蓋 guard 與 service 的理由。
+
+兩張表刻意放同一個檔案：Hard Rule 的目的是「一眼審視全部對外用詞」，
+分兩個檔案就要開兩個檔案才看得完。
+
+呼叫端算好訊息的 exception（目前只有 `InvalidUploadException`）另有 `UploadRejectReasons`
+承載那幾種措辭，呼叫端傳表裡的值而非字面值——**措辭在檔案裡，只有資料由呼叫端帶入**。
+
 ### 分頁
 
 `apps/api/src/infrastructure/pagination.ts`：

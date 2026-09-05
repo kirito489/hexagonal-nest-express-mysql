@@ -22,6 +22,7 @@ import {
 } from '@app/shared/constants/upload';
 import { InvalidUploadException } from '@app/domain/exception/InvalidUploadException';
 import { getEnv } from '@app/infrastructure/validate-env';
+import { UploadRejectReasons } from '@app/shared/constants/response-messages';
 
 export { UPLOAD_ATTACHMENT_USE_CASE };
 
@@ -38,20 +39,24 @@ export class UploadAttachmentService implements UploadAttachmentUseCase {
     command: UploadAttachmentCommand,
   ): Promise<UploadAttachmentResult> {
     if (!isUploadFolder(command.folder)) {
-      throw new InvalidUploadException(`不允許的上傳資料夾：${command.folder}`);
+      throw new InvalidUploadException(
+        UploadRejectReasons.FOLDER_NOT_ALLOWED(command.folder),
+      );
     }
     if (!isAllowedMime(command.mimeType)) {
-      throw new InvalidUploadException(`不允許的檔案類型：${command.mimeType}`);
+      throw new InvalidUploadException(
+        UploadRejectReasons.MIME_NOT_ALLOWED(command.mimeType),
+      );
     }
     // 白名單比對的是 client 自行宣告的 Content-Type——通過只代表字串填對了。
     // 用 magic byte 確認檔案內容真的是那個類型，擋掉「宣告 image/png、body 是 HTML」
     // 這類內容偽造（否則得完全仰賴 nosniff，而 S3 路徑上沒有那道 header）。
     if (sniffMime(command.buffer) !== command.mimeType) {
-      throw new InvalidUploadException('檔案內容與宣告的類型不符');
+      throw new InvalidUploadException(UploadRejectReasons.CONTENT_MISMATCH);
     }
     const maxBytes = getEnv().MAX_UPLOAD_BYTES;
     if (command.size > maxBytes) {
-      throw new InvalidUploadException(`檔案過大（上限 ${maxBytes} bytes）`);
+      throw new InvalidUploadException(UploadRejectReasons.TOO_LARGE(maxBytes));
     }
 
     // 副檔名由通過白名單與 magic byte 兩道檢查的 MIME 推導，不取 client 原始檔名

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FeatureFlagService } from '@app/application/service/shared/FeatureFlagService';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 import {
   IP_LIST_PORT,
   IpListPort,
@@ -32,11 +33,11 @@ export class IpBlacklistGuard implements CanActivate {
     // 封鎖類控制採 fail-closed：取不到可信來源 IP 時直接拒絕，
     // 避免在 trust proxy 設定不當或 socket 異常時靜默放行（與白名單方向一致）。
     if (!ip) {
-      throw new ForbiddenException('無法判定來源 IP，請求遭拒');
+      throw new ForbiddenException(HttpMessages.IP_UNDETERMINED);
     }
 
     if (await this.ipList.isBlacklisted(ip)) {
-      throw new ForbiddenException('IP 位址已被封鎖');
+      throw new ForbiddenException(HttpMessages.IP_BLOCKED);
     }
 
     return true;

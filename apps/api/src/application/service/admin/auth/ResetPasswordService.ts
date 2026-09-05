@@ -32,6 +32,7 @@ import {
 import { PasswordPolicyService } from '../../shared/PasswordPolicyService';
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { getEnv } from '@app/infrastructure/validate-env';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 
 /**
  * 重設密碼服務：驗證 token → 驗證密碼策略 → 更新密碼。
@@ -63,7 +64,7 @@ export class ResetPasswordService implements ResetPasswordUseCase {
     // 原子 claim：同步檢查 + 標記已使用，防止同 token 併發重複觸發
     const result = await this.resetToken.claim(command.token);
     if (!result) {
-      throw new BadRequestException('重設密碼連結無效或已過期');
+      throw new BadRequestException(HttpMessages.RESET_TOKEN_INVALID);
     }
 
     // 雜湊新密碼

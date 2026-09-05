@@ -90,7 +90,7 @@ pnpm --filter @app/api test        # 單元測試 + 架構守則（串接執行�
 | `layering.spec.ts` | 2 | controller 不得 import Prisma / persistence / `*Repository` |
 | `side-isolation.spec.ts` | 2 | 路徑含 `/admin/` 與 `/front/` 的檔案不得互相 import |
 | `response-codes.spec.ts` | 3 | domain exception 不得寫字面值 code；`ResponseCodes` 不得有死碼 |
-| `no-inline-message.spec.ts` | 2 | exception 不得內嵌文案（文案只在 `response-messages.ts`） |
+| `no-inline-message.spec.ts` | 10 | exception 不得內嵌文案（文案只在 `response-messages.ts`）。**兩個範圍兩種判準**：`domain/exception/` 用「任何中文字串」；guard / service / infrastructure 只比對 `new *Exception(` 的字面值引數——否則會掃到 logger、Zod 驗證訊息等內部字串 |
 | `env-schema.spec.ts` | 3 | 每個 `process.env.X` 都必須宣告於 `envSchema` |
 | `dto-from-zod.spec.ts` | 3 | DTO 一律由 `z.infer` 推導，不得手寫 class / interface |
 | `commonjs-baseline.spec.ts` | 2 | root 與 `apps/api` 不得出現 `"type": "module"` |

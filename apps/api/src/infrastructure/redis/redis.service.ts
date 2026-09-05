@@ -8,6 +8,7 @@ import {
 import { createClient, RedisClientType } from 'redis';
 import { createHash, randomUUID } from 'crypto';
 import { getEnv } from '../validate-env';
+import { HttpMessages } from '../../shared/constants/response-messages';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -171,7 +172,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async getBlacklistReason(token: string): Promise<string | null> {
     if (!this.client?.isOpen) {
-      throw new ServiceUnavailableException('認證服務暫時不可用，請稍後再試');
+      throw new ServiceUnavailableException(
+        HttpMessages.AUTH_SERVICE_UNAVAILABLE,
+      );
     }
     const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
     return this.get(`${this._keyPrefix}blacklist:${hash}`);
@@ -184,7 +187,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async isTokenBlacklisted(token: string): Promise<boolean> {
     if (!this.client?.isOpen) {
-      throw new ServiceUnavailableException('認證服務暫時不可用，請稍後再試');
+      throw new ServiceUnavailableException(
+        HttpMessages.AUTH_SERVICE_UNAVAILABLE,
+      );
     }
     const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
     const result = await this.get(`${this._keyPrefix}blacklist:${hash}`);

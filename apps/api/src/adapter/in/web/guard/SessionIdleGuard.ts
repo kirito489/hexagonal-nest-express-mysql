@@ -13,6 +13,7 @@ import {
 } from '@app/application/port/out/auth/SessionActivityPort';
 import { MemberContext } from '../decorator/current-member.decorator';
 import { getEnv } from '@app/infrastructure/validate-env';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 
 /**
  * 全域 Guard：檢查認證使用者的 session 是否因閒置而過期。
@@ -40,7 +41,7 @@ export class SessionIdleGuard implements CanActivate {
 
     const isActive = await this.sessionActivity.isActive(request.member.sub);
     if (!isActive) {
-      throw new UnauthorizedException('Session 已因閒置過久而過期，請重新登入');
+      throw new UnauthorizedException(HttpMessages.SESSION_IDLE_EXPIRED);
     }
 
     // 刷新活動時間

@@ -48,6 +48,7 @@ import {
 import { FeatureFlagService } from '../../shared/FeatureFlagService';
 import { JwtPayload } from '../../../port/jwt-payload';
 import { getEnv } from '@app/infrastructure/validate-env';
+import { HttpMessages } from '@app/shared/constants/response-messages';
 
 /**
  * 抹平時間差用的假 hash（首次使用時計算一次後快取）。
@@ -95,11 +96,11 @@ export class LoginService implements LoginUseCase {
     // reCAPTCHA 驗證
     if (this.featureFlags.isEnabled('googleRecaptchaEnabled')) {
       if (!recaptchaToken) {
-        throw new UnauthorizedException('請完成 reCAPTCHA 驗證');
+        throw new UnauthorizedException(HttpMessages.RECAPTCHA_REQUIRED);
       }
       const passed = await this.recaptcha.verify(recaptchaToken, ip);
       if (!passed) {
-        throw new UnauthorizedException('reCAPTCHA 驗證失敗');
+        throw new UnauthorizedException(HttpMessages.RECAPTCHA_FAILED);
       }
     }
 
@@ -141,13 +142,13 @@ export class LoginService implements LoginUseCase {
       // 在 BCRYPT_ROUNDS=12 下約 100ms，穩定可測，足以用來列舉帳號。
       await bcrypt.compare(password, dummyHash());
       await this.handleLoginFailure(email, ip, userAgent, '帳號不存在');
-      throw new UnauthorizedException('帳號或密碼錯誤');
+      throw new UnauthorizedException(HttpMessages.INVALID_CREDENTIALS);
     }
 
     const isMatch = await bcrypt.compare(password, member.password);
     if (!isMatch) {
       await this.handleLoginFailure(email, ip, userAgent, '密碼錯誤');
-      throw new UnauthorizedException('帳號或密碼錯誤');
+      throw new UnauthorizedException(HttpMessages.INVALID_CREDENTIALS);
     }
 
     // status 檢查（放在 bcrypt 後避免 user enumeration）

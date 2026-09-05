@@ -21,6 +21,7 @@ import {
 } from '../../decorator/current-member.decorator';
 import { Permissions } from '../../decorator/permissions.decorator';
 import { PermissionCode } from '@app/domain/value-object/Role';
+import { UploadRejectReasons } from '@app/shared/constants/response-messages';
 import {
   UploadAttachmentRequest,
   uploadAttachmentSchema,
@@ -54,7 +55,7 @@ export class AttachmentController {
     @CurrentMember() member: MemberContext,
   ): Promise<UploadAttachmentResult> {
     if (!file) {
-      throw new InvalidUploadException('未提供檔案（欄位名須為 file）');
+      throw new InvalidUploadException(UploadRejectReasons.NO_FILE);
     }
 
     return this.attachmentFacade.upload({
