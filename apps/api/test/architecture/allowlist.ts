@@ -133,3 +133,30 @@ export const PUBLIC_MOUNT_EXEMPTIONS: Array<{
     reason: 'Swagger UI，開關與 docs-json 同一個；CSP 於此路徑放寬',
   },
 ];
+
+/**
+ * 連線類環境變數（`*_HOST` / `*_PORT` / `*_URL`）中，刻意不在 compose 釘死的。
+ *
+ * 容器以 `env_file` 讀 `apps/api/.env.container`，而 compose 的 `environment`
+ * 優先序最高——**釘死就是保護**。沒釘死的會直接採用覆寫檔的值，
+ * 而那多半指向 `localhost`，在容器裡連不到。
+ *
+ * 每一筆都要寫理由。豁免一旦失去理由就會逐漸長大成無人維護的例外清冊。
+ */
+export const COMPOSE_UNPINNED_CONNECTION_VARS: Array<{
+  name: string;
+  reason: string;
+}> = [
+  {
+    name: 'LOCAL_MEDIA_BASE_URL',
+    reason:
+      '是**路徑前綴**（預設 /media）不是連線位址——它掛在同一個 origin 底下，' +
+      '沒有「指向 host 的 localhost」這個問題',
+  },
+  {
+    name: 'DB_TEST_DATABASE',
+    reason:
+      '雖以 _DATABASE 結尾但不屬連線位址，且只有 e2e 用得到——' +
+      '容器內跑 e2e 走的是 e2e 服務，那裡有自己的 environment',
+  },
+];

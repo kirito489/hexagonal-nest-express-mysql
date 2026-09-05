@@ -42,11 +42,24 @@ pnpm docker:renew  # 改了依賴後用這個：只重建 node_modules，DB / Re
 pnpm docker:reset  # 全部清掉（含 DB 與 Redis 資料），要重跑 docker:init
 ```
 
+**容器模式的入口只有一個**：nginx 反向代理（`127.0.0.1:8080`）。api 與 web 刻意不發布對外埠。
+
 | | 位置 |
 | --- | --- |
-| 前端 | http://127.0.0.1:5173 |
-| 後台 API | http://127.0.0.1:3000/api/admin/* |
-| Swagger | http://127.0.0.1:3000/api/admin/docs |
+| 前端 | http://127.0.0.1:8080 |
+| 後台 API | http://127.0.0.1:8080/api/admin/* |
+| Swagger | http://127.0.0.1:8080/api/admin/docs |
+
+> **為什麼是單一入口。** 正式是單一埠部署（API 一併服務前端打包產物），
+> 開發時若 api 與 web 各有各的埠，就是兩個 origin——而 CORS、cookie 的 `SameSite`、
+> 以及 CSP 的分路徑判斷，開發時走的都不是上線時那條路。
+> 保留直連的埠會讓「同一個 origin」變成可選的，問題只在沒人走的那條路上出現。
+>
+> 要直連 api / web 請改用下一節的 host 模式（3000 / 5173）。
+> 要分辨「代理壞了還是應用壞了」，從代理容器內部打後端——那涵蓋了代理的網路路徑：
+> `docker compose exec nginx wget -qO- http://api:3000/api/health`
+>
+> 代理埠可用 `APP_PROXY_PORT` 覆寫（預設 8080）。
 
 原始碼以 bind mount 掛進容器，**前後端都支援熱重載**——改 `apps/web` 走 Vite HMR，
 改 `apps/api` 約 15 秒內自動重啟生效。預設帳號 `admin@test.com` / `Admin1234!`。
@@ -81,8 +94,17 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6389       # 非預設 6379
 ```
 
-要改埠或密碼就在 repo 根目錄的 `.env` 設 `APP_API_PORT` / `APP_WEB_PORT` /
+要改埠或密碼就在 repo 根目錄的 `.env` 設 `APP_PROXY_PORT` /
 `DEV_DB_PORT` / `DEV_REDIS_PORT` / `DEV_DB_PASSWORD`（compose 會讀，預設值即上表）。
+
+**容器的個人化設定**寫 `apps/api/.env.container`（不進版控，compose 以 `env_file` 讀它）。
+優先序：compose 的 `environment` > `.env.container` > `docker/api.container.env` > `envSchema` 預設。
+連線類變數（`*_HOST` / `*_PORT` / `*_URL`）在 compose 釘死、蓋不掉——
+它們的正確值由拓撲決定，而本機的值必然指向 `localhost`，在容器裡連不到。
+
+> **不要把 `env_file` 指向 `apps/api/.env`。** compose 的 env 解析器比 dotenv 嚴格，
+> 解析失敗會讓**所有** `docker compose` 指令失效——連 `config` / `ps` / `down` 都跑不了。
+> 一行對應用程式完全合法的設定（例如帶角括號的寄件者位址）就足以讓整個 compose 無法使用。
 
 已經有自己的 MySQL / Redis 就兩個都不用，直接把 `.env` 指向它們即可。
 

@@ -64,11 +64,54 @@ services:
       pnpm --filter @app/api exec concurrently -n build,run -c blue,green
       \"nest build --watch --config nest-cli.docker.json\"
       \"sh -c 'until [ -f dist/main.js ]; do sleep 1; done; exec node --watch --enable-source-maps dist/main'\""
-    ports:
-      - '127.0.0.1:${APP_API_PORT:-3000}:3000'
+    # 刻意沒有 ports：容器模式的入口只有 nginx。api 提供的東西全在 /api 之下，
+    # 而那條在代理的路由表裡，沒有功能因此失去入口
+    # （Swagger 走 http://127.0.0.1:8080/api/admin/docs）。
+    # 要分辨「代理壞了還是應用壞了」從代理容器內部打後端，比開一個 host 埠更精準
+    # ——它涵蓋了代理的網路路徑：
+    #   docker compose exec nginx wget -qO- http://api:3000/api/health
+    # 要直連請改跑 host 模式：pnpm docker:deps + pnpm dev（3000 / 5173）。
+    #
+    # 打自己的健康端點，不是檢查行程或埠：容器啟動與「可以接請求」之間有一段實質空窗
+    # （nest build 產出 dist/main.js → Prisma 連上 DB → Nest bootstrap 完成），
+    # 而 `up -d --wait` 對沒有 healthcheck 的服務**只等到 running**，
+    # 會在那段空窗中回報成功，於是 nginx 起來後第一批請求得到 502。
+    #
+    # start_period 的來歷（**照實記，不要憑感覺調**）：
+    #   沒有實測過本專案的冷啟動時間。60s 是餘裕，不是量出來的需求。
+    #   代價要知道：應用真的壞掉時，`--wait` 也要等滿 start_period + retries×interval
+    #   才會失敗。要調小的話先在自己機器上量一次
+    #   （刪掉 apps/api/dist 與 .tsbuildinfo 後重啟，看多久 healthy）。
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+    # 個人的容器覆寫（不存在也不報錯，且不進版控）。
+    #
+    # **刻意不指向 apps/api/.env**：compose 的 env 解析器比 dotenv 嚴格，
+    # 而 `env_file` 解析失敗會讓**所有** docker compose 指令失效——連 `config`、
+    # `ps`、`down` 都跑不了。實測踩到：`.env` 有一行 `... <noreply@example.com>`，
+    # 對應用程式完全合法，卻讓整個 compose 無法使用。
+    # 那個代價遠大於它解決的問題（讓開發者能自訂 LOG_LEVEL 之類）。
+    #
+    # 優先序：environment > 本檔 > docker/api.container.env > envSchema 預設
+    env_file:
+      - path: ./apps/api/.env.container
+        required: false
     environment:
       NODE_ENV: development
-      # 連線指向 service 名稱，不是 localhost
+      # ─── 連線類變數一律在此釘死 ───
+      # compose 的 environment 優先序最高，host 的 .env 蓋不掉它們。
+      # 沒釘死的話會直接採用 host 的值，而那多半指向 localhost，在容器裡連不到。
+      # 由 compose-files.spec.ts 的「連線類環境變數必須釘死」守則盯著。
       DB_HOST: mysql
       DB_PORT: '3306'
       DB_USERNAME: root
@@ -86,6 +129,24 @@ services:
       STORAGE_DRIVER: local
       APP_TIMEZONE: Asia/Taipei
       CORS_ORIGIN: http://localhost:${APP_WEB_PORT:-5173}
+      # host 的 .env 常有 REDIS_URL 指向 localhost:6379——容器裡什麼都沒有。
+      # 設空字串讓 envSchema 的 optional 生效，改用上面的 REDIS_HOST / REDIS_PORT
+      REDIS_URL: ''
+      # 對外 URL：容器模式的入口是 nginx，不是 api 自己的埠
+      API_BASE_URL: http://localhost:${APP_PROXY_PORT:-8080}
+      SMTP_HOST: ''
+      SMTP_PORT: '587'
+      # 寄進信裡的對外連結。**這類字串在系統內部永遠不會被呼叫**，
+      # 所以任何「呼叫自己」的測試都驗不到它——e2e 打的是被測 app 自己的 base，
+      # 而錯的正是 base 本身。容器模式的對外位址是代理，不是 api 的埠
+      APP_PASSWORD_RESET_URL: http://localhost:${APP_PROXY_PORT:-8080}/reset-password
+      # 前面有 nginx，request.ip 必須採信它送來的 X-Forwarded-For。
+      # **這一項與 nginx 服務必須一起出現**——少了它，三個功能同時靜默失效：
+      #   IP 黑名單     擋不到真正的來源；一旦誤封就是封掉整個 nginx
+      #   登入失敗計數   所有人算成同一個，第 N 次失敗把全部人擋掉
+      #   全域節流       每分鐘 100 次變成**全站共用**一份額度
+      # 用 '1'（信任一跳）而非 'true'：後者會無條件採信偽造的 X-Forwarded-For
+      TRUST_PROXY: '1'
       # macOS 的 bind mount 不傳遞 inotify 事件，tsc watch 必須改輪詢才看得到改動
       TSC_WATCHFILE: UseFsEventsWithFallbackDynamicPolling
     depends_on:
@@ -95,14 +156,29 @@ services:
   web:
     <<: *app-base
     command: pnpm --filter @app/web dev
-    ports:
-      - '127.0.0.1:${APP_WEB_PORT:-5173}:5173'
+    # 同 api：容器模式的入口只有 nginx。要直連請跑 host 模式
     environment:
       # 容器內 localhost 是 web 自己，proxy 必須指向 api service
       VITE_API_PROXY_TARGET: http://api:3000
       VITE_USE_POLLING: 'true'
     depends_on:
       - api
+
+  # 容器模式的**唯一**入口。api 與 web 都沒有發布埠，所以 docker/nginx/default.conf
+  # 的路由表就是「後端有哪些東西對外」的完整清單。
+  nginx:
+    image: nginx:alpine
+    ports:
+      - '127.0.0.1:${APP_PROXY_PORT:-8080}:80'
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      # 等 api 真的能接請求再起代理：只等到 running 的話第一批請求會得到 502，
+      # 而在單一入口的拓撲下那看起來像代理設定壞了。
+      # web 只需 running——Vite dev server 沒有 healthcheck
+      api: { condition: service_healthy }
+      web: { condition: service_started }
+    restart: unless-stopped
 
   mysql:
     image: mysql:9
@@ -145,7 +221,12 @@ services:
   # 與 GitLab CI 的差異刻意保留：GitLab 的 services 不支援 compose 的 healthcheck 語法，
   # CI 端沿用手動等待迴圈，兩邊的 MySQL 版本則一致。
   mysql-verify:
-    profiles: [verify]
+    # 同時屬於兩個 profile：verify 是 host 跑測試（pnpm verify:ci），
+    # e2e 是連測試也在容器裡（pnpm test:e2e:docker）。
+    # 只掛 verify 的話，`--profile e2e` 啟動時它不在專案裡，
+    # e2e 服務的 depends_on 會以 "depends on undefined service" 失敗——
+    # 而那個錯誤訊息指向 depends_on，不會讓人想到是 profile
+    profiles: [verify, e2e]
     image: mysql:9
     environment:
       MYSQL_ROOT_PASSWORD: verify-secret
@@ -160,6 +241,37 @@ services:
       - /var/lib/mysql
     ports:
       - '127.0.0.1:13306:3306'
+
+  # 在容器內跑完整 e2e（--profile e2e）。與 host 的 test:e2e **並存而非取代**：
+  #   host  ── 最快，改一行就重跑，開發時用這條
+  #   容器  ── 密封，不依賴 host 的 Node / 套件 / .env，推上去之前用這條
+  e2e:
+    <<: *app-base
+    profiles: [e2e]
+    # 不需要 restart：跑完就該結束，退出碼即測試的成敗
+    restart: 'no'
+    # 先 db:generate 再跑測試：Prisma client 產在 node_modules 的具名 volume 裡，
+    # 新建的 volume（或剛被清掉重建的）不會有它，症狀是
+    # 「Cannot find module '.prisma/client/default'」而所有 spec 全部 failed to run。
+    command: >
+      sh -c "pnpm --filter @app/api db:generate &&
+      pnpm --filter @app/api test:e2e"
+    environment:
+      NODE_ENV: test
+      TZ: UTC
+      # 連 service 名稱，不是 127.0.0.1
+      DB_HOST: mysql-verify
+      DB_PORT: '3306'
+      DB_USERNAME: root
+      DB_PASSWORD: verify-secret
+      DB_DATABASE: hexagonal_verify_test
+      # **必須給**：applyE2EDbEnv() 會檢查它存在且名稱含 "test"，否則直接拋出。
+      # 容器內的 apps/api/.env 是被遮蔽的說明檔，dotenv 只能補值不能當唯一來源
+      DB_TEST_DATABASE: hexagonal_verify_test
+      AWS_MEDIA_LIBRARY_ROOT: local
+      APP_TIMEZONE: Asia/Taipei
+    depends_on:
+      mysql-verify: { condition: service_healthy }
 
 volumes:
   mysql-data:

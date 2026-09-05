@@ -43,13 +43,16 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 
 ### 容器化（單一 `compose.yml`）
 
-三種用法靠「指定服務」與 profile 區分，不需要多份檔案：
+四種用法靠「指定服務」與 profile 區分，不需要多份檔案：
 
 | 指令 | 起什麼 | 用途 |
 | --- | --- | --- |
-| `pnpm docker:up` | api + web + mysql + redis | 整套跑在容器裡，原始碼 bind mount + 熱重載 |
-| `pnpm docker:deps` | mysql + redis | 只要資料庫，api / web 跑在 host |
-| `pnpm verify:ci` | mysql-verify（`--profile verify`） | 重現 CI e2e 環境，跑完即 `down -v` |
+| `pnpm docker:up` | api + web + mysql + redis + **nginx** | 整套跑在容器裡，原始碼 bind mount + 熱重載。**入口只有 nginx** |
+| `pnpm docker:deps` | mysql + redis | 只要資料庫，api / web 跑在 host（3000 / 5173） |
+| `pnpm verify:ci` | mysql-verify（`--profile verify`） | 重現 CI 的資料庫環境，測試在 host 跑 |
+| `pnpm test:e2e:docker` | mysql-verify + e2e（`--profile e2e`） | 連測試也在容器裡跑 |
+
+後兩者的收尾**只移除自己起的服務**（`rm -fsv`），不是 `down -v`——理由見下方「兩條 e2e 執行路徑」。
 
 `mysql-verify` 獨立成一個服務而非共用開發用的那個，因為兩者對資料的要求相反：
 開發要 named volume 重啟保留，驗證要 `tmpfs` 每次乾淨。它掛在 profile 底下，
@@ -57,8 +60,9 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 避免「本機過、CI 掛」。
 
 對外埠一律避開預設的 3306 / 6379（多數開發機已有一組資料庫在跑），
-可用 repo 根目錄 `.env` 的 `APP_API_PORT` / `APP_WEB_PORT` / `DEV_DB_PORT` /
+可用 repo 根目錄 `.env` 的 `APP_PROXY_PORT` / `DEV_DB_PORT` /
 `DEV_REDIS_PORT` / `DEV_DB_PASSWORD` 覆寫。
+容器模式只有 nginx 發布埠，因此沒有 `APP_API_PORT` / `APP_WEB_PORT`。
 
 #### 容器化開發的六個非顯而易見之處
 
@@ -72,7 +76,8 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
    否則 Docker Desktop 清單裡十個隨機 hash 無從辨識。
 3. **host 的 `apps/api/.env` 會被 bind mount 帶進容器**，而 dotenv 不覆寫既有的
    `process.env`——等於「compose 沒設的都由開發者本機補」。用 `docker/api.container.env`
-   遮掉，設定才只有 compose 與 envSchema 預設兩個來源。
+   遮掉。個人化設定改走 `apps/api/.env.container`（見下方「容器設定的四層優先序」），
+   連線類變數則在 compose 釘死。
 4. **api 不能用 `nest start --watch`**——重啟時舊行程還在跑 `enableShutdownHooks` 的
    優雅關閉（Prisma pool + Redis quit），新行程搶埠失敗直接死，症狀是**編譯成功但
    改動不生效**，log 完全正常。改為 `nest build --watch` + `node --watch` 兩段，
@@ -96,6 +101,70 @@ hook 的**邏輯**放在工具無關的 `.agents/hooks/*.sh`，各家 AI 的設�
 - e2e 的 DB 連線走 **job variables**，不在 CI 偽造 `.env`：`applyE2EDbEnv()` 以 dotenv 載入 `.env`，而 **dotenv 不覆寫既有 `process.env`**，因此 CI 供應的變數優先生效。
 - `DB_TEST_DATABASE` 必須含 `test`，否則 e2e 的 globalSetup 守門會中止（防誤連 dev / prod）。
 - `--no-verify` 可繞過兩支 husky hook，但繞不過 CI —— 這是把關的最後一道。
+
+### 容器模式的單一入口
+
+`pnpm docker:up` 起的是 **api / web / mysql / redis / nginx 五個服務，而只有 nginx 有對外埠**
+（`${APP_PROXY_PORT:-8080}`）。路由表在 `docker/nginx/default.conf`：`/api` → api、`/` → web。
+
+目的不是「有一個 nginx」，是讓開發時的拓撲與正式的單一埠部署一致：**同一個 origin**。
+兩種拓撲不一樣的話，CORS、cookie 的 `SameSite`、以及 CSP 的分路徑判斷，
+開發時走的都不是上線時那條路。保留 api / web 的埠會讓「同一個 origin」變成可選的，
+而問題只在沒人走的那條路上出現——有守則（`compose-files.spec.ts`）擋著。
+
+**api 服務必須同時設 `TRUST_PROXY: '1'`**。少了它 `request.ip` 會變成 nginx 的容器位址，
+而三個功能同時靜默失效：
+
+| 功能 | 壞掉的樣子 |
+| --- | --- |
+| IP 黑名單 | 擋不到真正的來源；一旦誤封就是封掉整個 nginx |
+| 登入失敗計數 | 所有人算成同一個，第 N 次失敗把全部人擋掉 |
+| 全域節流 | 100 次／分鐘變成**全站共用**一份額度 |
+
+設 `'1'`（信任一跳）而非 `'true'`——後者會無條件採信偽造的 `X-Forwarded-For`。
+
+要直連 api / web 請改跑 host 模式（`pnpm docker:deps` + `pnpm dev`，3000 / 5173）。
+要分辨「代理壞了還是應用壞了」從代理容器內部打後端，比開一個 host 埠更精準
+（它涵蓋了代理的網路路徑）：
+
+```bash
+docker compose exec nginx wget -qO- http://api:3000/api/health
+```
+
+### 容器設定的四層優先序
+
+```
+compose 的 environment  >  apps/api/.env.container  >  docker/api.container.env  >  envSchema 預設
+```
+
+| 來源 | 進版控 | 職責 |
+| --- | --- | --- |
+| compose 的 `environment` | ✅ | 連線類變數，**釘死**不可被覆寫（有守則盯著） |
+| `apps/api/.env.container` | ❌ | 個人偏好，只影響自己這台 |
+| `docker/api.container.env` | ✅ | 隊友共用的容器基準 |
+
+連線類的判準是變數名以 `_HOST` / `_PORT` / `_URL` 結尾——它們的正確值由拓撲決定
+（service 名稱），本機的值必然指向 `localhost` 而在容器裡連不到。
+新增這類變數卻沒釘死時 `compose-files.spec.ts` 會紅。
+
+> ⚠️ **`env_file` 不可指向 `apps/api/.env`。** compose 的 env 解析器比 dotenv 嚴格，
+> 而解析失敗會讓**所有** `docker compose` 指令失效——連 `config` / `ps` / `down` 都跑不了。
+> 實測踩到：`.env` 裡一行帶角括號的寄件者位址，對應用程式完全合法，
+> 卻讓整個 compose 無法使用。因此個人覆寫用獨立的 `.env.container`。
+
+### 兩條 e2e 執行路徑
+
+| 指令 | 資料庫 | 測試在哪跑 | 用途 |
+| --- | --- | --- | --- |
+| `pnpm --filter @app/api test:e2e` | host 的 `.env` 指向的 | host | 最快，改一行就重跑 |
+| `pnpm verify:ci` | 容器（tmpfs） | host | 重現 CI 的**資料庫環境** |
+| `pnpm test:e2e:docker` | 容器（tmpfs） | **容器** | 密封，不依賴 host 的 Node / 套件 / `.env` |
+
+> ⚠️ **臨時容器的收尾絕不可用 `docker compose down -v`。** `--profile` 只影響
+> 「哪些服務被視為啟用」，**不限制 `down` 的作用範圍**——`-v` 會移除 compose 檔宣告的
+> **所有** named volume（`mysql-data`、`redis-data` 與五個 `node_modules`）。
+> 症狀是下次啟動「找不到 `.prisma/client`」或「資料庫是空的」，指不到是收尾造成的。
+> 用 `rm -fsv <服務>` 只收自己起的那個。`down -v` 保留給 `pnpm docker:reset`。
 
 ### 本機的兩層 git hook
 
@@ -143,14 +212,16 @@ pnpm lint                    # 三個 workspace 全部 eslint
 pnpm test                    # 跑各 workspace 的 test script
 
 # 容器化（單一 compose.yml，詳見上方「容器化」）
-pnpm docker:up               # 整套跑在容器裡（api + web + mysql + redis）
+pnpm docker:up               # 整套跑在容器裡（api + web + mysql + redis + nginx；入口只有 nginx）
 pnpm docker:init             # 容器內建表 + seed（首次一次）
 pnpm docker:logs             # 跟蹤 api / web
 pnpm docker:deps             # 只起 mysql + redis，api / web 跑在 host
 pnpm docker:down             # 停止，資料保留
 pnpm docker:renew            # 改依賴後：只重建 node_modules volume，資料保留
 pnpm docker:reset            # 刪除所有 volume（含 DB / Redis 資料）
-pnpm verify:ci               # 重現 CI 的 e2e 環境跑一次
+pnpm docker:prune            # 清 builder 快取與懸空映像（磁碟不夠時用）
+pnpm verify:ci               # 重現 CI 的資料庫環境，測試在 host 跑
+pnpm test:e2e:docker         # 連測試也在容器裡跑（密封，不依賴 host 環境）
 ```
 
 ### 後端 `apps/api`

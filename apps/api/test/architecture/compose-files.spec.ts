@@ -1,12 +1,31 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { API_ROOT } from './helpers';
+import { COMPOSE_UNPINNED_CONNECTION_VARS } from './allowlist';
 
 /** repo 根目錄（本檔位於 apps/api/test/architecture） */
 const REPO_ROOT = join(API_ROOT, '..', '..');
 
 const read = (relative: string): string =>
   readFileSync(join(REPO_ROOT, relative), 'utf8');
+
+/**
+ * 遞迴列出目錄下的所有檔案（相對 REPO_ROOT）。
+ *
+ * `docker/` 一度只有檔案，於是原本直接 `readdirSync().map()`——
+ * 加入 `docker/nginx/` 之後那個假設就壞了，`readFileSync` 對目錄丟 EISDIR。
+ * 掃描清單的規則要能承受「有人在裡面開子目錄」，否則它會在**別人加東西的那一刻**
+ * 壞掉，而錯誤訊息（EISDIR）完全指不到原因。
+ */
+const filesUnder = (relativeDir: string): string[] => {
+  const absolute = join(REPO_ROOT, relativeDir);
+  if (!existsSync(absolute)) return [];
+  return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? filesUnder(`${relativeDir}/${entry.name}`)
+      : [`${relativeDir}/${entry.name}`],
+  );
+};
 
 const composeFiles = (): string[] =>
   readdirSync(REPO_ROOT)
@@ -54,9 +73,7 @@ describe('架構守則：compose 檔的執行路徑與埠號文件', () => {
       ...files,
       'Dockerfile',
       '.dockerignore',
-      ...(existsSync(join(REPO_ROOT, 'docker'))
-        ? readdirSync(join(REPO_ROOT, 'docker')).map((f) => `docker/${f}`)
-        : []),
+      ...filesUnder('docker'),
     ].filter((f) => existsSync(join(REPO_ROOT, f)));
 
     const broken: string[] = [];
@@ -125,6 +142,145 @@ describe('架構守則：compose 檔的執行路徑與埠號文件', () => {
         : `compose.yml 的對外埠未寫進 README：\n${undocumented
             .map((p) => `  ${p}`)
             .join('\n')}\n照 README 設 .env 的人會連不上，且錯誤訊息指不到原因`,
+    ).toBe('');
+  });
+});
+
+/**
+ * 取出 `services:` 底下某個服務的區塊（不含服務名那行）。
+ *
+ * 終止條件只認「下一個服務鍵」（`  name:`）與頂層鍵，**不認註解**——
+ * 服務之間的說明註解同樣縮排兩格，拿它當邊界的話，區塊會在註解處被截斷，
+ * 截斷之後漏掉的宣告是**靜默通過**，不是報錯。
+ */
+const serviceBlock = (body: string, name: string): string | null => {
+  const lines = body.split('\n');
+  const start = lines.indexOf(`  ${name}:`);
+  if (start === -1) return null;
+
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => /^ {2}[\w-]+:/.test(l) || /^\S/.test(l));
+  return (end === -1 ? rest : rest.slice(0, end)).join('\n');
+};
+
+/** 服務區塊裡有沒有 `ports:` 宣告（服務屬性縮排四格） */
+const declaresPorts = (block: string): boolean => /^ {4}ports:/m.test(block);
+
+/**
+ * 容器模式的入口只有反向代理。
+ *
+ * 這條防的不是「有人不同意單一入口」，是**「為了 debug 暫時開一下然後忘了拿掉」**
+ * ——那個回歸沒有任何症狀，只會讓下一次驗 CORS 或 cookie 的人得到錯的結論。
+ *
+ * 用服務名稱表述而非「只有 nginx 可以有 ports」的白名單：白名單會在有人加新服務時
+ * 誤報，而誤報的處理方式是把服務加進白名單，規則從此空轉。
+ */
+describe('架構守則：容器模式的單一入口', () => {
+  it('api 與 web 不得宣告對外埠', () => {
+    const body = read('compose.yml');
+    const blocks = Object.fromEntries(
+      ['api', 'web', 'nginx'].map((n) => [n, serviceBlock(body, n)]),
+    );
+
+    // 掃不到服務就等於規則不存在，服務改名時要在這裡失敗而不是靜默通過
+    for (const [name, block] of Object.entries(blocks)) {
+      expect(block === null ? `compose.yml 找不到服務 ${name}` : '').toBe('');
+    }
+
+    // nginx 是正對照組：它一定有 ports。這裡若為 false 代表解析或正規式失效，
+    // 而失效的表現正好是「api / web 也都看起來沒有 ports」——規則空轉
+    expect(declaresPorts(blocks.nginx ?? '')).toBe(true);
+
+    const offenders = ['api', 'web'].filter((n) =>
+      declaresPorts(blocks[n] ?? ''),
+    );
+
+    expect(
+      offenders.length === 0
+        ? ''
+        : `以下服務宣告了對外埠：${offenders.join(' / ')}\n` +
+            '容器模式的入口只有 nginx——多一條直連的路，「單一 origin」就變成可選的，\n' +
+            '而代理設定漂掉時沒有人會發現。\n' +
+            '要直連 api / web 請改跑 host 模式：pnpm docker:deps + pnpm dev（3000 / 5173）。\n' +
+            '只是想確認代理有沒有壞：docker compose exec nginx wget -qO- http://api:3000/api/health',
+    ).toBe('');
+  });
+});
+
+/**
+ * 連線類環境變數必須在 compose 釘死。
+ *
+ * 容器以 `env_file` 讀入 `apps/api/.env.container`——compose 的 `environment`
+ * 優先序最高，所以**釘死就是保護**；反過來說，**沒釘死的連線類變數會直接採用
+ * 覆寫檔的值**，而那個值多半指向 `localhost`，在容器裡連不到。
+ *
+ * 這條要在**新增變數的當下**失敗，而不是等有人遇到：症狀全是靜默的
+ * ——Redis 連不上會降級運行、SMTP 要到真的寄信才失敗、對外 URL 錯了不會失敗。
+ *
+ * **只檢查「有沒有釘」，不檢查「值對不對」**：後者需要知道每個變數的語意。
+ * 值由實機驗收負責，這裡負責的是「新增時有沒有人想過它在容器裡該是什麼」。
+ */
+describe('架構守則：連線類環境變數必須在 compose 釘死', () => {
+  const CONNECTION_SUFFIX = /(_HOST|_PORT|_URL)$/;
+
+  /** envSchema 宣告的所有變數名 */
+  const declaredEnvVars = (): string[] => {
+    const src = readFileSync(
+      join(API_ROOT, 'src/infrastructure/validate-env.ts'),
+      'utf8',
+    );
+    const body = src.slice(src.indexOf('envSchema'));
+    return [...body.matchAll(/^ {2}([A-Z][A-Z0-9_]*):\s/gm)].map((m) => m[1]);
+  };
+
+  /** compose.yml 的 api 服務 `environment:` 底下宣告的變數名 */
+  const composePinned = (): string[] => {
+    const block = serviceBlock(read('compose.yml'), 'api') ?? '';
+    const start = block.indexOf('    environment:');
+    const end = block.indexOf('    depends_on:');
+    if (start === -1 || end === -1) return [];
+    return [
+      ...block.slice(start, end).matchAll(/^ {6}([A-Z][A-Z0-9_]*):/gm),
+    ].map((m) => m[1]);
+  };
+
+  it('掃描範圍有效', () => {
+    // 任一邊掃不到就代表結構變了，規則會空轉成「全部都釘了」
+    expect(declaredEnvVars().length).toBeGreaterThan(0);
+    expect(composePinned().length).toBeGreaterThan(0);
+    expect(
+      declaredEnvVars().filter((v) => CONNECTION_SUFFIX.test(v)).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('每個連線類變數都必須釘死或列入豁免', () => {
+    const pinned = new Set(composePinned());
+    const exempt = new Set(COMPOSE_UNPINNED_CONNECTION_VARS.map((e) => e.name));
+
+    const missing = declaredEnvVars()
+      .filter((v) => CONNECTION_SUFFIX.test(v))
+      .filter((v) => !pinned.has(v) && !exempt.has(v))
+      .map((v) => `  ${v}`);
+
+    expect(
+      missing.length === 0
+        ? ''
+        : `以下連線類變數未在 compose 的 api 服務釘死：\n${missing.join('\n')}\n` +
+            '沒釘死的話容器會採用 apps/api/.env.container 的值，而那多半指向 localhost。\n' +
+            '請在 compose 的 environment 補上，或加進 allowlist.ts 的 COMPOSE_UNPINNED_CONNECTION_VARS 並寫明理由。',
+    ).toBe('');
+  });
+
+  it('豁免清單不得有失效項目', () => {
+    const declared = new Set(declaredEnvVars());
+    const stale = COMPOSE_UNPINNED_CONNECTION_VARS.filter(
+      (e) => !declared.has(e.name),
+    ).map((e) => `  ${e.name}`);
+
+    expect(
+      stale.length === 0
+        ? ''
+        : `以下豁免的變數已不存在於 envSchema：\n${stale.join('\n')}\n請刪除。`,
     ).toBe('');
   });
 });

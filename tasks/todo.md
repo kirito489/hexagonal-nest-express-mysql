@@ -17,8 +17,8 @@
 - [x] **C3 `platform-guardrail-backport`** — 回補四支守則（`guardrail-inventory` / `env-example-sync` / `public-surface` / `role-permission-cache`），守則 19 支 / 69 項 → **23 支 / 102 項**。
       **順帶修掉一個活的 bug**：`UpdateRoleService` 改完角色權限不清成員快取，撤銷的權限最多 5 分鐘後才生效。
       刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
-- [ ] **C4 `platform-container-single-entry`** — `verify-ci.sh` 的 `down -v` 誤刪全專案 volume、nginx 單一入口 + `TRUST_PROXY`、容器吃本機 `.env`、`e2e-docker.sh`
-      ⚠️ **`down -v` 這條在 C1 已寫進 `lessons.md` 並標明「現在正踩著」**——在 C4 落地前，跑 `pnpm verify:ci` 會清掉開發用的 `mysql-data` / `redis-data` 與五個 `node_modules` volume，事後要重跑 `pnpm install` 與 `pnpm docker:init`
+- [x] **C4 `platform-container-single-entry`** — 修掉 `verify-ci.sh` 的 `down -v`（**修前實測證實會移除 `mysql-data` / `redis-data`**）、nginx 單一入口（api / web 不發布埠）+ `TRUST_PROXY: '1'`、容器個人覆寫改走 `.env.container` + 連線類在 compose 釘死、容器化 e2e（`pnpm test:e2e:docker`）。守則 23 支 / 102 → 106 項。
+      **實作中一個設計因實測而改**：原訂 `env_file` 指向 `apps/api/.env`，實際會讓**整個 compose 無法使用**（它的 env 解析器比 dotenv 嚴格），改用獨立的 `.env.container`。**待封存**
 - [ ] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions **兩份並存**（fork 的人自己刪一份），job 前置抽共用、版號取自 `.nvmrc` / `packageManager`
 - [ ] **C6a `api-account-lock-management`** — 見下方「功能」段既有條目
 - [ ] **C6b `ui-route-permission-guard`** — 路由依權限守衛，sidebar 隱藏不再是唯一防線

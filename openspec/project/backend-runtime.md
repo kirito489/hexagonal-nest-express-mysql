@@ -123,6 +123,20 @@ Express 預設不採信 `X-Forwarded-For`，部署在 LB / 反向代理後 `requ
 
 以 env `TRUST_PROXY` 控制（預設 `'loopback'` = 不採信外部 XFF）。部署時依拓樸改為信任跳數（如 `'1'`）或具體 CIDR；**切勿設 `true`** —— 會無條件採信偽造的 XFF。封鎖類 Guard（IP 黑名單）取不到 IP 時應 **fail-closed**（拒絕）而非放行。
 
+**開發環境也有代理了**：`pnpm docker:up` 會起一個 nginx 當單一入口，
+因此 compose 的 api 服務設 `TRUST_PROXY: '1'`。**這兩者必須一起出現**——
+少了它，三個讀 `request.ip` 的功能會同時失效而且不會報錯：
+
+| 功能 | 壞掉的樣子 |
+| --- | --- |
+| IP 黑名單 | 擋不到真正的來源；一旦誤封就是封掉整個 nginx |
+| 登入失敗計數 | 所有人算成同一個，第 N 次失敗把全部人擋掉 |
+| 全域節流 | 100 次／分鐘變成**全站共用**一份額度 |
+
+驗證方式：經代理打幾次錯誤密碼，看 Redis 的 `failed-login:*` key 是**真實來源**
+還是 nginx 的容器位址。設 `'1'` 時偽造的 `X-Forwarded-For` 會被正確忽略
+（只信任 nginx 那一跳）。
+
 ### 全域中介層
 
 以下 Provider 在 `apps/api/src/app.module.ts` 全域註冊，**所有端點自動套用，無需手動加裝飾器**：

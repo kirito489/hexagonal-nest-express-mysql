@@ -422,6 +422,38 @@ z.enum(['true', 'false']).or(z.literal('')).optional().transform((v) => (v === '
 
 ## 容器 / Docker
 
+### 2026-09-06 — compose 的 `env_file` 解析比 dotenv 嚴格，一行壞掉整個 compose 就不能用
+
+**踩到什麼**：為了讓容器能讀本機的個人設定，在 compose 的 api 服務加 `env_file: ./apps/api/.env`。結果**所有** `docker compose` 指令直接失效——連 `config` / `ps` / `down` 都跑不了：
+
+```
+failed to read apps/api/.env: line 61: unexpected character "<" in variable name "<noreply@example.com>"
+```
+
+**Why**：compose 自己解析 env 檔，規則比 dotenv 嚴格。一行像 `EMAIL_FROM=系統 <noreply@example.com>` 的設定對應用程式完全合法（dotenv 吃得下），compose 卻視為語法錯誤。而它是在**載入專案設定時**解析的，所以不是「那個服務起不來」，是**整個 compose 專案無法操作**。
+
+**How to apply**：`env_file` **不要指向應用程式自己的 `.env`**。要讓容器讀個人設定就開一支專用檔（如 `apps/api/.env.container`，加進 `.gitignore`）——保留了目的，同時拿掉「compose 的可用性取決於某人 `.env` 的寫法」這個耦合。判準通用：**兩個工具讀同一個檔案時，寬鬆的那個會讓嚴格的那個在別人的機器上爆掉**，而爆的範圍往往遠大於那個檔案的用途。
+
+### 2026-09-06 — `docker compose restart` 不重讀設定
+
+**踩到什麼**：改了 compose 的 `env_file` 之後用 `docker compose restart api` 驗證，容器內的變數是 `undefined`，一度以為 `env_file` 沒生效。
+
+**Why**：`restart` 只是停掉再啟動**既有的容器**，容器的環境變數在建立時就固定了。要套用新的設定必須**重建**容器（`up -d` 會偵測設定變更並重建）。
+
+**How to apply**：驗證任何 compose 設定改動一律用 `docker compose up -d <服務>`，不要用 `restart`。`restart` 的用途是「應用程式卡住了，重開一下」，不是「我改了設定」。
+
+### 2026-09-06 — profile 只影響「哪些服務被視為啟用」，而 `depends_on` 會因此解析失敗
+
+**踩到什麼**：`e2e` 服務掛 `--profile e2e` 並 `depends_on: mysql-verify`，而後者掛的是 `--profile verify`。跑 `docker compose --profile e2e run --rm e2e` 得到：
+
+```
+service "e2e" depends on undefined service "mysql-verify": invalid compose project
+```
+
+**Why**：啟用某個 profile 時，**沒有被啟用的 profile 底下的服務等於不存在於這個專案**。`depends_on` 指向一個「不存在」的服務，於是整個專案被判定為 invalid。而錯誤訊息說的是 `depends_on`，不會讓人想到是 profile。
+
+**How to apply**：被多個情境共用的服務要**同時列入所有相關 profile**（`profiles: [verify, e2e]`），而不是要求每個呼叫端記得帶兩個 `--profile`。後者能動，但那是把設定的複雜度轉嫁給每一個使用它的地方。
+
 ### 2026-09 — `docker compose down -v` 的 `-v` 是「專案的所有 volume」
 
 **踩到什麼**（衍生專案案例）：容器化 e2e 的收尾寫成 `docker compose --profile e2e down -v`，跑完一次之後開發環境整個消失——五個 `node_modules` volume、資料庫 volume、redis volume 全沒。下一次跑 e2e 的症狀是整批 spec `Cannot find module '.prisma/client/default'`，**完全指不到是收尾那一行造成的**。
@@ -430,7 +462,10 @@ z.enum(['true', 'false']).or(z.literal('')).optional().transform((v) => (v === '
 
 **How to apply**：只想收自己起的服務就用 `rm -fsv <服務名>`（`-f` 不問、`-s` 先停、`-v` 只移除**該容器的匿名 volume**）。`down -v` 保留給「我真的要重置整個專案」——那正是 `pnpm docker:reset` 的定位。
 
-> ⚠️ **本專案的 `scripts/verify-ci.sh` 目前正踩著這個坑**（`docker compose --profile verify down -v`），也就是說**每跑一次 `pnpm verify:ci` 就清掉開發用的 `mysql-data`、`redis-data` 與五個 `node_modules` volume**。修復排在 `platform-container-single-entry`（C4）；在那之前跑 `verify:ci` 要有心理準備，事後得重跑 `pnpm install` 與 `pnpm docker:init`。
+> ✅ **本專案曾經正踩著這個坑**（`scripts/verify-ci.sh` 的 `docker compose --profile verify down -v`），
+> 已於 `platform-container-single-entry`（C4）修掉，改用 `rm -fsv mysql-verify`。
+> 修之前實測過一次：輸出直接顯示 `Volume hexagonal-nest_mysql-data Removed` /
+> `redis-data Removed`——那兩個 volume 與 verify profile 毫無關係。
 
 ### 2026-09 — 容器跑著的時候在 host 跑 `pnpm build`，會把容器打死
 
