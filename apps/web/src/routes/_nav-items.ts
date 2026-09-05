@@ -1,4 +1,5 @@
-import { Home, Shield, ShieldBan, ShieldCheck, Users } from 'lucide-react';
+import { Home, Shield, LockKeyhole,
+  ShieldBan, ShieldCheck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { ROLE_CODE, type RoleCode } from '@/lib/role-codes';
@@ -52,6 +53,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'IP 黑名單',
     path: '/security/ip-blacklist',
     icon: ShieldBan,
+    group: '安全',
+    requiredRoleCode: ROLE_CODE.SUPERADMIN,
+  },
+  {
+    label: '帳號鎖定',
+    path: '/security/account-locks',
+    icon: LockKeyhole,
     group: '安全',
     requiredRoleCode: ROLE_CODE.SUPERADMIN,
   },

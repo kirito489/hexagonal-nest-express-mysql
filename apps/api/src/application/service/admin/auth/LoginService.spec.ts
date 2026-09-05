@@ -79,6 +79,7 @@ const mockAccountLock = {
   recordFailedLogin: jest.fn().mockResolvedValue(0),
   resetFailedLogin: jest.fn(),
   unlockAccount: jest.fn(),
+  listLocked: jest.fn().mockResolvedValue({ list: [], total: 0 }),
 } as unknown as jest.Mocked<AccountLockPort>;
 
 /**

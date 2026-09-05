@@ -196,4 +196,111 @@ describe('Security hardening E2E', () => {
       expect(counters.get(failedLoginKeys[0])).toBe(2);
     });
   });
+  /**
+   * D3 的漂移點:列表的到期判定與登入路徑必須是同一份規則。
+   *
+   * 漂移的症狀是「列表說鎖著、但那個人登得進去」——看起來像資料不同步,
+   * 實際是兩份計算。**這一條同時斷言兩邊**,所以任一邊改了規則都會紅。
+   *
+   * 本 spec 開啟了鎖定功能,因此也是驗 `lockEnabled: true` 的地方。
+   */
+  describe('鎖定列表與登入路徑的一致性', () => {
+    const ADMIN_EMAIL = 'lock-admin@example.com';
+
+    /** 以 SUPERADMIN 登入並取得 token */
+    const superadminToken = async (): Promise<string> => {
+      await seedMember(prisma, {
+        email: ADMIN_EMAIL,
+        password: PASSWORD,
+        roleName: '管理者',
+        roleCode: 'SUPERADMIN',
+      });
+      const res = await login(app, ADMIN_EMAIL, PASSWORD);
+      return (res.body as { data: { accessToken: string } }).data.accessToken;
+    };
+
+    const listLocks = (token: string, query = '') =>
+      request(app.getHttpServer())
+        .get(`/api/admin/security/locks${query}`)
+        .set('Authorization', `Bearer ${token}`);
+
+    it('功能已啟用 → lockEnabled 為 true', async () => {
+      const token = await superadminToken();
+
+      const res = await listLocks(token);
+
+      expect(res.status).toBe(200);
+      expect(
+        (res.body as { data: { lockEnabled: boolean } }).data.lockEnabled,
+      ).toBe(true);
+    });
+
+    it('鎖定中的帳號:列表說 locked,且該帳號登不進去', async () => {
+      const token = await superadminToken();
+      await seedMember(prisma, { email: EMAIL, password: PASSWORD });
+      for (let i = 0; i < THRESHOLD; i += 1) {
+        await login(app, EMAIL, 'wrong-password');
+      }
+
+      const res = await listLocks(token);
+      const { list } = (
+        res.body as { data: { list: Array<{ email: string; status: string }> } }
+      ).data;
+      const row = list.find((item) => item.email === EMAIL);
+
+      expect(row?.status).toBe('locked');
+      // 同一筆資料的另一半:此時登入必須被擋
+      expectApiError(
+        await login(app, EMAIL, PASSWORD),
+        423,
+        ResponseCodes.ACCOUNT_LOCKED,
+      );
+    });
+
+    it('剛好超過時效:列表說 expired,且該帳號同時登得進去', async () => {
+      const token = await superadminToken();
+      const member = await seedMember(prisma, {
+        email: EMAIL,
+        password: PASSWORD,
+      });
+      await prisma.memberRecord.update({
+        where: { id: member.memberId },
+        data: {
+          lockedAt: new Date(Date.now() - (DURATION_MIN + 1) * 60 * 1000),
+        },
+      });
+
+      const res = await listLocks(token, '?status=expired');
+      const { list } = (
+        res.body as { data: { list: Array<{ email: string; status: string }> } }
+      ).data;
+      const row = list.find((item) => item.email === EMAIL);
+
+      expect(row?.status).toBe('expired');
+      // 兩份規則若漂移,這一行會綠而上一行會紅(或反過來)
+      expect((await login(app, EMAIL, PASSWORD)).status).toBe(200);
+    });
+
+    it('預設過濾不會把已到期的列成鎖定中', async () => {
+      const token = await superadminToken();
+      const member = await seedMember(prisma, {
+        email: EMAIL,
+        password: PASSWORD,
+      });
+      await prisma.memberRecord.update({
+        where: { id: member.memberId },
+        data: {
+          lockedAt: new Date(Date.now() - (DURATION_MIN + 1) * 60 * 1000),
+        },
+      });
+
+      const res = await listLocks(token);
+
+      expect(
+        (
+          res.body as { data: { list: Array<{ email: string }> } }
+        ).data.list.map((item) => item.email),
+      ).not.toContain(EMAIL);
+    });
+  });
 });

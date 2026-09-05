@@ -20,6 +20,10 @@ import {
   REMOVE_IP_WHITELIST_USE_CASE,
   RemoveIpBlacklistUseCase,
   RemoveIpWhitelistUseCase,
+  LIST_ACCOUNT_LOCKS_USE_CASE,
+  ListAccountLocksQuery,
+  ListAccountLocksResult,
+  ListAccountLocksUseCase,
   UNLOCK_ACCOUNT_USE_CASE,
   UnlockAccountUseCase,
   UPDATE_IP_BLACKLIST_USE_CASE,
@@ -55,6 +59,8 @@ export class SecurityFacade {
     private readonly removeIpBlacklist: RemoveIpBlacklistUseCase,
     @Inject(UNLOCK_ACCOUNT_USE_CASE)
     private readonly unlockAccountUseCase: UnlockAccountUseCase,
+    @Inject(LIST_ACCOUNT_LOCKS_USE_CASE)
+    private readonly listAccountLocksUseCase: ListAccountLocksUseCase,
     @Inject(GET_IP_WHITELIST_USE_CASE)
     private readonly getIpWhitelistUseCase: GetIpWhitelistUseCase,
     @Inject(UPDATE_IP_WHITELIST_USE_CASE)
@@ -111,5 +117,11 @@ export class SecurityFacade {
 
   unlockAccount(email: string): Promise<void> {
     return this.unlockAccountUseCase.execute(email);
+  }
+
+  listAccountLocks(
+    query: ListAccountLocksQuery,
+  ): Promise<ListAccountLocksResult> {
+    return this.listAccountLocksUseCase.execute(query);
   }
 }

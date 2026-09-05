@@ -17,7 +17,10 @@ const makeMocks = () => {
     memberRecord: {
       findFirst: jest.fn().mockResolvedValue({ lockedAt: null }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
+    $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
   } as unknown as PrismaService;
 
   const redis = {
@@ -223,5 +226,193 @@ describe('PrismaAccountLockAdapter', () => {
       ).memberRecord.updateMany;
       expect(mock).not.toHaveBeenCalled();
     });
+  });
+});
+
+/** 取出 findMany 的查詢參數 */
+const findManyArgs = (
+  prisma: PrismaService,
+): {
+  where: Record<string, unknown>;
+  orderBy: unknown;
+  skip: number;
+  take: number;
+} => {
+  const mock = (prisma as unknown as { memberRecord: { findMany: jest.Mock } })
+    .memberRecord.findMany;
+  return mock.mock.calls[0][0] as never;
+};
+
+const lockedRow = (lockedAt: Date, overrides = {}) => ({
+  id: 'id-1',
+  email: EMAIL,
+  member: '測試帳號',
+  failedLoginCount: 3,
+  lockedAt,
+  ...overrides,
+});
+
+describe('PrismaAccountLockAdapter.listLocked', () => {
+  const baseQuery = { page: 1, limit: 20, status: 'locked' as const };
+
+  describe('查詢條件', () => {
+    it('一律排除軟刪除，且只看有鎖定紀錄的列', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked(baseQuery);
+
+      const { where } = findManyArgs(prisma);
+      expect(where.deletedAt).toBeNull();
+      expect(where.lockedAt).toBeDefined();
+    });
+
+    it('status=locked 以分界時間戳轉成範圍條件，不逐列呼叫 checkLock', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'locked' });
+
+      const { where } = findManyArgs(prisma);
+      // 鎖定中 = lockedAt 嚴格大於分界點
+      expect(where.lockedAt).toEqual({ gt: expect.any(Date) });
+      // N+1 的守門：列表不得回頭查單筆
+      const findFirst = (
+        prisma as unknown as { memberRecord: { findFirst: jest.Mock } }
+      ).memberRecord.findFirst;
+      expect(findFirst).not.toHaveBeenCalled();
+    });
+
+    it('status=expired 取分界點以前（含邊界）', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'expired' });
+
+      expect(findManyArgs(prisma).where.lockedAt).toEqual({
+        lte: expect.any(Date),
+      });
+    });
+
+    it('status=all 只要求有鎖定紀錄', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'all' });
+
+      expect(findManyArgs(prisma).where.lockedAt).toEqual({ not: null });
+    });
+
+    it('search 做 email 模糊比對，排序依 lockedAt 遞減', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'all', search: 'adm' });
+
+      const args = findManyArgs(prisma);
+      expect(args.where.email).toEqual({ contains: 'adm' });
+      expect(args.orderBy).toEqual({ lockedAt: 'desc' });
+    });
+
+    it('未提供 search 時不下 email 條件', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'all' });
+
+      expect(findManyArgs(prisma).where.email).toBeUndefined();
+    });
+
+    it('分頁換算為 skip / take', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, page: 3, limit: 10 });
+
+      const args = findManyArgs(prisma);
+      expect(args.skip).toBe(20);
+      expect(args.take).toBe(10);
+    });
+  });
+
+  describe('逐列的狀態與到期時間', () => {
+    it('回傳判定後的 status 與 unlocksAt，不讓呼叫端自己心算', async () => {
+      const { prisma, adapter } = makeMocks();
+      const lockedAt = minutesAgo(DURATION_MIN - 1);
+      (
+        prisma as unknown as { memberRecord: { findMany: jest.Mock } }
+      ).memberRecord.findMany.mockResolvedValue([lockedRow(lockedAt)]);
+
+      const { list } = await adapter.listLocked({
+        ...baseQuery,
+        status: 'all',
+      });
+
+      expect(list[0].status).toBe('locked');
+      expect(list[0].unlocksAt.getTime()).toBe(
+        lockedAt.getTime() + DURATION_MIN * 60 * 1000,
+      );
+    });
+
+    it('已超過時效的列判定為 expired', async () => {
+      const { prisma, adapter } = makeMocks();
+      (
+        prisma as unknown as { memberRecord: { findMany: jest.Mock } }
+      ).memberRecord.findMany.mockResolvedValue([
+        lockedRow(minutesAgo(DURATION_MIN + 1)),
+      ]);
+
+      const { list } = await adapter.listLocked({
+        ...baseQuery,
+        status: 'all',
+      });
+
+      expect(list[0].status).toBe('expired');
+    });
+  });
+
+  /**
+   * D3 說的漂移點。
+   *
+   * 邊界上的那一列如果列表判 `locked` 而 `checkLock` 判 `EXPIRED`，
+   * 症狀就是「列表說鎖著、但那個人登得進去」——看起來像資料不同步，
+   * 實際是兩份規則。這一條盯的就是那個。
+   */
+  describe('邊界：列表判定與 checkLock 必須一致', () => {
+    it('剛好滿時效時兩者都說「已到期」', async () => {
+      const { prisma, adapter } = makeMocks();
+      const boundary = minutesAgo(DURATION_MIN);
+
+      (
+        prisma as unknown as { memberRecord: { findFirst: jest.Mock } }
+      ).memberRecord.findFirst.mockResolvedValue({ lockedAt: boundary });
+      (
+        prisma as unknown as { memberRecord: { findMany: jest.Mock } }
+      ).memberRecord.findMany.mockResolvedValue([lockedRow(boundary)]);
+
+      const status = await adapter.checkLock(EMAIL);
+      const { list } = await adapter.listLocked({
+        ...baseQuery,
+        status: 'all',
+      });
+
+      expect(status).toBe('EXPIRED');
+      expect(list[0].status).toBe('expired');
+    });
+
+    it('status=locked 的 SQL 條件會排除剛好滿時效的那一列', async () => {
+      const { prisma, adapter } = makeMocks();
+
+      await adapter.listLocked({ ...baseQuery, status: 'locked' });
+
+      // gt（非 gte）才會排除邊界；用 gte 的話邊界那列會被列成「鎖定中」
+      const where = findManyArgs(prisma).where as { lockedAt: { gt: Date } };
+      expect(where.lockedAt.gt).toBeInstanceOf(Date);
+      expect(Object.keys(where.lockedAt)).toEqual(['gt']);
+    });
+  });
+
+  it('回傳符合條件的總筆數', async () => {
+    const { prisma, adapter } = makeMocks();
+    (
+      prisma as unknown as { memberRecord: { count: jest.Mock } }
+    ).memberRecord.count.mockResolvedValue(7);
+
+    const { total } = await adapter.listLocked(baseQuery);
+
+    expect(total).toBe(7);
   });
 });

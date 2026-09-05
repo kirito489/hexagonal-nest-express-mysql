@@ -112,6 +112,7 @@ describe('Security E2E', () => {
       'post',
       '/api/admin/security/unlock-account',
     );
+    describeUnauthorized(() => app, 'get', '/api/admin/security/locks');
   });
 
   describe('GET /api/admin/security/ip-whitelist', () => {
@@ -351,6 +352,172 @@ describe('Security E2E', () => {
       const res = await del(`/api/admin/security/ip-blacklist/${MISSING_ID}`);
 
       expect(res.status).toBe(204);
+    });
+  });
+
+  // ── 帳號鎖定列表 ───────────────────────────
+
+  describe('GET /api/admin/security/locks', () => {
+    /** 建一筆有 lockedAt 的帳號 */
+    const seedLocked = async (
+      email: string,
+      lockedAt: Date,
+      extra: Record<string, unknown> = {},
+    ) =>
+      prisma.memberRecord.create({
+        data: {
+          member: email,
+          email,
+          password: 'x',
+          roleId: adminRoleId,
+          status: true,
+          isDefault: false,
+          failedLoginCount: 3,
+          lockedAt,
+          ...extra,
+        },
+      });
+
+    const minutesAgo = (n: number) => new Date(Date.now() - n * 60 * 1000);
+
+    // 預設 DURATION_MIN 為 15；此 spec 未載入 enable-account-lock，故 flag 為關閉
+    const STILL_LOCKED = 1;
+    const ALREADY_EXPIRED = 60;
+
+    it('預設只回鎖定中的帳號', async () => {
+      await seedLocked('locked@test.com', minutesAgo(STILL_LOCKED));
+      await seedLocked('expired@test.com', minutesAgo(ALREADY_EXPIRED));
+
+      const res = await get('/api/admin/security/locks');
+
+      expect(res.status).toBe(200);
+      const { list } = (
+        res.body as { data: { list: Array<{ email: string; status: string }> } }
+      ).data;
+      expect(list).toHaveLength(1);
+      expect(list[0].email).toBe('locked@test.com');
+      expect(list[0].status).toBe('locked');
+    });
+
+    it('status=expired 回已到期但尚未清除的紀錄', async () => {
+      await seedLocked('locked@test.com', minutesAgo(STILL_LOCKED));
+      await seedLocked('expired@test.com', minutesAgo(ALREADY_EXPIRED));
+
+      const res = await get('/api/admin/security/locks?status=expired');
+
+      const { list } = (
+        res.body as { data: { list: Array<{ email: string; status: string }> } }
+      ).data;
+      expect(list).toHaveLength(1);
+      expect(list[0].email).toBe('expired@test.com');
+      expect(list[0].status).toBe('expired');
+    });
+
+    it('status=all 兩者都回，並帶 unlocksAt', async () => {
+      await seedLocked('locked@test.com', minutesAgo(STILL_LOCKED));
+      await seedLocked('expired@test.com', minutesAgo(ALREADY_EXPIRED));
+
+      const res = await get('/api/admin/security/locks?status=all');
+
+      const { list, meta } = (
+        res.body as {
+          data: {
+            list: Array<{ unlocksAt: string; lockedAt: string }>;
+            meta: { total: number };
+          };
+        }
+      ).data;
+      expect(meta.total).toBe(2);
+      // unlocksAt 一併回傳:管理員要判斷的是「還要等多久」
+      list.forEach((row) => {
+        expect(new Date(row.unlocksAt).getTime()).toBeGreaterThan(
+          new Date(row.lockedAt).getTime(),
+        );
+      });
+    });
+
+    it('search 依 email 模糊過濾', async () => {
+      await seedLocked('alpha@test.com', minutesAgo(STILL_LOCKED));
+      await seedLocked('beta@test.com', minutesAgo(STILL_LOCKED));
+
+      const res = await get('/api/admin/security/locks?search=alph');
+
+      const { list } = (
+        res.body as { data: { list: Array<{ email: string }> } }
+      ).data;
+      expect(list).toHaveLength(1);
+      expect(list[0].email).toBe('alpha@test.com');
+    });
+
+    it('軟刪除的帳號不出現', async () => {
+      await seedLocked('deleted@test.com', minutesAgo(STILL_LOCKED), {
+        deletedAt: new Date(),
+      });
+
+      const res = await get('/api/admin/security/locks?status=all');
+
+      expect(
+        (res.body as { data: { list: unknown[] } }).data.list,
+      ).toHaveLength(0);
+    });
+
+    it('沒有任何鎖定紀錄 → 空 list 與 total 0,不是錯誤', async () => {
+      const res = await get('/api/admin/security/locks');
+
+      expect(res.status).toBe(200);
+      const { list, meta } = (
+        res.body as { data: { list: unknown[]; meta: { total: number } } }
+      ).data;
+      expect(list).toEqual([]);
+      expect(meta.total).toBe(0);
+    });
+
+    it('status 值不合法 → 400', async () => {
+      const res = await get('/api/admin/security/locks?status=unknown');
+
+      expect(res.status).toBe(400);
+    });
+
+    /**
+     * flag 關閉時登入路徑不寫入 lockedAt,清單必然是空的。
+     *
+     * 少了這個旗標,呼叫端分不出「沒有人被鎖」與「根本不會鎖」
+     * ——而那兩件事的意義相反。
+     */
+    it('本 spec 未開啟鎖定功能 → lockEnabled 為 false', async () => {
+      const res = await get('/api/admin/security/locks');
+
+      expect(
+        (res.body as { data: { lockEnabled: boolean } }).data.lockEnabled,
+      ).toBe(false);
+    });
+    /**
+     * role gate 是**粗粒度**的:持有全部 BACKEND:* 權限碼也進不來。
+     * 只驗 401 的話,這條界線可以被整個拿掉而沒有東西變紅。
+     */
+    it('非 SUPERADMIN 即使持有全部權限碼 → 403', async () => {
+      await seedMember(prisma, {
+        email: 'plain@test.com',
+        password: PASSWORD,
+        roleName: '一般管理者',
+        permissionCodes: [
+          'BACKEND:ACCOUNT:VIEW',
+          'BACKEND:ACCOUNT:EDIT',
+          'BACKEND:ROLE:VIEW',
+          'BACKEND:ROLE:EDIT',
+        ],
+      });
+      const login = await request(app.getHttpServer())
+        .post('/api/admin/auth/login')
+        .send({ email: 'plain@test.com', password: PASSWORD });
+      const plainToken = (login.body as { data: { accessToken: string } }).data
+        .accessToken;
+
+      const res = await request(app.getHttpServer())
+        .get('/api/admin/security/locks')
+        .set('Authorization', `Bearer ${plainToken}`);
+
+      expect(res.status).toBe(403);
     });
   });
 

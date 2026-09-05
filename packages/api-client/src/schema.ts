@@ -2249,6 +2249,102 @@ export interface paths {
         };
         trace?: never;
     };
+    "/security/locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查詢帳號鎖定列表
+         * @description 分頁取得有鎖定紀錄的後台帳號（`locked_at` 非空）；支援 email 模糊搜尋與狀態過濾。
+         *     排序依 `lockedAt` 遞減，並排除軟刪除的帳號。
+         *
+         *     到期判定與登入路徑共用同一份規則（`lockedAt` + `APPLICATION_ACCOUNT_LOCK_DURATION_MIN`），
+         *     逐列回傳判定後的 `status` 與 `unlocksAt`，呼叫端不需自行換算。
+         *
+         *     回應的 `lockEnabled` 反映 `APPLICATION_ACCOUNT_LOCK_ENABLED`（預設 `false`）。
+         *     該旗標關閉時登入路徑不會寫入 `locked_at`，清單必然為空——
+         *     **沒有這個值就分不出「沒有人被鎖」與「根本不會鎖」**。
+         *
+         *     需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    limit?: number;
+                    /** @description email 模糊搜尋（contains） */
+                    search?: string;
+                    /**
+                     * @description 鎖定狀態過濾。預設 `locked`（現在還鎖著的）。
+                     *     `expired` 為已超過時效但 `locked_at` 尚未被清除的紀錄——
+                     *     清除發生在下次登入或解鎖時，在那之前這是唯一能查到「今天被鎖過」的地方。
+                     */
+                    status?: "locked" | "expired" | "all";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 查詢成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                list: {
+                                    /** Format: uuid */
+                                    id?: string;
+                                    /** Format: email */
+                                    email?: string;
+                                    member?: string;
+                                    /** Format: date-time */
+                                    lockedAt?: string;
+                                    /**
+                                     * Format: date-time
+                                     * @description 鎖定失效的時間點；管理員要判斷的是「還要等多久」
+                                     */
+                                    unlocksAt?: string;
+                                    failedLoginCount?: number;
+                                    /** @enum {string} */
+                                    status?: "locked" | "expired";
+                                }[];
+                                meta: {
+                                    page?: number;
+                                    limit?: number;
+                                    total?: number;
+                                    totalPages?: number;
+                                };
+                                /** @description 帳號鎖定功能是否啟用；`false` 時清單必然為空 */
+                                lockEnabled: boolean;
+                            };
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["NoToken"];
+                403: components["responses"]["Forbidden"];
+                500: components["responses"]["InternalServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/security/unlock-account": {
         parameters: {
             query?: never;

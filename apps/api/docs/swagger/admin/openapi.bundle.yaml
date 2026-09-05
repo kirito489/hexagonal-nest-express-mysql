@@ -2339,6 +2339,134 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /security/locks:
+    get:
+      tags:
+        - Security
+      summary: 查詢帳號鎖定列表
+      description: |
+        分頁取得有鎖定紀錄的後台帳號（`locked_at` 非空）；支援 email 模糊搜尋與狀態過濾。
+        排序依 `lockedAt` 遞減，並排除軟刪除的帳號。
+
+        到期判定與登入路徑共用同一份規則（`lockedAt` + `APPLICATION_ACCOUNT_LOCK_DURATION_MIN`），
+        逐列回傳判定後的 `status` 與 `unlocksAt`，呼叫端不需自行換算。
+
+        回應的 `lockEnabled` 反映 `APPLICATION_ACCOUNT_LOCK_ENABLED`（預設 `false`）。
+        該旗標關閉時登入路徑不會寫入 `locked_at`，清單必然為空——
+        **沒有這個值就分不出「沒有人被鎖」與「根本不會鎖」**。
+
+        需要 `SUPERADMIN` 角色。需要 JWT Bearer Token 認證。
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: email 模糊搜尋（contains）
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - locked
+              - expired
+              - all
+            default: locked
+          description: |
+            鎖定狀態過濾。預設 `locked`（現在還鎖著的）。
+            `expired` 為已超過時效但 `locked_at` 尚未被清除的紀錄——
+            清除發生在下次登入或解鎖時，在那之前這是唯一能查到「今天被鎖過」的地方。
+      responses:
+        '200':
+          description: 查詢成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - list
+                      - meta
+                      - lockEnabled
+                    properties:
+                      list:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            email:
+                              type: string
+                              format: email
+                            member:
+                              type: string
+                            lockedAt:
+                              type: string
+                              format: date-time
+                            unlocksAt:
+                              type: string
+                              format: date-time
+                              description: 鎖定失效的時間點；管理員要判斷的是「還要等多久」
+                            failedLoginCount:
+                              type: integer
+                            status:
+                              type: string
+                              enum:
+                                - locked
+                                - expired
+                      meta:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+                          total:
+                            type: integer
+                          totalPages:
+                            type: integer
+                      lockEnabled:
+                        type: boolean
+                        description: 帳號鎖定功能是否啟用；`false` 時清單必然為空
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NoToken'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /security/unlock-account:
     post:
       tags:

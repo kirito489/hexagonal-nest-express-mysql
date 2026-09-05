@@ -14,6 +14,7 @@ import { MembersPage } from '@/routes/members/page';
 import { RolesPage } from '@/routes/roles/page';
 import { IpWhitelistPage } from '@/routes/security/ip-whitelist/page';
 import { IpBlacklistPage } from '@/routes/security/ip-blacklist/page';
+import { AccountLocksPage } from '@/routes/security/account-locks/page';
 import { queryClient } from '@/api/query-client';
 import { Toaster } from '@/components/ui/sonner';
 import { ROLE_CODE } from '@/lib/role-codes';
@@ -51,6 +52,14 @@ export const App = () => {
                   element={
                     <RequireRole roleCode={ROLE_CODE.SUPERADMIN}>
                       <IpBlacklistPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/security/account-locks"
+                  element={
+                    <RequireRole roleCode={ROLE_CODE.SUPERADMIN}>
+                      <AccountLocksPage />
                     </RequireRole>
                   }
                 />

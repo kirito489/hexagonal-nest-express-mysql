@@ -3,6 +3,10 @@
  * 聚合在單一檔內：每個 use case 介面都極窄（一個 method），個別檔過於碎片化。
  */
 import { IpBlacklistItem, IpListItem } from '../../../out/security/IpListPort';
+import type {
+  AccountLockFilter,
+  LockedAccountItem,
+} from '../../../out/auth/AccountLockPort';
 
 /** 列表 use case 收的 query（page/limit 可選，service 內套預設） */
 export interface ListIpListQuery {
@@ -97,6 +101,32 @@ export interface UpdateIpBlacklistCommand {
 export interface UpdateIpBlacklistUseCase {
   /** @throws IpListNotFoundException - id 不存在 */
   execute(command: UpdateIpBlacklistCommand): Promise<void>;
+}
+
+// ── 帳號鎖定列表 ──────────────────────────────
+
+export const LIST_ACCOUNT_LOCKS_USE_CASE = 'LIST_ACCOUNT_LOCKS_USE_CASE';
+
+export interface ListAccountLocksQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: AccountLockFilter;
+}
+
+export interface ListAccountLocksResult extends ListIpListResult<LockedAccountItem> {
+  /**
+   * 帳號鎖定功能是否啟用。
+   *
+   * **沒有它，呼叫端分不出「沒有人被鎖」與「根本不會鎖」**，而那兩件事意義相反：
+   * `APPLICATION_ACCOUNT_LOCK_ENABLED` 預設 false，關閉時登入路徑不寫入 `lockedAt`，
+   * 清單於是永遠是空的。
+   */
+  lockEnabled: boolean;
+}
+
+export interface ListAccountLocksUseCase {
+  execute(query: ListAccountLocksQuery): Promise<ListAccountLocksResult>;
 }
 
 // ── 帳號解鎖 ─────────────────────────────────

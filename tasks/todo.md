@@ -22,7 +22,7 @@
 - [x] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions 兩份並存（fork 的人刪一份），前置抽 composite action、版號取自 `.nvmrc` / `packageManager`。
       新增 `ci-parity.spec.ts` 守住「兩份跑同一組檢查 + 同一條資料庫版本線」，**只剩一份時自動放行**。
       **順帶修掉**：GitLab 的 `prepare-production` 原本只在推分支時才建置，改為 MR 也跑——`tsc --noEmit` 抓不到 build 階段的錯誤，只在 push 跑等於「PR 綠、合併完才紅」。守則 23 支 / 106 → 24 支 / 110 項。**待封存**
-- [ ] **C6a `api-account-lock-management`** — 見下方「功能」段既有條目
+- [x] ~~**C6a `api-account-lock-management`**~~ —— 已完成（**範圍比原記載小，見下**）
 - [ ] **C6b `ui-route-permission-guard`** — 路由依權限守衛，sidebar 隱藏不再是唯一防線
 - [ ] **C6c `ui-permission-tree-legibility`** — 權限樹中文化、不可指派的安全管理改純說明列表
 - [ ] **C6d `ui-admin-orientation`** — 後台導覽依管理對象分組、首頁改營運摘要
@@ -39,7 +39,7 @@
 - [x] **C2b `fix-viewless-module-permission`** — `BACKEND:ATTACHMENT:EDIT` 對任何角色都存不進去（前後端各有一個獨立的擋路者）。已修並封存。
 - [x] **PageHeader 共用元件**（nexus `43e2fc4`）：四支列表頁的頁首抽成 `components/PageHeader.tsx` + 5 條測試。純重構，DOM 與 class 零變化。
       刻意**不加守則**擋「頁首必須用它」——明細頁與登入頁沒有這層結構，規則放寬到能容納它們就抓不到真正的偏差，而會誤報的守則會被繞過。判準寫進 `frontend.md`。**待封存**
-- [ ] **帳號鎖定頁版面**（nexus `e674a2a`）：**不單獨搬**，回補 C6a（`api-account-lock-management`）時直接以修正後的版本為藍本。
+- [x] ~~**帳號鎖定頁版面**（nexus `e674a2a`）~~ —— C6a 已回補，且不必再手動對齊：本模板改用 `@/components/PageHeader`，衍生專案那三處偏差（內距、`<div>` 而非 `<header>`、字重）在元件裡沒有可以寫歪的地方。
 
 ### 從 C2 分出來的後續
 
@@ -84,10 +84,12 @@
 
 ### 功能
 
-- **帳號鎖定管理 CRUD（`api-account-lock-management`，即上方 C6a）**：`add-security-ip-list-management` 的 Non-Goals 預留。後端 `GET/POST /api/admin/security/locks`、`DELETE …/:id`（已鎖帳號列表 + 分頁 + 搜尋 / 手動鎖定 / 手動解鎖）；前端 `/security/account-locks` 列表頁，sidebar「安全」group 加第三條。沿用 SUPERADMIN role gate。**衍生專案已實作，回補時以其為藍本**。
-  **前置條件已滿足**（C2 已落地時效，手動解鎖不再是唯一途徑）。
-  **新頁面用 `@/components/PageHeader`，不要照抄既有頁面的頁首**——衍生專案的帳號鎖定頁正是照抄抄歪的那一頁（三處偏差、測試全綠）。
-  另注意兩點：(1) 列表的到期判定必須與 `AccountLockPort.checkLock()` 用同一份規則，自己再算一次會漂移成「列表說鎖著、但那個人登得進去」；(2) `APPLICATION_ACCOUNT_LOCK_ENABLED` **預設 false**，關閉時系統永遠不會產生鎖定紀錄，那一頁會永遠是空的——端點要把開關狀態一起回傳，畫面在關閉時明講「不會有」而非「目前沒有」。
+- [x] ~~**帳號鎖定管理 CRUD（`api-account-lock-management`）**~~ —— 已完成並 archive。
+  **實作範圍比這條原本記載的小，那是刻意的，不是做漏**：只做 `GET /api/admin/security/locks`。
+  - **不做 `DELETE /locks/:id`**（design D1）：與既有 `POST unlock-account` 是同一個動作，只差吃 id 還是 email，而列表本來就拿得到 email。兩支做同一件事的端點會各自演化，呼叫端選錯不會有人發現。
+  - **不做 `POST /locks`（手動鎖定）**（design D2）：管理員按「鎖定」的意圖是「擋住這個人」，拿到的卻是「N 分鐘後自己失效的封鎖」。停用帳號（`status=false`）才是對的工具——不是少一個功能，是給錯工具。
+  - 到期規則抽成 `domain/value-object/AccountLockPolicy.ts`，登入路徑與列表共用（D3）；回應帶 `lockEnabled`（D6）。
+  - **⏸ 待實機確認**：前端 `/security/account-locks` 的畫面（需 `pnpm dev`）——flag 關閉時的停用提示與空狀態文案、狀態過濾的網址同步、解鎖對話框對已到期列的補充說明。後端與資料層兩種 flag 狀態都已有 e2e 覆蓋。
 
 ### 技術債（外部相依卡住，延後）
 

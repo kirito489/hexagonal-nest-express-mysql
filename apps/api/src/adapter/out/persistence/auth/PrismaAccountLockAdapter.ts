@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import {
+  AccountLockListQuery,
   AccountLockPort,
   AccountLockStatus,
+  LockedAccountItem,
 } from '@app/application/port/out/auth/AccountLockPort';
 import { RedisService } from '@app/infrastructure/redis/redis.service';
 import { buildFailedLoginKey } from '@app/infrastructure/redis/cache-keys';
 import { getEnv } from '@app/infrastructure/validate-env';
 import { normalizeEmail } from '@app/shared/utils/normalize-email';
+import {
+  lockExpiresAt,
+  lockedSinceCutoff,
+  resolveLockStatus,
+} from '@app/domain/value-object/AccountLockPolicy';
 
 /**
  * 帳號鎖定 Adapter：
@@ -81,14 +88,73 @@ export class PrismaAccountLockAdapter implements AccountLockPort {
       select: { lockedAt: true },
     });
 
-    if (!record?.lockedAt) return 'NONE';
+    return resolveLockStatus(
+      record?.lockedAt,
+      getEnv().APPLICATION_ACCOUNT_LOCK_DURATION_MIN,
+      new Date(),
+    );
+  }
 
-    // 到期時間即時算出，不另存欄位——調整設定要能立刻反映在既有的鎖定紀錄上
-    const durationMs =
-      getEnv().APPLICATION_ACCOUNT_LOCK_DURATION_MIN * 60 * 1000;
-    const unlocksAt = record.lockedAt.getTime() + durationMs;
+  async listLocked(
+    query: AccountLockListQuery,
+  ): Promise<{ list: LockedAccountItem[]; total: number }> {
+    const durationMin = getEnv().APPLICATION_ACCOUNT_LOCK_DURATION_MIN;
+    const now = new Date();
+    const cutoff = lockedSinceCutoff(durationMin, now);
 
-    return Date.now() >= unlocksAt ? 'EXPIRED' : 'LOCKED';
+    // 同一條到期規則換算成 SQL 的範圍條件——逐列呼叫 checkLock 會是 N+1。
+    // 鎖定中用 gt（非 gte）：剛好滿時效算到期，與 resolveLockStatus 的邊界一致
+    const lockedAtFilter =
+      query.status === 'locked'
+        ? { gt: cutoff }
+        : query.status === 'expired'
+          ? { lte: cutoff }
+          : { not: null };
+
+    const where = {
+      deletedAt: null,
+      lockedAt: lockedAtFilter,
+      ...(query.search ? { email: { contains: query.search } } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.memberRecord.findMany({
+        where,
+        orderBy: { lockedAt: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        select: {
+          id: true,
+          email: true,
+          member: true,
+          failedLoginCount: true,
+          lockedAt: true,
+        },
+      }),
+      this.prisma.memberRecord.count({ where }),
+    ]);
+
+    return {
+      total,
+      list: rows.flatMap((row) => {
+        // select 出來的 lockedAt 型別仍是 nullable；where 已排除 null，這裡只是收斂型別
+        if (!row.lockedAt) return [];
+        return [
+          {
+            id: row.id,
+            email: row.email,
+            member: row.member,
+            failedLoginCount: row.failedLoginCount,
+            lockedAt: row.lockedAt,
+            unlocksAt: lockExpiresAt(row.lockedAt, durationMin),
+            status:
+              resolveLockStatus(row.lockedAt, durationMin, now) === 'LOCKED'
+                ? ('locked' as const)
+                : ('expired' as const),
+          },
+        ];
+      }),
+    };
   }
 
   async lockAccount(email: string): Promise<void> {

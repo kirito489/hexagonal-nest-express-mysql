@@ -17,7 +17,10 @@ import {
   IpBlacklistItem,
   IpListItem,
 } from '@app/application/port/out/security/IpListPort';
-import { ListIpListResult } from '@app/application/port/in/admin/security/SecurityUseCases';
+import {
+  ListAccountLocksResult,
+  ListIpListResult,
+} from '@app/application/port/in/admin/security/SecurityUseCases';
 import { RolesGuard } from '../../guard/RolesGuard';
 import { Roles } from '../../decorator/roles.decorator';
 import { RoleCode } from '@app/domain/value-object/Role';
@@ -27,6 +30,10 @@ import {
 } from '../../decorator/current-member.decorator';
 import { ZodValidationPipe } from '@app/infrastructure/zod-validation.pipe';
 import { listIpListQuerySchema, ListIpListQuery } from './ListIpListQuery';
+import {
+  listAccountLocksQuerySchema,
+  ListAccountLocksQuery,
+} from './ListAccountLocksQuery';
 import {
   AddIpWhitelistRequest,
   addIpWhitelistSchema,
@@ -159,6 +166,16 @@ export class SecurityController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.securityFacade.removeFromBlacklist(id);
+  }
+
+  // ── 帳號鎖定 ─────────────────────────────────
+
+  @Get('locks')
+  listAccountLocks(
+    @Query(new ZodValidationPipe(listAccountLocksQuerySchema))
+    query: ListAccountLocksQuery,
+  ): Promise<ListAccountLocksResult> {
+    return this.securityFacade.listAccountLocks(query);
   }
 
   // ── 帳號解鎖 ─────────────────────────────────

@@ -20,6 +20,9 @@ import {
   AddIpWhitelistUseCase,
   GetIpBlacklistUseCase,
   GetIpWhitelistUseCase,
+  ListAccountLocksQuery,
+  ListAccountLocksResult,
+  ListAccountLocksUseCase,
   ListIpBlacklistUseCase,
   ListIpListQuery,
   ListIpListResult,
@@ -39,6 +42,7 @@ import {
 import { EmailNotFoundException } from '@app/domain/exception/EmailNotFoundException';
 import { AccountNotLockedException } from '@app/domain/exception/AccountNotLockedException';
 import { IpListNotFoundException } from '@app/domain/exception/IpListNotFoundException';
+import { getEnv } from '@app/infrastructure/validate-env';
 
 // ── IP 白名單 ────────────────────────────────
 
@@ -168,6 +172,30 @@ export class UpdateIpBlacklistService implements UpdateIpBlacklistUseCase {
 }
 
 // ── 帳號解鎖 ─────────────────────────────────
+
+@Injectable()
+export class ListAccountLocksService implements ListAccountLocksUseCase {
+  constructor(
+    @Inject(ACCOUNT_LOCK_PORT) private readonly accountLock: AccountLockPort,
+  ) {}
+
+  async execute(query: ListAccountLocksQuery): Promise<ListAccountLocksResult> {
+    const { page, limit } = getPagination(query);
+    const { list, total } = await this.accountLock.listLocked({
+      page,
+      limit,
+      search: query.search?.trim() || undefined,
+      status: query.status ?? 'locked',
+    });
+
+    return {
+      list,
+      meta: buildPaginationMeta(page, limit, total),
+      // 沒有這個值，呼叫端分不出「沒有人被鎖」與「根本不會鎖」——flag 關閉時清單必然是空的
+      lockEnabled: getEnv().APPLICATION_ACCOUNT_LOCK_ENABLED,
+    };
+  }
+}
 
 @Injectable()
 export class UnlockAccountService implements UnlockAccountUseCase {
