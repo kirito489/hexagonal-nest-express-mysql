@@ -30,6 +30,12 @@
 
 ## 待辦
 
+### 從衍生專案再撈的（2026-09-06 盤點，nexus 多出三支 commit）
+
+- [x] **C2b `fix-viewless-module-permission`** — `BACKEND:ATTACHMENT:EDIT` 對任何角色都存不進去（前後端各有一個獨立的擋路者）。已修並封存。
+- [ ] **PageHeader 共用元件**（nexus `43e2fc4`）：列表頁的頁首抽成 `components/PageHeader.tsx` + 測試，模板有 4 支列表頁適用（members / roles / security/ip-blacklist / ip-whitelist）。附 `platform-frontend-conventions` 的 spec delta。純前端重構，風險低。
+- [ ] **帳號鎖定頁版面**（nexus `e674a2a`）：**不單獨搬**，回補 C6a（`api-account-lock-management`）時直接以修正後的版本為藍本。
+
 ### 從 C2 分出來的後續
 
 - **守則應涵蓋「`.env.example` 真的能通過 `envSchema`」**：目前 `env-schema.spec.ts` 只檢查「程式用到的變數有沒有宣告」，**沒有任何東西把範例檔餵進 `envSchema` 跑一次**。這個缺口在 C2 收尾時親自踩到——`SWAGGER_ENABLED=`（留空）會被 `.optional()` 判定為不合法，任何照抄範例檔的新部署都會啟動失敗，而開發機因為本機 `.env` 沒有那一行所以完全無感。同一次比對還抓出四個長期缺漏的變數（`LOG_PURGE_ENABLED` / `LOG_RETENTION_DAYS` / `LOG_PURGE_CRON` / `THROTTLE_FAIL_OPEN`）。**新守則要做兩件事**：(1) `envSchema` 宣告的變數與範例檔的鍵集合完全相等；(2) 把範例檔 parse 後（必填項補假值）餵進 `envSchema`，必須通過。建議併進 C3。
@@ -45,7 +51,22 @@
 
 ### 觀察中
 
-- **e2e 有間歇性失敗（已發生 2 次，仍無法重現）**：2026-08-14 一次（`1 failed / 137 passed`）、2026-08-16 一次（`1 failed / 143 passed`）。兩次都在重跑後全綠，連跑 5 次亦全綠。**兩次的共同點是「緊接在另一個會寫檔案的指令之後的第一次執行」**（一次接在 `pnpm test` 後、一次接在 `lint:fix` 後）——懷疑與 ts-jest 快取或檔案 mtime 有關，但未證實。已排除的可能：各 spec 的 DB 隔離正常（不碰 DB 的 3 支之外都有 `beforeEach resetDb`）。**下次務必用 `test:e2e > /tmp/x.log 2>&1` 保留完整輸出**——兩次都因為用 grep 管線過濾而沒留下失敗的測試名稱，這是查不下去的主因。
+- **e2e 有間歇性失敗（已發生 3 次）**：2026-08-14（`1 failed / 137 passed`）、2026-08-16（`1 failed / 143 passed`）、**2026-09-06（`1 failed / 161 passed`）**。三次都在重跑後全綠（第三次連跑 3 次皆綠）。**共同點是「緊接在另一個會寫檔案的指令之後的第一次執行」**——前兩次接在 `pnpm test` / `lint:fix` 後，第三次接在 `pnpm test:cov` 後。懷疑與 ts-jest 快取或檔案 mtime 有關，但未證實。已排除：各 spec 的 DB 隔離正常。
+
+  **第三次終於留下了失敗的測試名稱與症狀**（前兩次因 grep 過濾而遺失，這是先前查不下去的主因）：
+
+  ```
+  ● Role E2E › GET /api/admin/roles › 無 token → 401
+    Expected: 401
+    Received: 404
+  ```
+
+  **關鍵新線索：症狀是 404 而不是授權失敗。** 404 代表那個請求根本沒有匹配到路由，
+  與 JWT / guard 完全無關——所以先前「懷疑 DB 隔離或 token 汙染」的方向可以排除。
+  可能的方向：`ServeStaticModule` 的 SPA fallback 在某些時序下攔截了 `/api/*`
+  （`serve-static.e2e-spec.ts` 會在 tmpdir 建 `index.html` fixture），
+  或 app 尚未完成 `init()` 就收到請求。下次再發生時**優先確認當下 `WEB_STATIC_ROOT`
+  指向的 fixture 是否存在**，以及失敗的是不是同一支 spec。
 
 - **剩餘 77 個傳遞依賴漏洞**：2026-08-14 已把能直接控制的修完（overrides 機制修復 + js-yaml / vite / nodemailer 升級，85 → 77）。剩下的皆深埋在 `prisma` / `@nestjs/terminus` 等上游相依樹中（含 2 個 critical：`shell-quote`、`websocket-driver`），**刻意不加 override 強制提版**——相容風險大於收益，模板穩定性優先。追蹤方式：定期 `pnpm audit`，待上游更新後再跑一次升級；若某漏洞出現實際可利用的攻擊面，再單獨評估。
 

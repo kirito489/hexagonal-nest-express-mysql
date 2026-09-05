@@ -11,9 +11,7 @@
 
 前端畫面行為見 `ui-role-management`。Swagger 與 `@app/api-client` 的同步義務由
 `platform-api-client-generation` 統一規範，本 spec 不逐條重述。
-
 ## Requirements
-
 ### Requirement: 角色列表查詢
 
 `GET /api/admin/roles` SHALL 以分頁回傳角色清單，支援名稱模糊搜尋與啟用狀態過濾，
@@ -181,8 +179,20 @@ permission，供角色建立／編輯 Modal 的權限勾選樹使用。MUST 要�
 
 `POST /api/admin/roles` SHALL 建立角色並指派權限，成功回 `201` 與新角色 ID。
 MUST 要求 `BACKEND:ROLE:EDIT`。角色名稱 MUST 唯一（比對未軟刪除者）。
-`permissionCodes` 的每個值 MUST 存在於權限目錄，且 **EDIT 類權限 MUST 搭配同模組的
-VIEW 權限**——只能編輯卻看不到的組合無意義，MUST 於此擋下。
+`permissionCodes` 的每個值 MUST 存在於權限目錄。
+
+**EDIT 類權限 MUST 搭配同模組的 VIEW 權限——但這條規則只在該模組確實提供 VIEW 時成立。**
+只能編輯卻看不到的組合無意義，MUST 於此擋下；然而權限目錄中**允許存在只有 EDIT 的模組**
+（例如附件：上傳與刪除都是寫入操作，沒有「只能看」的場景），
+對這類模組無條件要求 VIEW 會索取一個目錄裡不存在的碼，
+使該權限**永遠不可能被指派給任何角色**——它存在、畫得出來、就是存不進去。
+
+判斷 MUST 依權限目錄而非字串推導。驗證流程本來就要查目錄確認每個碼存在，
+一次把要求的 VIEW 碼一併查即可回答「它存不存在」。
+**「碼不存在」的判定 MUST 只針對呼叫端實際送出的碼**——衍生的 VIEW 碼查不到是正常情況，
+那正是要偵測的東西，不得計入 `INVALID_PERMISSION_CODE`。
+
+同一條規則適用於「更新角色」；該需求的失敗清單只列錯誤碼，規範性敘述以本條為準。
 
 **Request**（body，`name` 必填）：
 
@@ -210,7 +220,7 @@ VIEW 權限**——只能編輯卻看不到的組合無意義，MUST 於此擋�
 
 - `400`：`name` 長度不合法
 - `400`、`code: "INVALID_PERMISSION_CODE"`：`permissionCodes` 含不存在的權限碼
-- `400`、`code: "INVALID_PERMISSION_COMBINATION"`：有 EDIT 但缺同模組的 VIEW
+- `400`、`code: "INVALID_PERMISSION_COMBINATION"`：有 EDIT 但缺同模組的 VIEW（僅限該模組也提供 VIEW 時）
 - `401`、`code: "UNAUTHORIZED"`：未帶或無效 Token
 - `403`、`code: "FORBIDDEN"`：缺 `BACKEND:ROLE:EDIT`
 - `409`、`code: "DUPLICATE_ROLE_NAME"`：角色名稱已存在
@@ -232,8 +242,18 @@ VIEW 權限**——只能編輯卻看不到的組合無意義，MUST 於此擋�
 
 #### Scenario: EDIT 未搭配 VIEW
 
-- **WHEN** `permissionCodes` 含 `BACKEND:ACCOUNT:EDIT` 但不含 `BACKEND:ACCOUNT:VIEW`
+- **WHEN** `permissionCodes` 含 `BACKEND:ACCOUNT:EDIT` 但不含 `BACKEND:ACCOUNT:VIEW`，而該模組有提供 VIEW
 - **THEN** 回 `400`、`code: "INVALID_PERMISSION_COMBINATION"`，不建立
+
+#### Scenario: 只有 EDIT 的模組不套用蘊含規則
+
+- **WHEN** `permissionCodes` 含 `BACKEND:ATTACHMENT:EDIT`，而權限目錄中沒有 `BACKEND:ATTACHMENT:VIEW`
+- **THEN** 回 `201` 建立成功，MUST NOT 回 `INVALID_PERMISSION_COMBINATION`
+
+#### Scenario: 指派目錄中全部的權限
+
+- **WHEN** `permissionCodes` 為權限目錄的完整清單
+- **THEN** 回 `201` 建立成功——只要目錄本身合法，全選就必須是一個合法的組合
 
 #### Scenario: 不指派任何權限
 
@@ -351,3 +371,4 @@ MUST 要求 `BACKEND:ROLE:EDIT`。
 
 - **WHEN** 對已軟刪除的角色再次呼叫
 - **THEN** 回 `404`、`code: "ROLE_NOT_FOUND"`
+

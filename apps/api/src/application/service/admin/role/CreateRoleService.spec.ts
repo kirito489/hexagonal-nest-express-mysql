@@ -74,8 +74,12 @@ describe('CreateRoleService', () => {
 
   it('EDIT 缺同模組 VIEW → 拋 InvalidPermissionCombinationException', async () => {
     (mockRoleRepo.findByName as jest.Mock).mockResolvedValue(null);
+    // 目錄裡 ROLE 兩者都有——只回 EDIT 的話，驗證器會把它當成「刻意只有 EDIT
+    // 的模組」而跳過蘊含規則，於是這條測試會以「沒有拋例外」的形式假綠。
+    // mock 必須反映真實目錄，否則驗的是一個不存在的世界。
     (mockPermissionRepo.findByCodes as jest.Mock).mockResolvedValue([
       permRecord('BACKEND:ROLE:EDIT'),
+      permRecord('BACKEND:ROLE:VIEW'),
     ]);
 
     await expect(

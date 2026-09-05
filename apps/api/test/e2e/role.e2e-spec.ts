@@ -2,13 +2,19 @@ import request from 'supertest';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { createE2EApp, createMockRedis } from '../setup/test-app';
-import { resetDb, seedMember, seedRole } from '../helpers/db';
+import {
+  ensurePermissions,
+  resetDb,
+  seedMember,
+  seedRole,
+} from '../helpers/db';
 import {
   expectApiError,
   expectUnauthorized,
   describeUnauthorized,
 } from '../helpers/assertions';
 import { ResponseCodes } from '@app/shared/constants/response-codes';
+import { ALL_PERMISSION_CODES } from '@app/shared/constants/permissions';
 
 // 走真 test DB:beforeEach seed 一個帶 BACKEND:ROLE:VIEW/EDIT 的 admin 並登入取 token；
 // 目標角色以 seedRole 建，斷言查真 DB。列表含 admin 自身的角色，故用「包含」語意。
@@ -186,6 +192,36 @@ describe('Role E2E', () => {
       });
 
       expectApiError(res, 400, ResponseCodes.INVALID_PERMISSION_COMBINATION);
+    });
+
+    // 附件刻意只有 EDIT（上傳與刪除都是寫入操作，沒有「只能看」的場景）。
+    // 無條件套用蘊含規則會索取一個目錄裡不存在的碼，
+    // 讓這個權限永遠不可能被指派——它存在、畫得出來、就是存不進去。
+    it('只有 EDIT 的模組不套用蘊含規則 → 201', async () => {
+      // 測試庫的 permissions 表只有 beforeEach seed 進去的那幾個碼，
+      // 附件的碼要先存在才驗得到「蘊含規則」——否則擋下它的是
+      // INVALID_PERMISSION_CODE，那是另一回事
+      await ensurePermissions(prisma, ['BACKEND:ATTACHMENT:EDIT']);
+
+      const res = await post('/api/admin/roles', {
+        name: '附件管理者',
+        permissionCodes: ['BACKEND:ATTACHMENT:EDIT'],
+      });
+
+      expect(res.status).toBe(201);
+    });
+
+    // 最有價值的回歸測試：只要目錄本身合法，全選就必須是合法組合。
+    // 下一個「只有 EDIT 的模組」加進目錄時，它會自動守住。
+    it('指派目錄中全部的權限 → 201', async () => {
+      await ensurePermissions(prisma, [...ALL_PERMISSION_CODES]);
+
+      const res = await post('/api/admin/roles', {
+        name: '全權限角色',
+        permissionCodes: [...ALL_PERMISSION_CODES],
+      });
+
+      expect(res.status).toBe(201);
     });
   });
 
