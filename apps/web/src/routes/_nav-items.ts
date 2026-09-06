@@ -33,17 +33,17 @@ export const NAV_ITEMS: NavItem[] = [
 
   // 使用者與權限
   {
-    label: '會員管理',
+    label: '管理者帳號',
     path: '/members',
     icon: Users,
-    group: '使用者與權限',
+    group: '管理者與權限',
     requiredPermission: PERMISSION_CODE.ACCOUNT_VIEW,
   },
   {
     label: '角色管理',
     path: '/roles',
     icon: Shield,
-    group: '使用者與權限',
+    group: '管理者與權限',
     requiredPermission: PERMISSION_CODE.ROLE_VIEW,
   },
 

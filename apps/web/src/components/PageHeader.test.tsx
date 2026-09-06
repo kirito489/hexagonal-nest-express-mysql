@@ -13,7 +13,7 @@ describe('PageHeader', () => {
   });
 
   it('沒有副標時不渲染空的段落', () => {
-    const { container } = render(<PageHeader title="會員管理" />);
+    const { container } = render(<PageHeader title="管理者帳號" />);
 
     expect(container.querySelector('p')).toBeNull();
   });
@@ -55,8 +55,8 @@ describe('PageHeader', () => {
   });
 
   it('標題一律是 h1（給讀屏與大綱用）', () => {
-    const { container } = render(<PageHeader title="會員管理" />);
+    const { container } = render(<PageHeader title="管理者帳號" />);
 
-    expect(container.querySelector('h1')?.textContent).toBe('會員管理');
+    expect(container.querySelector('h1')?.textContent).toBe('管理者帳號');
   });
 });

@@ -22,7 +22,7 @@ export const PLATFORM_LABELS: Readonly<Record<string, string>> = {
 };
 
 export const MODULE_LABELS: Readonly<Record<string, string>> = {
-  ACCOUNT: '帳號管理',
+  ACCOUNT: '管理者帳號',
   ROLE: '角色管理',
   // 目前沒有任何後台頁面在用 BACKEND:ATTACHMENT:EDIT（端點在 AttachmentController，
   // apps/web 還沒有附件頁），所以勾了看不出差別。**不從權限樹移除**：它確實在保護

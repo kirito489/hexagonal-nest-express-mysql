@@ -1326,7 +1326,7 @@ export interface paths {
          * 單筆角色選項（fallback）
          * @description 帳號編輯 Modal 的「角色」Combobox 在「現有 roleId 不在分頁第一頁」時 fallback 取用。
          *     與 `GET /api/roles/:id` 區隔：本 endpoint 給「會員」場景，只回 `{ id, name, isDefault }`，
-         *     且只需要 `BACKEND:ACCOUNT:VIEW` 權限，方便沒有 `BACKEND:ROLE:VIEW` 的會員管理者使用。
+         *     且只需要 `BACKEND:ACCOUNT:VIEW` 權限，方便只負責管理帳號、沒有 `BACKEND:ROLE:VIEW` 的人使用。
          *     軟刪除或 status=false 的角色一律回 404。
          */
         get: {

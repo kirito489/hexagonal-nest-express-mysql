@@ -5,7 +5,7 @@ import { moduleLabel, platformLabel } from './permission-labels';
 describe('permission-labels', () => {
   it('有對照時回中文名', () => {
     expect(platformLabel('BACKEND')).toBe('後台');
-    expect(moduleLabel('ACCOUNT')).toBe('帳號管理');
+    expect(moduleLabel('ACCOUNT')).toBe('管理者帳號');
     expect(moduleLabel('ROLE')).toBe('角色管理');
   });
 
@@ -20,7 +20,7 @@ describe('permission-labels', () => {
 
   it('用語與側邊欄一致', () => {
     // 兩處不同的用語等於要指派權限的人自己做一次翻譯
-    expect(moduleLabel('ACCOUNT')).toBe('帳號管理');
+    expect(moduleLabel('ACCOUNT')).toBe('管理者帳號');
     expect(moduleLabel('ROLE')).toBe('角色管理');
   });
 });

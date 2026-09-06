@@ -27,10 +27,14 @@
   ⚠️ **`RequireRole` 有行為變更**：非 SUPERADMIN 存取 `/security/*` 從「靜默導回首頁」改為「就地顯示『沒有存取權限』並標出缺少的角色碼」。代價是洩漏了「這個頁面存在」，是知情取捨（design D3）——sidebar 本來就藏著它，而會手動輸入該網址的人已經知道它存在了。
   ⏸ **待實機確認**：以非 SUPERADMIN 手動輸入 `/security/*` 與 `/members`，確認顯示說明而非彈回首頁（需 `pnpm dev`）。
 - [x] ~~**C6c `ui-permission-tree-legibility`**~~ —— 已完成。權限樹群組標題中文化（`permission-labels.ts`）、項目改顯示動作名、新增「安全管理」不可指派區塊（無 checkbox），並把「隱藏 vs disabled」寫成明文規則。守則加兩條到 `permission-codes-sync.spec.ts`（中文對照雙向比對、`SecurityController` 仍有 `@Roles(SUPERADMIN)`）。
-  **範圍比藍本小**：不改 `PERMISSION_CATALOG` 的 `name`——藍本改它是因為它自己的側邊欄改名而目錄沒跟上，本模板兩邊本來就一致，照抄只會多一次不必要的 `db:seed`。
-  ⚠️ **給 C6d 的提醒**：若 `ui-admin-orientation` 改了側邊欄用語，**`MODULE_LABELS` 與 `PERMISSION_CATALOG.name` 都要一起改**，否則會在本模板複製出藍本那個漂移。守則擋得住「對照缺漏」，**擋不住「兩邊都在但用詞不同」**。
+  ~~**範圍比藍本小**：不改 `PERMISSION_CATALOG` 的 `name`——本模板兩邊本來就一致~~ ⚠️ **那句話是錯的**：當時只比對了 `PERMISSION_CATALOG` 與 `MODULE_LABELS`，**沒看 sidebar 的 label**——sidebar 寫的是「會員管理」，而目錄寫「後台-帳號管理」，模板早就處在漂移狀態。已由 C6d 統一為「管理者帳號」（四處全改，含 `name`）。
+  ✅ 給 C6d 的提醒已執行：四處用字統一。守則擋得住「對照缺漏」，**擋不住「兩邊都在但用詞不同」**——這次正是靠人比對才發現的。
   ⏸ **待實機確認**：權限樹的中文標題與不可指派區塊（需 `pnpm dev`）。
-- [ ] **C6d `ui-admin-orientation`** — 後台導覽依管理對象分組、首頁改營運摘要
+- [x] ~~**C6d `ui-admin-orientation`**~~ —— 已完成。命名統一為「管理者帳號」（sidebar / 頁面標題 / 權限樹 / `PERMISSION_CATALOG` 四處）、sidebar 分組「使用者與權限」→「管理者與權限」、首頁拿掉佔位文字並新增 `ui-home` capability。
+  **範圍與藍本不同**：不新增前台會員管理——藍本的分組問題來自它有兩個帳號體系，本模板前台側只有 `ping`。首頁也不做營運摘要：模板沒有任何統計端點，硬做的數字是騙人的。
+  ⚠️ **待你執行**：`PERMISSION_CATALOG` 的 `name` 改了，**部署需重跑 `pnpm --filter @app/api db:seed`**。本機無法代跑——`hexagonal_express_db` 這個 dev 庫在這台機器上不存在（`prisma migrate status` 回 `P1003`），e2e 能跑是因為它自己建 `*_test` 庫。你的環境要先有 dev 庫（`pnpm docker:up` 或 `db:migrate`）才跑得了 seed。
+  **忘了跑的症狀**：權限樹群組標題顯示「管理者帳號」，項目名卻還是「後台-帳號管理-檢視」——項目名讀的是 DB 的值。
+  ⏸ **待實機確認**：sidebar 分組、四處用字一致、首頁（需 `pnpm dev`）。
 - [ ] **C6e `api-front-auth`** — 前台註冊 / 信箱驗證 / 密碼重設（模板 front 端目前只有 `ping`，唯一從零到有的一支，最後做）
 
 **共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。

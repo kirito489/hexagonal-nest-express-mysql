@@ -167,7 +167,7 @@ export const MembersPage = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="會員管理" description="管理後台帳號、角色指派與啟用狀態">
+      <PageHeader title="管理者帳號" description="管理可登入後台的帳號、角色指派與啟用狀態">
         <Button disabled={!canEdit} onClick={() => setCreateOpen(true)}>
           <Plus />
           新增會員

@@ -34,7 +34,7 @@ describe('PermissionsField 的可讀性', () => {
     renderField();
 
     expect(screen.getAllByText('後台').length).toBeGreaterThan(0);
-    expect(screen.getByText('帳號管理')).toBeInTheDocument();
+    expect(screen.getByText('管理者帳號')).toBeInTheDocument();
     expect(screen.queryByText('BACKEND')).not.toBeInTheDocument();
     expect(screen.queryByText('ACCOUNT')).not.toBeInTheDocument();
   });
