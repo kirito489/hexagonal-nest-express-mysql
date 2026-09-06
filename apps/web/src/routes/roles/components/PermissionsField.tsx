@@ -14,6 +14,8 @@ import {
   type PermissionItem,
   type ModuleGroup,
 } from '../lib/group-permissions';
+import { moduleLabel, platformLabel } from '../lib/permission-labels';
+import { UNASSIGNABLE_GROUP } from '../lib/unassignable-permissions';
 
 type PermissionsFieldProps = {
   value: string[];
@@ -44,10 +46,6 @@ export const PermissionsField = ({
         <Skeleton className="h-24 w-full" />
       </div>
     );
-  }
-
-  if (groups.length === 0) {
-    return <p className="text-muted-foreground text-sm">尚無可指派的權限</p>;
   }
 
   // 對 selected 做變動：clone → 變動 → sort → onChange，三個 toggle 共用這個樣板
@@ -92,10 +90,13 @@ export const PermissionsField = ({
 
   return (
     <div className="max-h-[60vh] space-y-4 overflow-auto rounded-md border p-3">
+      {groups.length === 0 && (
+        <p className="text-muted-foreground text-sm">尚無可指派的權限</p>
+      )}
       {groups.map((platform) => (
         <div key={platform.platform} className="space-y-2">
-          <div className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-            {platform.platform}
+          <div className="text-muted-foreground text-xs font-medium tracking-wide">
+            {platformLabel(platform.platform)}
           </div>
           <div className="space-y-2">
             {platform.modules.map((g) => {
@@ -107,10 +108,11 @@ export const PermissionsField = ({
               const allChecked =
                 (!view || viewChecked) && (!edit || editChecked);
               const viewLocked = isViewLockedByEdit(g, selected);
+              const label = moduleLabel(g.module);
               return (
                 <div key={g.module} className="rounded-sm border bg-card p-2">
                   <div className="flex items-center justify-between gap-2 border-b pb-1.5 mb-2">
-                    <div className="text-sm font-medium">{g.module}</div>
+                    <div className="text-sm font-medium">{label}</div>
                     <Button
                       type="button"
                       size="sm"
@@ -130,9 +132,9 @@ export const PermissionsField = ({
                               <Checkbox
                                 checked={true}
                                 disabled
-                                aria-label={`${g.module} 檢視（已鎖定）`}
+                                aria-label={`${label} 檢視（已鎖定）`}
                               />
-                              <span>{view.name}</span>
+                              <span>檢視</span>
                             </label>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -147,9 +149,9 @@ export const PermissionsField = ({
                             onCheckedChange={(checked) =>
                               toggleCode(view.permissionCode, checked === true)
                             }
-                            aria-label={`${g.module} 檢視`}
+                            aria-label={`${label} 檢視`}
                           />
-                          <span>{view.name}</span>
+                          <span>檢視</span>
                         </label>
                       )
                     ) : null}
@@ -161,9 +163,9 @@ export const PermissionsField = ({
                           onCheckedChange={(checked) =>
                             toggleEdit(g, checked === true)
                           }
-                          aria-label={`${g.module} 編輯`}
+                          aria-label={`${label} 編輯`}
                         />
-                        <span>{edit.name}</span>
+                        <span>編輯</span>
                       </label>
                     ) : null}
                   </div>
@@ -173,6 +175,41 @@ export const PermissionsField = ({
           </div>
         </div>
       ))}
+      {/*
+        後台有這三頁、權限設定裡卻找不到——不畫出來的話使用者會合理地判斷成
+        「權限漏設了」。顯示成不可指派則當場回答了那個問題。
+
+        **刻意不用 disabled 的 checkbox**：那仍在說「這是一個可以勾的東西，
+        只是你現在不能勾」，而它對任何人都不能勾
+      */}
+      <div className="space-y-2">
+        <div className="text-muted-foreground text-xs font-medium tracking-wide">
+          {platformLabel('BACKEND')}
+        </div>
+        <div className="bg-muted/40 rounded-sm border border-dashed p-2">
+          <div className="mb-2 flex items-center gap-2 border-b pb-1.5">
+            <div className="text-sm font-medium">
+              {UNASSIGNABLE_GROUP.module}
+            </div>
+            <span className="text-muted-foreground rounded border px-1.5 py-0.5 text-xs">
+              {UNASSIGNABLE_GROUP.badge}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1 pl-1">
+            <p className="text-muted-foreground text-sm">
+              {UNASSIGNABLE_GROUP.note}
+            </p>
+            <ul className="text-muted-foreground list-inside list-disc text-sm">
+              {UNASSIGNABLE_GROUP.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {UNASSIGNABLE_GROUP.reason}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

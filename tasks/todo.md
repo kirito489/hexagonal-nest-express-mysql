@@ -26,7 +26,10 @@
 - [x] ~~**C6b `ui-route-permission-guard`**~~ —— 已完成。`/members` 與 `/roles` 掛上 `RequirePermission`（先前完全沒守衛，只靠 sidebar 隱藏）；權限碼型別化為 `apps/web/src/lib/permission-codes.ts`；新增 `permission-codes-sync.spec.ts`（前端碼須存在於後端目錄、路由與 sidebar 宣告須一致）。
   ⚠️ **`RequireRole` 有行為變更**：非 SUPERADMIN 存取 `/security/*` 從「靜默導回首頁」改為「就地顯示『沒有存取權限』並標出缺少的角色碼」。代價是洩漏了「這個頁面存在」，是知情取捨（design D3）——sidebar 本來就藏著它，而會手動輸入該網址的人已經知道它存在了。
   ⏸ **待實機確認**：以非 SUPERADMIN 手動輸入 `/security/*` 與 `/members`，確認顯示說明而非彈回首頁（需 `pnpm dev`）。
-- [ ] **C6c `ui-permission-tree-legibility`** — 權限樹中文化、不可指派的安全管理改純說明列表
+- [x] ~~**C6c `ui-permission-tree-legibility`**~~ —— 已完成。權限樹群組標題中文化（`permission-labels.ts`）、項目改顯示動作名、新增「安全管理」不可指派區塊（無 checkbox），並把「隱藏 vs disabled」寫成明文規則。守則加兩條到 `permission-codes-sync.spec.ts`（中文對照雙向比對、`SecurityController` 仍有 `@Roles(SUPERADMIN)`）。
+  **範圍比藍本小**：不改 `PERMISSION_CATALOG` 的 `name`——藍本改它是因為它自己的側邊欄改名而目錄沒跟上，本模板兩邊本來就一致，照抄只會多一次不必要的 `db:seed`。
+  ⚠️ **給 C6d 的提醒**：若 `ui-admin-orientation` 改了側邊欄用語，**`MODULE_LABELS` 與 `PERMISSION_CATALOG.name` 都要一起改**，否則會在本模板複製出藍本那個漂移。守則擋得住「對照缺漏」，**擋不住「兩邊都在但用詞不同」**。
+  ⏸ **待實機確認**：權限樹的中文標題與不可指派區塊（需 `pnpm dev`）。
 - [ ] **C6d `ui-admin-orientation`** — 後台導覽依管理對象分組、首頁改營運摘要
 - [ ] **C6e `api-front-auth`** — 前台註冊 / 信箱驗證 / 密碼重設（模板 front 端目前只有 `ping`，唯一從零到有的一支，最後做）
 
@@ -65,7 +68,7 @@
 
 ### 觀察中
 
-- **e2e 有間歇性失敗（已發生 3 次）**：2026-08-14（`1 failed / 137 passed`）、2026-08-16（`1 failed / 143 passed`）、**2026-09-06（`1 failed / 161 passed`）**。三次都在重跑後全綠（第三次連跑 3 次皆綠）。**共同點是「緊接在另一個會寫檔案的指令之後的第一次執行」**——前兩次接在 `pnpm test` / `lint:fix` 後，第三次接在 `pnpm test:cov` 後。懷疑與 ts-jest 快取或檔案 mtime 有關，但未證實。已排除：各 spec 的 DB 隔離正常。
+- **e2e 有間歇性失敗（已發生 4 次）**：2026-08-14（`1 failed / 137 passed`）、2026-08-16（`1 failed / 143 passed`）、2026-09-06（`1 failed / 161 passed`）、**2026-09-06 第二次（`1 failed / 179 passed`）**。三次都在重跑後全綠（第三次連跑 3 次皆綠）。**共同點是「緊接在另一個會寫檔案的指令之後的第一次執行」**——前兩次接在 `pnpm test` / `lint:fix` 後，第三次接在 `pnpm test:cov` 後。懷疑與 ts-jest 快取或檔案 mtime 有關，但未證實。已排除：各 spec 的 DB 隔離正常。
 
   **第三次終於留下了失敗的測試名稱與症狀**（前兩次因 grep 過濾而遺失，這是先前查不下去的主因）：
 
@@ -77,6 +80,29 @@
 
   **關鍵新線索：症狀是 404 而不是授權失敗。** 404 代表那個請求根本沒有匹配到路由，
   與 JWT / guard 完全無關——所以先前「懷疑 DB 隔離或 token 汙染」的方向可以排除。
+  **第四次的症狀不同，而這個差異本身是線索**：
+
+  ```
+  ● Role E2E › 未授權存取 › 未帶 token → 401（POST /api/admin/roles）
+    Expected: 401
+    Received: 403
+  ```
+
+  403（非 404、非 401）**只可能來自 IP 層**：`app.module.ts` 的 `APP_GUARD` 順序是
+  `ThrottlerGuard` → `IpBlacklistGuard`(222) → `IpWhitelistGuard`(223) → `JwtAuthGuard`(226)，
+  所以未帶 token 的請求若先撞上 IP 守衛，拿到的是 403 而不是 401。
+  兩支 IP 守衛的 403 訊息不同（`IP_BLOCKED` / `IP_NOT_WHITELISTED` / `IP_UNDETERMINED`），
+  **下次發生時先看 response body 的 message**——它直接指出是哪一支。
+
+  兩次症狀（404 / 403）都指向「請求在到達 JwtAuthGuard 之前就被別的東西處理掉」，
+  只是攔截點不同。可能的共同成因：app 尚未完成 `init()` 就收到請求。
+
+  IP 相關的具體懷疑：`LoginService` 會在連續失敗達 `APPLICATION_IP_BLOCK_THRESHOLD`
+  時把來源 IP 自動加入黑名單，而 e2e 有大量刻意的失敗登入。`resetDb` 確實清了
+  `ipBlacklistRecord`，但若守衛有快取、或 `resetDb` 與請求之間有時序落差，
+  就會出現「表已清空但守衛仍擋」。**下次優先驗證**：失敗當下查
+  `ipBlacklistRecord` 是否真的有 127.0.0.1 的紀錄。
+
   可能的方向：`ServeStaticModule` 的 SPA fallback 在某些時序下攔截了 `/api/*`
   （`serve-static.e2e-spec.ts` 會在 tmpdir 建 `index.html` fixture），
   或 app 尚未完成 `init()` 就收到請求。下次再發生時**優先確認當下 `WEB_STATIC_ROOT`

@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { PERMISSION_CATALOG } from '@app/shared/constants/permissions';
-import { API_ROOT } from './helpers';
+import {
+  PERMISSION_CATALOG,
+  parsePermissionCode,
+} from '@app/shared/constants/permissions';
+import { API_ROOT, readSource, stripComments } from './helpers';
 
 /** `apps/web/src`（本檔位於 `apps/api/test/architecture`） */
 const WEB_SRC = join(API_ROOT, '..', 'web', 'src');
@@ -28,6 +31,22 @@ const literalValues = (body: string, constName: string): string[] => {
 };
 
 /**
+ * 從 `export const X: ... = { KEY: '值', ... }` 取出所有 key。
+ *
+ * 與 {@link literalValues} 同一個限制：常數必須維持字面物件的寫法。
+ */
+const literalKeys = (body: string, constName: string): string[] => {
+  const start = body.indexOf(`export const ${constName}`);
+  if (start === -1) return [];
+  const open = body.indexOf('{', start);
+  const close = body.indexOf('};', open);
+  if (open === -1 || close === -1) return [];
+  return [
+    ...body.slice(open, close).matchAll(/^\s{2}([A-Z][A-Z0-9_]*):/gm),
+  ].map((match) => match[1]);
+};
+
+/**
  * 前端寫死的後端知識必須跟得上後端。
  *
  * `apps/web` 不能 import `apps/api` 的常數（不同 workspace、CommonJS vs ESM），
@@ -42,6 +61,8 @@ describe('架構守則：前端權限碼與路由守衛', () => {
   const codes = readWeb(codesFile);
   const navBody = readWeb('routes/_nav-items.ts');
   const appBody = readWeb('App.tsx');
+  const labelsFile = 'routes/roles/lib/permission-labels.ts';
+  const labels = readWeb(labelsFile);
 
   it('掃描範圍有效', () => {
     // 讀不到檔案或解不出值時，底下每一條都會空轉成「全部通過」
@@ -50,6 +71,9 @@ describe('架構守則：前端權限碼與路由守衛', () => {
     expect(appBody).not.toBe('');
     expect(literalValues(codes, 'PERMISSION_CODE').length).toBeGreaterThan(0);
     expect(PERMISSION_CATALOG.length).toBeGreaterThan(0);
+    expect(labels).not.toBe('');
+    expect(literalKeys(labels, 'PLATFORM_LABELS').length).toBeGreaterThan(0);
+    expect(literalKeys(labels, 'MODULE_LABELS').length).toBeGreaterThan(0);
   });
 
   /**
@@ -141,6 +165,87 @@ describe('架構守則：前端權限碼與路由守衛', () => {
           ]
             .filter(Boolean)
             .join('\n\n'),
+    ).toBe('');
+  });
+  /**
+   * 權限樹的群組標題是碼片段，中文對照放在前端（不動 API 回應契約）。
+   * 這條是那筆代價的擔保。
+   *
+   * **雙向比對**：缺對照時群組標題會退回英文碼片段——畫面不會壞、不會報錯，
+   * 只有一張卡片長得跟別人不一樣；反向的死條目則是權限碼移除後留下的字串，
+   * 沒有人會注意到它還在。只檢查單向會讓對照表單向膨脹，
+   * 而膨脹的部分正好是最沒人看的地方。
+   */
+  it('每個 platform 與 module 都要有中文對照', () => {
+    const platformKeys = new Set(literalKeys(labels, 'PLATFORM_LABELS'));
+    const moduleKeys = new Set(literalKeys(labels, 'MODULE_LABELS'));
+
+    const missing: string[] = [];
+    const usedPlatforms = new Set<string>();
+    const usedModules = new Set<string>();
+
+    for (const { code } of PERMISSION_CATALOG) {
+      const { platform, module } = parsePermissionCode(code);
+      usedPlatforms.add(platform);
+      usedModules.add(module);
+      if (!platformKeys.has(platform))
+        missing.push(`  PLATFORM_LABELS 缺少 ${platform}（來自 ${code}）`);
+      if (!moduleKeys.has(module))
+        missing.push(`  MODULE_LABELS 缺少 ${module}（來自 ${code}）`);
+    }
+
+    expect(
+      missing.length === 0
+        ? ''
+        : `權限樹的中文對照不齊全：\n${[...new Set(missing)].join('\n')}\n` +
+            `請補進 apps/web/src/${labelsFile}——缺對照時群組標題會退回英文碼片段，\n` +
+            '畫面不會壞、不會報錯，只有一張卡片長得跟別人不一樣',
+    ).toBe('');
+
+    const orphans = [
+      ...[...platformKeys]
+        .filter((key) => !usedPlatforms.has(key))
+        .map((key) => `  PLATFORM_LABELS.${key}`),
+      ...[...moduleKeys]
+        .filter((key) => !usedModules.has(key))
+        .map((key) => `  MODULE_LABELS.${key}`),
+    ];
+
+    expect(
+      orphans.length === 0
+        ? ''
+        : `以下中文對照沒有對應的權限碼：\n${orphans.join('\n')}\n` +
+            '權限碼移除後留下的死字串，請一併刪除',
+    ).toBe('');
+  });
+
+  /**
+   * 前端的權限樹寫死了一段「安全管理｜限超級管理者｜不可指派」的說明。
+   *
+   * 那段話的正確性完全依賴 `SecurityController` 沒有改用 `PermissionsGuard`
+   * ——**改了的話前端會繼續顯示「不可指派」，而它已經可以指派了**，
+   * 畫面在對使用者說謊，且沒有任何測試會失敗。
+   *
+   * 刻意只驗守衛、不比對條目內容（「IP 白名單 / IP 黑名單 / 帳號鎖定」三個字串）：
+   * 比對它們需要第三份端點與中文名的對照，而擋下的只是文案不精確。
+   */
+  it('安全管理仍由 SUPERADMIN role gate 保護', () => {
+    const controller =
+      'src/adapter/in/web/admin/security/SecurityController.ts';
+    expect(existsSync(join(API_ROOT, controller))).toBe(true);
+
+    // **必須先去註解**：把裝飾器註解掉是最典型的「停用但留著」，而
+    // `// @Roles(RoleCode.SUPERADMIN)` 會把不去註解的正規式餵飽，規則就永遠是綠的
+    const body = stripComments(readSource(controller));
+    const guarded = /@Roles\(\s*RoleCode\.SUPERADMIN\s*\)/.test(body);
+
+    expect(
+      guarded
+        ? ''
+        : `${controller} 不再以 @Roles(RoleCode.SUPERADMIN) 保護。\n` +
+            'apps/web/src/routes/roles/lib/unassignable-permissions.ts 有一段寫死的說明\n' +
+            '（「安全管理」「限超級管理者」「不透過角色權限指派」）需要同步移除，\n' +
+            '否則權限樹會顯示不可指派而實際上已經可以指派了',
     ).toBe('');
   });
 });
