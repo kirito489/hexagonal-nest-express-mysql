@@ -96,6 +96,43 @@ model MemberRecord {
   @@map("members")
 }
 
+/// 前台使用者。**與 members 完全獨立**——members 帶著 roleId / lockedAt /
+/// isDefault / failedLoginCount 這些 RBAC 與後台專屬欄位，前台一個都不需要；
+/// 反過來前台需要顯示名稱與信箱驗證狀態，後台沒有。
+///
+/// 共用一張表會讓每一支查詢都要記得帶「這是哪一側」的條件，
+/// 而忘記帶的後果是跨側資料外洩。分表之後那個錯誤在型別層就發生不了。
+model UserRecord {
+  id String @id @default(uuid())
+
+  email    String @unique @db.VarChar(255)
+  /// bcrypt hash
+  password String @db.VarChar(255)
+
+  /// 對外顯示的名字。**刻意不唯一**——強制唯一會讓註冊體驗變差
+  displayName String @map("display_name") @db.VarChar(50)
+
+  /// 信箱驗證完成的時間；null 表示未驗證。
+  /// 本階段**只存不判斷**，要不要擋未驗證的帳號由註冊流程決定
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  /// 啟用狀態。false 時登入直接拒絕
+  status Boolean @default(true)
+
+  /// JWT 失效世代。與 members 同樣的機制：登出、改密碼、refresh 重用連坐撤銷時 +1，
+  /// 是「立即讓該帳號所有裝置的既發 token 失效」的唯一手段
+  tokenVersion Int @default(0) @map("token_version")
+
+  lastLoginAt DateTime? @map("last_login_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  /// 軟刪除標記。所有查詢必須帶 deletedAt: null
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("users")
+}
+
 model AuthLogRecord {
   id        String   @id @default(uuid())
   memberId  String?  @map("member_id")

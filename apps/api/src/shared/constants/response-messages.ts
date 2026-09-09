@@ -106,6 +106,7 @@ export const HttpMessages = {
   TOKEN_REVOKED: 'Token 已登出或失效',
   TOKEN_VERIFY_FAILED: 'Token 驗證失敗',
   TOKEN_WRONG_TYPE: 'Token 類型不正確',
+  TOKEN_WRONG_SIDE: 'Token 不屬於此系統',
   TOKEN_MEMBER_NOT_FOUND: '會員不存在',
   TOKEN_SUPERSEDED: 'Token 已失效，請重新登入',
   SESSION_IDLE_EXPIRED: 'Session 已因閒置過久而過期，請重新登入',

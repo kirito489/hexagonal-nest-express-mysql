@@ -35,7 +35,12 @@
   ⚠️ **待你執行**：`PERMISSION_CATALOG` 的 `name` 改了，**部署需重跑 `pnpm --filter @app/api db:seed`**。本機無法代跑——`hexagonal_express_db` 這個 dev 庫在這台機器上不存在（`prisma migrate status` 回 `P1003`），e2e 能跑是因為它自己建 `*_test` 庫。你的環境要先有 dev 庫（`pnpm docker:up` 或 `db:migrate`）才跑得了 seed。
   **忘了跑的症狀**：權限樹群組標題顯示「管理者帳號」，項目名卻還是「後台-帳號管理-檢視」——項目名讀的是 DB 的值。
   ⏸ **待實機確認**：sidebar 分組、四處用字一致、首頁（需 `pnpm dev`）。
-- [ ] **C6e `api-front-auth`** — 前台註冊 / 信箱驗證 / 密碼重設（模板 front 端目前只有 `ping`，唯一從零到有的一支，最後做）
+- **C6e 前台認證**——依藍本拆成兩支（合起來大到無法 review）：
+  - [x] ~~**C6e-1 `api-front-auth-account`**~~ —— 已完成。`users` 表（與 `members` 完全獨立）、`JwtPayload` 加 `side`、**前後台各用一組 secret**（忘記比對 side 時是 fail-closed）、`@FrontAuth()` + `FrontJwtAuthGuard`、四支端點（login/refresh/logout/me）、前台 seed 兩個帳號（已驗證/未驗證各一）。
+    e2e 驗到**雙向跨側隔離**（admin token 打前台 401、前台 token 打後台 401）。
+    **不做 `EmailVerifiedGuard`**：模板前台沒有任何功能可擋，那是為不存在的問題建設施（同 C3 不搬 `infra-endpoint` 的理由）。`emailVerifiedAt` 只存不判斷。
+    ⚠️ **待你執行三件事**：(1) `.env.example` 補四個鍵（見下）；(2) dev 庫 `db:migrate`；(3) `db:seed`。
+  - [ ] **C6e-2 `api-front-auth-registration`** —— 註冊、信箱驗證、重發驗證信、忘記/重設密碼。需要 `user_tokens` 表（一次性 token，只存 sha256）、防濫用（IP + 信箱雙重節流）、新環境變數（前台網址、token 效期）。沿用既有的 `SendEmailPort` / `NodemailerEmailAdapter`。
 
 **共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。
 

@@ -87,6 +87,13 @@ export class RefreshTokenService implements RefreshTokenUseCase {
       throw new InvalidRefreshTokenException();
     }
 
+    // side 缺漏視為 admin：加這個欄位時既發的 admin token 裡沒有它，
+    // 當成必填會讓所有人在部署當下被登出。**這是過渡期的寬鬆，不是「side 是選填的」**
+    // ——前台側嚴格要求 'front'。admin token 效期短，下次 refresh 就會帶上
+    if ((payload.side ?? 'admin') !== 'admin') {
+      throw new InvalidRefreshTokenException();
+    }
+
     const context = await this.loadMemberContext.loadMemberContext(payload.sub);
     if (!context) {
       throw new InvalidRefreshTokenException();
@@ -102,11 +109,21 @@ export class RefreshTokenService implements RefreshTokenUseCase {
     }
 
     const accessToken = this.jwtService.sign(
-      { sub: payload.sub, type: 'access', tokenVersion } satisfies JwtPayload,
+      {
+        sub: payload.sub,
+        type: 'access',
+        side: 'admin',
+        tokenVersion,
+      } satisfies JwtPayload,
       { secret: env.ACCESS_SECRET, expiresIn: env.ACCESS_TOKEN_EXPIRES_IN },
     );
     const newRefreshToken = this.jwtService.sign(
-      { sub: payload.sub, type: 'refresh', tokenVersion } satisfies JwtPayload,
+      {
+        sub: payload.sub,
+        type: 'refresh',
+        side: 'admin',
+        tokenVersion,
+      } satisfies JwtPayload,
       { secret: env.REFRESH_SECRET, expiresIn: env.REFRESH_TOKEN_EXPIRES_IN },
     );
 

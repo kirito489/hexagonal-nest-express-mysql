@@ -1,0 +1,45 @@
+tags: [FrontMe]
+summary: 前台個人資料
+description: |
+  回傳目前登入的前台使用者。
+
+  含 `emailVerified`，前台可據此提示使用者去完成信箱驗證。
+
+security:
+  - frontBearerAuth: []
+
+responses:
+  '200':
+    description: 查詢成功
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                email:
+                  type: string
+                  format: email
+                displayName:
+                  type: string
+                emailVerified:
+                  type: boolean
+                lastLoginAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+
+  '401':
+    description: 未帶 token 或 token 無效

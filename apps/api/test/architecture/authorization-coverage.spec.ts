@@ -1,7 +1,19 @@
 import { collectSourceFiles, readSource, stripComments } from './helpers';
 
 /** 授權相關的裝飾器；三者任一即算已表態 */
-const AUTHZ_DECORATORS = ['@Permissions(', '@Roles(', '@Public('];
+/**
+ * 已表態的授權裝飾器。
+ *
+ * `@FrontAuth(` 在列：前台的已認證端點需要繞過只認後台的全域 `JwtAuthGuard`，
+ * 但**不能改掛 `@Public(` 冒充**——那會讓本規則與 `public-surface`
+ * 在錯誤的前提上繼續全綠，兩者都以「哪些端點是公開的」為前提做判斷。
+ */
+const AUTHZ_DECORATORS = [
+  '@Permissions(',
+  '@Roles(',
+  '@Public(',
+  '@FrontAuth(',
+];
 
 /**
  * 收外部輸入的參數裝飾器。
@@ -181,6 +193,31 @@ describe('架構守則：接受任意資源識別碼的端點必須表態授權'
       ]);
     });
 
+    /**
+     * 前台的已認證端點以 `@FrontAuth()` 表態。
+     *
+     * 這一條同時釘住**不該要求它改掛 `@Public()`**：那會讓一個需要認證的端點
+     * 在程式碼裡自稱公開，而本規則與 `public-surface` 都以
+     * 「哪些端點是公開的」為前提做判斷。
+     */
+    it('D2：只有 @FrontAuth() 也算表態', () => {
+      const src = wrap(
+        `@Controller('front/auth')`,
+        `  @FrontAuth()\n  @UseGuards(FrontJwtAuthGuard)\n  @Post('logout')\n  logout(@Body() dto: unknown) {}`,
+      );
+      expect(auditAuthorization(src).unguarded).toEqual([]);
+    });
+
+    it('D3：前台端點沒有任何表態 → 仍須攔截', () => {
+      const src = wrap(
+        `@Controller('front/auth')`,
+        `  @UseGuards(FrontJwtAuthGuard)\n  @Post('logout')\n  logout(@Body() dto: unknown) {}`,
+      );
+      expect(auditAuthorization(src).unguarded.map((h) => h.name)).toEqual([
+        'logout',
+      ]);
+    });
+
     it('D：識別碼走 @Body 而非 @Param → 仍須攔截', () => {
       const src = wrap(
         `@Controller('x')`,
@@ -216,5 +253,45 @@ describe('架構守則：接受任意資源識別碼的端點必須表態授權'
         'remove',
       ]);
     });
+  });
+});
+
+/**
+ * 掛了 `FrontJwtAuthGuard` 就必須同時有 `@FrontAuth()`。
+ *
+ * **少了 `@FrontAuth()` 的端點是死的**：全域 `JwtAuthGuard`（APP_GUARD）比
+ * `@UseGuards` 先跑，而它只認後台——前台的 token 一律 401，
+ * 那支端點永遠不會被呼叫成功。
+ *
+ * 這條補的是「授權裝飾器覆蓋檢查」涵蓋不到的形狀：那條規則只在 handler
+ * **收外部輸入**（`@Param` / `@Body` / `@Query`）時才觸發，
+ * 而 `logout` 與 `me` 這類只收 `@CurrentUser()` 的端點不在它的視野內。
+ */
+describe('架構守則：前台守衛必須搭配 @FrontAuth()', () => {
+  const files = collectSourceFiles(['src/adapter/in/web/front'], {
+    exclude: ['.spec.ts'],
+  });
+
+  it('掃描範圍有效', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it('用到 FrontJwtAuthGuard 的檔案必須也用 @FrontAuth()', () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const body = stripComments(readSource(file));
+      const usesGuard = body.includes('FrontJwtAuthGuard');
+      const declares = body.includes('@FrontAuth(');
+      if (usesGuard && !declares) offenders.push(`  ${file}`);
+    }
+
+    expect(
+      offenders.length === 0
+        ? ''
+        : `以下檔案掛了 FrontJwtAuthGuard 卻沒有 @FrontAuth()：\n${offenders.join(
+            '\n',
+          )}\n全域 JwtAuthGuard 會先跑且只認後台——這些端點會永遠回 401`,
+    ).toBe('');
   });
 });

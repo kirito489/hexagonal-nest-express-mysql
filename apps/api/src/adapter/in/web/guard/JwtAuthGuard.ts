@@ -31,6 +31,7 @@ import {
   MemberContextSchema,
 } from '../decorator/current-member.decorator';
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
+import { IS_FRONT_AUTH_KEY } from '../decorator/front-auth.decorator';
 import { AccountDisabledException } from '@app/domain/exception/AccountDisabledException';
 import { PasswordChangeRequiredException } from '@app/domain/exception/PasswordChangeRequiredException';
 import { HttpMessages } from '@app/shared/constants/response-messages';
@@ -75,6 +76,15 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
     ]);
     if (isPublic) return true;
 
+    // 前台的已認證端點：本守衛只認後台，處理權交給 FrontJwtAuthGuard。
+    // **放行不等於公開**——那些端點掛著 @UseGuards(FrontJwtAuthGuard)，
+    // 而漏掛 @FrontAuth() 的前台端點會落到下面被當成後台端點擋成 401
+    const isFrontAuth = this.reflector.getAllAndOverride<boolean>(
+      IS_FRONT_AUTH_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (isFrontAuth) return true;
+
     // Prometheus /api/metrics 由第三方 controller 提供、無法掛 @Public，以路徑略過
     const url = request.originalUrl ?? request.url ?? '';
     if (url.startsWith('/api/metrics')) return true;
@@ -99,6 +109,13 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
     // 防止 refresh token 被當 access token 使用
     if (payload.type !== 'access') {
       throw new UnauthorizedException(HttpMessages.TOKEN_WRONG_TYPE);
+    }
+
+    // side 缺漏視為 admin：加這個欄位時既發的 admin token 裡沒有它，
+    // 當成必填會讓所有人在部署當下被登出。**這是過渡期的寬鬆，不是「side 是選填的」**
+    // ——前台側嚴格要求 'front'。admin token 效期短，下次 refresh 就會帶上
+    if ((payload.side ?? 'admin') !== 'admin') {
+      throw new UnauthorizedException(HttpMessages.TOKEN_WRONG_SIDE);
     }
 
     const cached = await this.memberContextCache.getByMemberId(payload.sub);

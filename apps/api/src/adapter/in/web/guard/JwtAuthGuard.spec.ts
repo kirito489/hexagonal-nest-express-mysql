@@ -172,4 +172,53 @@ describe('JwtAuthGuard', () => {
       guard.canActivate(makeContext('Bearer valid-token')),
     ).rejects.toThrow(UnauthorizedException);
   });
+  /**
+   * side 的過渡期行為。
+   *
+   * 加 `side` 欄位時，**已經簽出去的 admin token 裡沒有它**——當成必填會讓
+   * 所有人在部署當下被登出。這一條把那個寬鬆釘住，因為它看起來像個可以順手
+   * 收緊的 `??`，而收緊的代價要等到部署才看得見。
+   *
+   * 前台側不套用這個寬鬆（前台是全新的，不存在舊 token）。
+   */
+  describe('token 的側別', () => {
+    const givenPayload = (payload: Record<string, unknown>) => {
+      mockTokenBlacklist.isBlacklisted.mockResolvedValue(false);
+      (mockJwt.verify as jest.Mock).mockReturnValue(payload);
+      mockMemberContextCache.getByMemberId.mockResolvedValue(
+        JSON.stringify({
+          sub: TEST_UUID,
+          email: 'u@e.com',
+          roleName: 'admin',
+          roleCode: 'SUPERADMIN',
+          permissions: [],
+          status: true,
+        }),
+      );
+    };
+
+    it('沒有 side 的舊 token 仍然有效（視為 admin）', async () => {
+      givenPayload({ sub: TEST_UUID, type: 'access' });
+
+      await expect(
+        guard.canActivate(makeContext('Bearer legacy-token')),
+      ).resolves.toBe(true);
+    });
+
+    it('side 為 admin → 通過', async () => {
+      givenPayload({ sub: TEST_UUID, type: 'access', side: 'admin' });
+
+      await expect(
+        guard.canActivate(makeContext('Bearer admin-token')),
+      ).resolves.toBe(true);
+    });
+
+    it('side 為 front → 拒絕', async () => {
+      givenPayload({ sub: TEST_UUID, type: 'access', side: 'front' });
+
+      await expect(
+        guard.canActivate(makeContext('Bearer front-token')),
+      ).rejects.toThrow();
+    });
+  });
 });

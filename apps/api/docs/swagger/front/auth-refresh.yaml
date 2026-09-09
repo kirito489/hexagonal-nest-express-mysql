@@ -1,0 +1,26 @@
+tags: [FrontAuth]
+summary: 前台 Token 更新
+description: |
+  以 refresh token 換發新的 token 組。
+
+  MUST 通過 `type === 'refresh'`、`side === 'front'` 與 `tokenVersion` 三項比對；
+  登出會遞增 `tokenVersion`，因此登出後的舊 token 立即失效。
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [refreshToken]
+        properties:
+          refreshToken:
+            type: string
+
+responses:
+  '200':
+    description: 換發成功；回應結構與登入相同
+  '400':
+    description: 欄位驗證失敗
+  '401':
+    description: token 無效、過期、類型不符、側別不符或已被撤銷

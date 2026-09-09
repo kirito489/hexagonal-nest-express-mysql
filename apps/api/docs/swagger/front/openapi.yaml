@@ -4,14 +4,40 @@ info:
   title: Hexagonal NestJS 前台 (Front) API
   version: 1.0.0
   description: |
-    前台（公開）API 文件。目前僅骨架示範端點 /ping。
-    實際前台端點以 `gen:module <name> --front` 產生後補進本文件。
+    前台 API 文件。認證端點在 `/auth/*`，個人資料在 `/me`。
+    其餘前台端點以 `gen:module <name> --front` 產生後補進本文件。
+
+    **前台與後台使用各自的 JWT secret**：本文件簽出的 token 無法通過後台守衛，反之亦然。
 
 servers:
   - url: http://localhost:3000/api/front
     description: 本地開發環境（前台 API）
 
+components:
+  securitySchemes:
+    frontBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 前台的 access token（以 FRONT_ACCESS_SECRET 簽發）
+
 paths:
   /ping:
     get:
       $ref: './ping.yaml'
+
+  /auth/login:
+    post:
+      $ref: './auth-login.yaml'
+
+  /auth/refresh:
+    post:
+      $ref: './auth-refresh.yaml'
+
+  /auth/logout:
+    post:
+      $ref: './auth-logout.yaml'
+
+  /me:
+    get:
+      $ref: './me.yaml'

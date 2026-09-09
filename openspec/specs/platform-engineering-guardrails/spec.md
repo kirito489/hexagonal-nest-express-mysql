@@ -328,7 +328,7 @@ root 與 `apps/api` 的 `package.json` MUST NOT 設定 `"type": "module"`。`app
 
 系統 SHALL 確保接受外部輸入的端點都明確表態授權。任何 controller handler
 若含 `@Param(` / `@Body(` / `@Query(` 之一，且其 class 與 method 皆無
-`@Permissions(` / `@Roles(` / `@Public(`，檢查 MUST 失敗。
+`@Permissions(` / `@Roles(` / `@Public(` / `@FrontAuth(`，檢查 MUST 失敗。
 
 觸發條件不限於路徑參數——「接受任意資源識別碼」不等於「用 `@Param`」，
 `POST /xxx { ids: [] }` 這類 body 帶識別碼的端點同樣需要表態。
@@ -346,6 +346,11 @@ root 與 `apps/api` 的 `package.json` MUST NOT 設定 `"type": "module"`。`app
    之前的全部內容——後者包含檔頭 TSDoc。
 3. **handler 切塊 MUST 往前納入連續的裝飾器行。** `@Public()` 常寫在 HTTP method
    裝飾器上方，只從後者起算會把它歸給前一個 handler，造成前一支漏報、本支誤報。
+
+`@FrontAuth(` MUST 被視為**已表態**。前台的已認證端點需要繞過只認後台的全域
+`JwtAuthGuard`，但 MUST NOT 改掛 `@Public(` 冒充——那會讓本規則與
+`public-surface` **在錯誤的前提上繼續全綠**，兩者都以「哪些端點是公開的」
+為前提做判斷。
 
 自我範圍端點（含 `@CurrentMember()` 且不含 `@Param(`）MUST 豁免——它們操作的是呼叫者
 自己的資料。**已知缺口**：`@CurrentMember()` 搭配 `@Body({ targetId })` 會被誤豁免；
@@ -388,6 +393,11 @@ root 與 `apps/api` 的 `package.json` MUST NOT 設定 `"type": "module"`。`app
 
 - **WHEN** handler 標了 `@Public()`
 - **THEN** 檢查通過——公開是刻意的決定，不是遺漏
+
+#### Scenario: 前台已認證端點以 @FrontAuth 表態
+
+- **WHEN** 前台 handler 標記 `@FrontAuth()`
+- **THEN** 檢查通過，且 MUST NOT 要求它同時掛 `@Public()`
 
 ### Requirement: 全域 guard 註冊與順序檢查
 

@@ -3,11 +3,20 @@ info:
   title: Hexagonal NestJS 前台 (Front) API
   version: 1.0.0
   description: |
-    前台（公開）API 文件。目前僅骨架示範端點 /ping。
-    實際前台端點以 `gen:module <name> --front` 產生後補進本文件。
+    前台 API 文件。認證端點在 `/auth/*`，個人資料在 `/me`。
+    其餘前台端點以 `gen:module <name> --front` 產生後補進本文件。
+
+    **前台與後台使用各自的 JWT secret**：本文件簽出的 token 無法通過後台守衛，反之亦然。
 servers:
   - url: 'http://localhost:3000/api/front'
     description: 本地開發環境（前台 API）
+components:
+  securitySchemes:
+    frontBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 前台的 access token（以 FRONT_ACCESS_SECRET 簽發）
 paths:
   /ping:
     get:
@@ -48,3 +57,176 @@ paths:
                 data:
                   message: 前台 API 運作中
                 timestamp: '2024-01-01T00:00:00.000Z'
+  /auth/login:
+    post:
+      tags:
+        - FrontAuth
+      summary: 前台登入
+      description: |
+        驗證前台使用者帳密並簽發 token 組。
+
+        **前台與後台使用各自的 JWT secret**——本端點簽出的 token 無法通過後台的守衛，
+        反之亦然。payload 帶 `side: 'front'` 作為第二道識別。
+
+        帳號不存在與密碼錯誤回**完全相同**的 401，避免本端點變成帳號列舉工具。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - accessToken
+                      - refreshToken
+                      - accessTokenExpiresIn
+                      - refreshTokenExpiresIn
+                      - user
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+                      accessTokenExpiresIn:
+                        type: integer
+                      refreshTokenExpiresIn:
+                        type: integer
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          email:
+                            type: string
+                            format: email
+                          displayName:
+                            type: string
+                          emailVerified:
+                            type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: 欄位驗證失敗
+        '401':
+          description: 帳號或密碼錯誤（兩者回應完全相同）
+        '403':
+          description: 帳號已停用
+  /auth/refresh:
+    post:
+      tags:
+        - FrontAuth
+      summary: 前台 Token 更新
+      description: |
+        以 refresh token 換發新的 token 組。
+
+        MUST 通過 `type === 'refresh'`、`side === 'front'` 與 `tokenVersion` 三項比對；
+        登出會遞增 `tokenVersion`，因此登出後的舊 token 立即失效。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: 換發成功；回應結構與登入相同
+        '400':
+          description: 欄位驗證失敗
+        '401':
+          description: token 無效、過期、類型不符、側別不符或已被撤銷
+  /auth/logout:
+    post:
+      tags:
+        - FrontAuth
+      summary: 前台登出
+      description: |
+        遞增 `tokenVersion`，使該帳號**所有裝置**的既發 token 立即失效。
+
+        需要前台的 access token。
+      security:
+        - frontBearerAuth: []
+      responses:
+        '204':
+          description: 登出成功（無回應內容）
+        '401':
+          description: 未帶 token 或 token 無效
+  /me:
+    get:
+      tags:
+        - FrontMe
+      summary: 前台個人資料
+      description: |
+        回傳目前登入的前台使用者。
+
+        含 `emailVerified`，前台可據此提示使用者去完成信箱驗證。
+      security:
+        - frontBearerAuth: []
+      responses:
+        '200':
+          description: 查詢成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                        format: email
+                      displayName:
+                        type: string
+                      emailVerified:
+                        type: boolean
+                      lastLoginAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          description: 未帶 token 或 token 無效

@@ -1,0 +1,15 @@
+tags: [FrontAuth]
+summary: 前台登出
+description: |
+  遞增 `tokenVersion`，使該帳號**所有裝置**的既發 token 立即失效。
+
+  需要前台的 access token。
+
+security:
+  - frontBearerAuth: []
+
+responses:
+  '204':
+    description: 登出成功（無回應內容）
+  '401':
+    description: 未帶 token 或 token 無效
