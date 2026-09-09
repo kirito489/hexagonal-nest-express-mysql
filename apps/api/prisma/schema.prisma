@@ -133,6 +133,39 @@ model UserRecord {
   @@map("users")
 }
 
+/// 一次性 token 的用途。**用 enum 而非自由字串**：打錯字的後果是
+/// 「token 永遠 claim 不到」，而那看起來像 token 失效、不像程式錯誤——
+/// 排查方向會被帶偏。
+enum UserTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+/// 前台使用者的一次性 token（信箱驗證與密碼重設共用一張表）。
+///
+/// 兩種用途在機制上完全相同（一次性、有效期、只存雜湊、原子 claim），
+/// 差別只有用途與效期——開兩張表會把同一段邏輯寫兩次。
+///
+/// ⚠️ **claim 時必須一併比對 purpose**：少了它，拿驗證信的 token 就能重設密碼，
+/// 而兩者的取得難度差很多（驗證信在註冊當下就寄出，不需要知道密碼）。
+model UserTokenRecord {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+
+  /// 只存 sha256 雜湊，不存明文——DB 外洩也無法反推出可用的 token
+  token   String           @unique
+  purpose UserTokenPurpose
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // 供「重發時作廢該使用者其他 token」與過期 token 清理
+  @@index([userId, purpose], map: "idx_user_tokens_user_purpose")
+  @@index([expiresAt], map: "idx_user_tokens_expires")
+  @@map("user_tokens")
+}
+
 model AuthLogRecord {
   id        String   @id @default(uuid())
   memberId  String?  @map("member_id")

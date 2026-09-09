@@ -134,6 +134,8 @@ services:
       REDIS_URL: ''
       # 對外 URL：容器模式的入口是 nginx，不是 api 自己的埠
       API_BASE_URL: http://localhost:${APP_PROXY_PORT:-8080}
+      # 前台站台網址：驗證信的連結會指向它。容器內釘死，否則信裡的連結會指向 undefined
+      APP_FRONT_URL: http://localhost:${APP_PROXY_PORT:-8080}
       SMTP_HOST: ''
       SMTP_PORT: '587'
       # 寄進信裡的對外連結。**這類字串在系統內部永遠不會被呼叫**，

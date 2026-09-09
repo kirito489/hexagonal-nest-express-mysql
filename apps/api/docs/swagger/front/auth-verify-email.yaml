@@ -1,0 +1,26 @@
+tags: [FrontAuth]
+summary: 驗證信箱
+description: |
+  消耗驗證 token 並寫入 `emailVerifiedAt`。
+
+  ⚠️ **本端點回 302 導回前台，不回 JSON**——這個網址是使用者在信件裡點的，
+  開啟的是瀏覽器。**失敗也導回**（不回 4xx）：一個瀏覽器錯誤頁對他沒有意義。
+
+  導向 `${APP_FRONT_URL}${APP_FRONT_VERIFY_REDIRECT_PATH}?status=<status>`，
+  `status` 為 `success` / `invalid` / `expired`，供前台決定下一步（重寄 vs 去登入）。
+
+parameters:
+  - in: query
+    name: token
+    required: true
+    schema: { type: string }
+
+responses:
+  '302':
+    description: 導回前台，結果以 query 的 status 帶回
+    headers:
+      Location:
+        schema: { type: string }
+        description: 例 `http://front.example/verify-email?status=success`
+  '400':
+    description: 缺少 token

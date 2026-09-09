@@ -64,6 +64,9 @@ const makeMocks = () => {
     loadUserById: jest.fn(),
   } as jest.Mocked<LoadUserPort>;
   const saveUser = {
+    createUser: jest.fn(),
+    markEmailVerified: jest.fn(),
+    updatePassword: jest.fn(),
     touchLastLogin: jest.fn().mockResolvedValue(undefined),
     bumpTokenVersion: jest.fn().mockResolvedValue(1),
   } as jest.Mocked<SaveUserPort>;

@@ -20,6 +20,14 @@ export const envSchema = z.object({
   LOG_LEVEL: z.string().default('info'),
   SERVICE_NAME: z.string().default('hexagonal-nest-express'),
   API_BASE_URL: z.string().optional(),
+  /**
+   * 前台站台網址。**production 必填**——沒有它，驗證信的連結會指向
+   * `undefined/...`，而那個錯誤要等到第一個使用者點信才會被發現。
+   * dev 未設時退回相對路徑，讓開發不被卡住。
+   */
+  APP_FRONT_URL: z.string().optional(),
+  /** 驗證完成後導回前台的路徑；結果以 ?status=success|invalid|expired 帶回 */
+  APP_FRONT_VERIFY_REDIRECT_PATH: z.string().default('/verify-email'),
 
   // 應用時區
   APP_TIMEZONE: z
@@ -192,6 +200,13 @@ export const envSchema = z.object({
     .min(1)
     .default(30),
   APP_PASSWORD_RESET_URL: z.string().optional(),
+  /**
+   * 前台的 token 效期（分鐘）。**與驗證信分開設定**：
+   * 驗證信是歡迎流程的一部分，使用者可能隔天才點；重設密碼是敏感操作，
+   * 窗口越短越好。共用一個值會逼你在兩個目的之間取一個都不適合的數字。
+   */
+  EMAIL_VERIFICATION_EXPIRES_IN: z.coerce.number().int().default(1440),
+  FRONT_PASSWORD_RESET_EXPIRES_IN: z.coerce.number().int().default(30),
 
   // ─── 速率限制 ───
 
@@ -462,6 +477,11 @@ export const getEnv = (): Env => {
     if (_env.CORS_ORIGIN === '*') {
       productionErrors.push(
         'CORS_ORIGIN: 生產環境不允許設定為 *，請指定明確的來源網域',
+      );
+    }
+    if (!_env.APP_FRONT_URL) {
+      productionErrors.push(
+        'APP_FRONT_URL: 生產環境必填，否則驗證信的連結會指向 undefined',
       );
     }
     if (!_env.DB_PASSWORD) {

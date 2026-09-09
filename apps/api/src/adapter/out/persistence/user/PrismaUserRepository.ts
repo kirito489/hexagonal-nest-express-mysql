@@ -5,7 +5,10 @@ import {
   UserContext,
   UserCredentials,
 } from '@app/application/port/out/user/LoadUserPort';
-import { SaveUserPort } from '@app/application/port/out/user/SaveUserPort';
+import {
+  CreateUserCommand,
+  SaveUserPort,
+} from '@app/application/port/out/user/SaveUserPort';
 import { normalizeEmail } from '@app/shared/utils/normalize-email';
 
 /** Prisma 查詢要取的欄位；集中一份避免兩支方法各挑各的 */
@@ -64,6 +67,34 @@ export class PrismaUserRepository implements LoadUserPort, SaveUserPort {
       select: USER_FIELDS,
     });
     return row ? toContext(row) : null;
+  }
+
+  async createUser(command: CreateUserCommand): Promise<string> {
+    const created = await this.prisma.userRecord.create({
+      data: {
+        email: normalizeEmail(command.email),
+        password: command.password,
+        displayName: command.displayName,
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.prisma.userRecord.updateMany({
+      where: { id: userId, deletedAt: null },
+      data: { emailVerifiedAt: new Date() },
+    });
+  }
+
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    // 密碼與 tokenVersion 在同一次寫入：漏掉遞增的後果是受害者改了密碼，
+    // 而攻擊者既有的 session 仍然有效
+    await this.prisma.userRecord.updateMany({
+      where: { id: userId, deletedAt: null },
+      data: { password: passwordHash, tokenVersion: { increment: 1 } },
+    });
   }
 
   async touchLastLogin(id: string): Promise<void> {

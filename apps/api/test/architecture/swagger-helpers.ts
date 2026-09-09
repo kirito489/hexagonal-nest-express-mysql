@@ -121,7 +121,17 @@ const HTTP_STATUS_VALUE: Record<string, number> = {
   CREATED: 201,
   ACCEPTED: 202,
   NO_CONTENT: 204,
+  // 3xx：導向端點的「成功」就是那個 302。前台的信箱驗證是使用者在信件裡
+  // 點的連結，回 JSON 對他沒有意義——把它排除在外會讓那支端點永遠對不上契約
+  MOVED_PERMANENTLY: 301,
+  FOUND: 302,
+  SEE_OTHER: 303,
+  TEMPORARY_REDIRECT: 307,
+  PERMANENT_REDIRECT: 308,
 };
+
+/** 成功狀態涵蓋 2xx 與 3xx：導向端點的成功結果就是那個 3xx */
+const isSuccessStatus = (code: number): boolean => code >= 200 && code < 400;
 
 /** NestJS 未指定 `@HttpCode` 時的預設成功狀態：POST 為 201，其餘為 200 */
 const defaultSuccessStatus = (method: string): number =>
@@ -173,9 +183,9 @@ export const successStatusFromControllers = (): Map<Route, number> => {
 };
 
 /**
- * 從 OpenAPI yaml 取出每條路由記載的 2xx 狀態碼
+ * 從 OpenAPI yaml 取出每條路由記載的成功狀態碼（2xx 與 3xx）
  * @param file - 相對 apps/api 的 yaml 路徑
- * @returns 路由 → 該路由記載的所有 2xx 狀態碼
+ * @returns 路由 → 該路由記載的所有成功狀態碼
  */
 export const successStatusFromOpenApi = (
   file: string,
@@ -199,7 +209,7 @@ export const successStatusFromOpenApi = (
 
       const success = Object.keys(responses)
         .map(Number)
-        .filter((code) => code >= 200 && code < 300);
+        .filter(isSuccessStatus);
 
       result.set(
         `${method.toUpperCase()} ${normalizePath(`${base}${path}`)}`,

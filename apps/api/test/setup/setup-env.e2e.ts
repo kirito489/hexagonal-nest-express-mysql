@@ -13,6 +13,7 @@ process.env.NODE_ENV = 'test';
 process.env.ACCESS_SECRET = 'e2e-test-access-secret-min-32-chars!!'; // min(32)
 process.env.FRONT_ACCESS_SECRET = 'e2e-test-front-access-secret-32chars!';
 process.env.FRONT_REFRESH_SECRET = 'e2e-test-front-refresh-secret-32chars';
+process.env.APP_FRONT_URL = 'http://localhost:5173';
 process.env.REFRESH_SECRET = 'e2e-test-refresh-secret-min-32-chars!'; // min(32)
 process.env.COOKIE_SECRET = 'e2e-test-cookie-secret-32-chars!!';
 process.env.BCRYPT_ROUNDS = '1'; // 測試用最低 cost factor，加速

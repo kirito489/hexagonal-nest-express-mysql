@@ -1,0 +1,42 @@
+tags: [FrontAuth]
+summary: 前台註冊
+description: |
+  建立一個**未驗證**的前台帳號並寄出驗證信。
+
+  ⚠️ **信箱已存在時回應與成功完全相同，且不會建立帳號**——
+  回 409「此信箱已註冊」是帳號列舉，任何人都能拿一份信箱清單問出誰有帳號。
+  此時改寄一封「你的信箱已有帳號」的信給既有擁有者。
+
+  受 **IP 節流（3 次 / 分鐘）與信箱節流**兩層保護。
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [email, password, displayName]
+        properties:
+          email: { type: string, format: email, maxLength: 255 }
+          password: { type: string, description: 長度與複雜度依 APPLICATION_PASSWORD_* 設定 }
+          displayName: { type: string, maxLength: 50 }
+
+responses:
+  '201':
+    description: 註冊成功（信箱已存在時亦回此回應）
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [success, data, timestamp]
+          properties:
+            success: { type: boolean, example: true }
+            data:
+              type: object
+              properties:
+                message: { type: string }
+            timestamp: { type: string, format: date-time }
+  '400':
+    description: 欄位驗證失敗，或密碼不符政策
+  '429':
+    description: 超過 IP 或信箱的節流上限

@@ -40,7 +40,10 @@
     e2e 驗到**雙向跨側隔離**（admin token 打前台 401、前台 token 打後台 401）。
     **不做 `EmailVerifiedGuard`**：模板前台沒有任何功能可擋，那是為不存在的問題建設施（同 C3 不搬 `infra-endpoint` 的理由）。`emailVerifiedAt` 只存不判斷。
     ⚠️ **待你執行三件事**：(1) `.env.example` 補四個鍵（見下）；(2) dev 庫 `db:migrate`；(3) `db:seed`。
-  - [ ] **C6e-2 `api-front-auth-registration`** —— 註冊、信箱驗證、重發驗證信、忘記/重設密碼。需要 `user_tokens` 表（一次性 token，只存 sha256）、防濫用（IP + 信箱雙重節流）、新環境變數（前台網址、token 效期）。沿用既有的 `SendEmailPort` / `NodemailerEmailAdapter`。
+  - [x] ~~**C6e-2 `api-front-auth-registration`**~~ —— 已完成。`user_tokens` 表（單表帶 `purpose` enum，只存 sha256）、五支端點、IP + 信箱雙重節流、四個新環境變數。
+    **順帶補了一個真的缺口**：admin 的 `PrismaPasswordResetTokenRepository` 先前**完全沒有測試**，而 e2e 只測 `reset-password` 的失敗路徑——也就是說把 `hashToken` 拿掉、token 存明文，全部測試照樣綠。重構前先補了 8 條，並反向驗證它抓得到。
+    **兩條守則被這支撐大**：`swagger-sync` 的「成功狀態碼」原本寫死只認 2xx，導向端點（`verify-email` 回 302）永遠對不上契約——已把成功狀態的定義擴到含 3xx；`compose-files` 抓到 `APP_FRONT_URL` 未在 compose 釘死。
+    ⚠️ **待你執行**：`.env.example` 補四個變數（`APP_FRONT_URL` / `APP_FRONT_VERIFY_REDIRECT_PATH` / `EMAIL_VERIFICATION_EXPIRES_IN` / `FRONT_PASSWORD_RESET_EXPIRES_IN`）、dev 庫 `db:migrate`。
 
 **共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。
 

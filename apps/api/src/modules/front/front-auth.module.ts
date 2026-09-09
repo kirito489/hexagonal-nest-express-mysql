@@ -17,6 +17,27 @@ import { LOAD_USER_PORT } from '../../application/port/out/user/LoadUserPort';
 import { SAVE_USER_PORT } from '../../application/port/out/user/SaveUserPort';
 import { PrismaUserRepository } from '../../adapter/out/persistence/user/PrismaUserRepository';
 import { FrontJwtAuthGuard } from '../../adapter/in/web/guard/FrontJwtAuthGuard';
+import { FrontRegistrationController } from '../../adapter/in/web/front/auth/FrontRegistrationController';
+import { FrontRegistrationFacade } from '../../application/facade/front/FrontRegistrationFacade';
+import {
+  FRONT_FORGOT_PASSWORD_USE_CASE,
+  FRONT_REGISTER_USE_CASE,
+  FRONT_RESEND_VERIFICATION_USE_CASE,
+  FRONT_RESET_PASSWORD_USE_CASE,
+  FRONT_VERIFY_EMAIL_USE_CASE,
+} from '../../application/port/in/front/auth/FrontRegistrationUseCases';
+import {
+  FrontForgotPasswordService,
+  FrontRegisterService,
+  FrontResendVerificationService,
+  FrontResetPasswordService,
+  FrontVerifyEmailService,
+} from '../../application/service/front/auth/FrontRegistrationServices';
+import { USER_TOKEN_PORT } from '../../application/port/out/user/UserTokenPort';
+import { EMAIL_THROTTLE_PORT } from '../../application/port/out/user/EmailThrottlePort';
+import { PrismaUserTokenRepository } from '../../adapter/out/persistence/user/PrismaUserTokenRepository';
+import { RedisEmailThrottleAdapter } from '../../adapter/out/redis/RedisEmailThrottleAdapter';
+import { PasswordPolicyService } from '../../application/service/shared/PasswordPolicyService';
 
 /**
  * 前台認證模組。
@@ -27,7 +48,11 @@ import { FrontJwtAuthGuard } from '../../adapter/in/web/guard/FrontJwtAuthGuard'
  */
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [FrontAuthController, FrontMeController],
+  controllers: [
+    FrontAuthController,
+    FrontRegistrationController,
+    FrontMeController,
+  ],
   providers: [
     FrontAuthFacade,
     FrontJwtAuthGuard,
@@ -37,6 +62,26 @@ import { FrontJwtAuthGuard } from '../../adapter/in/web/guard/FrontJwtAuthGuard'
     { provide: FRONT_LOGIN_USE_CASE, useClass: FrontLoginService },
     { provide: FRONT_REFRESH_USE_CASE, useClass: FrontRefreshTokenService },
     { provide: FRONT_LOGOUT_USE_CASE, useClass: FrontLogoutService },
+    FrontRegistrationFacade,
+    PasswordPolicyService,
+    PrismaUserTokenRepository,
+    RedisEmailThrottleAdapter,
+    { provide: USER_TOKEN_PORT, useExisting: PrismaUserTokenRepository },
+    { provide: EMAIL_THROTTLE_PORT, useExisting: RedisEmailThrottleAdapter },
+    { provide: FRONT_REGISTER_USE_CASE, useClass: FrontRegisterService },
+    { provide: FRONT_VERIFY_EMAIL_USE_CASE, useClass: FrontVerifyEmailService },
+    {
+      provide: FRONT_RESEND_VERIFICATION_USE_CASE,
+      useClass: FrontResendVerificationService,
+    },
+    {
+      provide: FRONT_FORGOT_PASSWORD_USE_CASE,
+      useClass: FrontForgotPasswordService,
+    },
+    {
+      provide: FRONT_RESET_PASSWORD_USE_CASE,
+      useClass: FrontResetPasswordService,
+    },
   ],
 })
 export class FrontAuthModule {}

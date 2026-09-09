@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import {
+  generateOneTimeToken,
+  hashOneTimeToken,
+} from '@app/shared/utils/one-time-token';
 import { PrismaService } from '@app/infrastructure/prisma/prisma.service';
 import { PasswordResetTokenPort } from '@app/application/port/out/auth/PasswordResetTokenPort';
 
@@ -15,12 +18,12 @@ export class PrismaPasswordResetTokenRepository implements PasswordResetTokenPor
     memberId: string,
     expiresInMinutes: number,
   ): Promise<string> {
-    const token = randomBytes(32).toString('hex');
+    const token = generateOneTimeToken();
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
 
     // 只存雜湊：原文僅回傳給呼叫端寄信，DB 外洩也無法反推出可用的重設 token
     await this.prisma.passwordResetTokenRecord.create({
-      data: { memberId, token: this.hashToken(token), expiresAt },
+      data: { memberId, token: hashOneTimeToken(token), expiresAt },
     });
 
     return token;
@@ -32,7 +35,7 @@ export class PrismaPasswordResetTokenRepository implements PasswordResetTokenPor
       // 任一條件不滿足 → Prisma 丟 P2025（記錄找不到）→ 視為 claim 失敗
       const result = await this.prisma.passwordResetTokenRecord.update({
         where: {
-          token: this.hashToken(token),
+          token: hashOneTimeToken(token),
           usedAt: null,
           expiresAt: { gt: new Date() },
         },
@@ -53,10 +56,5 @@ export class PrismaPasswordResetTokenRepository implements PasswordResetTokenPor
       'code' in err &&
       (err as { code: string }).code === 'P2025'
     );
-  }
-
-  /** token 為高熵隨機值，單向 sha256 即足以防 DB 外洩反推（不需 bcrypt） */
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
   }
 }

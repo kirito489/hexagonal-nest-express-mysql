@@ -1,0 +1,26 @@
+tags: [FrontAuth]
+summary: 重發驗證信
+description: |
+  對未驗證的帳號重寄驗證信，並作廢該帳號既有未使用的驗證 token
+  ——兩枚同時有效的連結沒有意義，而舊的那枚會在信箱裡留更久。
+
+  **帳號不存在或已完成驗證時回相同的回應且不寄信**（防帳號列舉）。
+  受 IP 與信箱兩層節流。
+
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [email]
+        properties:
+          email: { type: string, format: email }
+
+responses:
+  '204':
+    description: 已受理（無回應內容；不代表一定寄出了信）
+  '400':
+    description: 欄位驗證失敗
+  '429':
+    description: 超過節流上限
