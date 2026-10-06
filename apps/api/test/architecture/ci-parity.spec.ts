@@ -139,6 +139,58 @@ describe('架構守則：多份 CI 設定必須跑同一組檢查', () => {
     ).toBe('');
   });
 
+  /**
+   * CI 與 compose.yml 的映像版本必須一致。
+   *
+   * 上一條比的是「兩份 CI 之間」，這條比的是「CI 與本機容器環境之間」——
+   * 兩者漂移的症狀相同（**本機過、CI 掛，而差異在版本不在程式碼**），
+   * 但來源不同，只擋其中一邊等於沒擋。
+   *
+   * 只比**兩邊都宣告**的映像：CI 不一定起得了所有服務（例如沒有 redis
+   * service container），那不是漂移。
+   */
+  it('⭐ CI 與 compose.yml 的映像版本必須一致', () => {
+    const composePath = join(REPO_ROOT, 'compose.yml');
+    expect(existsSync(composePath)).toBe(true);
+
+    const versionsByName = (body: string): Map<string, Set<string>> => {
+      const found = new Map<string, Set<string>>();
+      for (const m of body.matchAll(/image:\s*["']?([a-z][\w.-]*):([\w.]+)/g)) {
+        const [, name, version] = m;
+        if (!found.has(name)) found.set(name, new Set());
+        found.get(name)?.add(version);
+      }
+      return found;
+    };
+
+    const composeImages = versionsByName(readFileSync(composePath, 'utf8'));
+    const ciImages = versionsByName(configs.map((c) => c.body).join('\n'));
+
+    // 任一邊抓不到映像就代表宣告寫法變了，規則會空轉成「版本一致」
+    expect(composeImages.size).toBeGreaterThan(0);
+    expect(ciImages.size).toBeGreaterThan(0);
+
+    const mismatched = [...ciImages.entries()]
+      .filter(([name]) => composeImages.has(name))
+      .filter(([name, versions]) => {
+        const all = new Set([...versions, ...(composeImages.get(name) ?? [])]);
+        return all.size > 1;
+      })
+      .map(
+        ([name, versions]) =>
+          `  ${name}：CI=${[...versions].join(' / ')}、compose=${[
+            ...(composeImages.get(name) ?? []),
+          ].join(' / ')}`,
+      );
+
+    expect(
+      mismatched.length === 0
+        ? ''
+        : `CI 與 compose.yml 使用不同的映像版本：\n${mismatched.join('\n')}\n` +
+            '版本不同會產生「本機過、CI 掛」，而差異在版本不在程式碼——那是最難查的一種。',
+    ).toBe('');
+  });
+
   it('e2e 的測試庫名必須含 test', () => {
     // globalSetup 的守門會拒絕不含 test 的庫名（防誤連 dev / prod）。
     // 設定裡寫錯的話 job 會紅得莫名其妙，而錯誤訊息指向 globalSetup 不是 CI 設定

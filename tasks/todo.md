@@ -3,59 +3,38 @@
 > 跨模組待辦清單。每次新 session 先讀；實作中發現新 TODO 立即記錄，**完成當下就回頭勾掉**（曾有兩條早已完成的待辦掛了近一個月，讓人誤判專案現況）。
 > 排序原則：近期可動 → 需等外部條件 → 延後技術債。
 
-## 進行中
+## 撰寫格式
 
-### 從 nexus-nest-backend 回補模板（2026-09-04 起）
+**區段固定八個 `##`，順序不變，不要自創，同類一律歸進同一個**：
 
-`/Users/alantsai/side_projects/nexus-nest-backend` 是本模板的衍生專案（87 commits），已改為 PostgreSQL + 聊天/WebSocket。
-盤點後確認可回補的部分切成 10 支 change，依風險與相依排序：
+| `##` 區段 | 收什麼 |
+| --- | --- |
+| `## 待辦` | 還沒開始、可動工的新工作 |
+| `## 技術債` | 既有實作的欠債，現在就有成本 |
+| `## 待收尾的 change` | 後端已封存、前端配合或 smoke test 未完 |
+| `## 延後項目` | 刻意延後的，**要寫解除條件** |
+| `## 已決議不做` | 評估過決定不做的，**要寫理由與重提條件** |
+| `## 注意事項` | 長期性提醒、觀察中、需人工處理的操作 |
+| `## 已完成` | 完成的項目 |
 
-- [x] **C1 `platform-ai-workflow-backport`** — `.claude/skills/`（grill-me / pr-body / tidy-todo）、`.husky/pre-push`、PR/MR 模板（GitLab 側改 symlink）、`openspec/config.yaml`、lessons 合併 22 條（288 → 473 行）。守則 19 支 / 68 → 69 項。**待封存**
-- [x] **C2 `platform-security-hardening`** — 帳號鎖定時效 + 三態 `checkLock`、大小寫繞過修補、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天。
-      **實作途中另外修掉三個既有缺陷**：鎖定回應 403/`FORBIDDEN` 與 spec 寫的 423/`ACCOUNT_LOCKED` 不符（**對外契約變更**）、`AccountLockedException` 是零呼叫端的死碼、`LoginService` 內嵌使用者文案違反 Hard Rule。
-      單元 330 條 / 守則 69 條 / e2e 160 條（151 → 160）。**待封存**
-- [x] **C3 `platform-guardrail-backport`** — 回補四支守則（`guardrail-inventory` / `env-example-sync` / `public-surface` / `role-permission-cache`），守則 19 支 / 69 項 → **23 支 / 102 項**。
-      **順帶修掉一個活的 bug**：`UpdateRoleService` 改完角色權限不清成員快取，撤銷的權限最多 5 分鐘後才生效。
-      刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b——**C6b 已完成，其中「權限碼同步」那半已回補為 `permission-codes-sync.spec.ts`；權限樹中文對照那半屬 C6c**）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。**待封存**
-- [x] **C4 `platform-container-single-entry`** — 修掉 `verify-ci.sh` 的 `down -v`（**修前實測證實會移除 `mysql-data` / `redis-data`**）、nginx 單一入口（api / web 不發布埠）+ `TRUST_PROXY: '1'`、容器個人覆寫改走 `.env.container` + 連線類在 compose 釘死、容器化 e2e（`pnpm test:e2e:docker`）。守則 23 支 / 102 → 106 項。
-      **實作中一個設計因實測而改**：原訂 `env_file` 指向 `apps/api/.env`，實際會讓**整個 compose 無法使用**（它的 env 解析器比 dotenv 嚴格），改用獨立的 `.env.container`。**待封存**
-- [x] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions 兩份並存（fork 的人刪一份），前置抽 composite action、版號取自 `.nvmrc` / `packageManager`。
-      新增 `ci-parity.spec.ts` 守住「兩份跑同一組檢查 + 同一條資料庫版本線」，**只剩一份時自動放行**。
-      **順帶修掉**：GitLab 的 `prepare-production` 原本只在推分支時才建置，改為 MR 也跑——`tsc --noEmit` 抓不到 build 階段的錯誤，只在 push 跑等於「PR 綠、合併完才紅」。守則 23 支 / 106 → 24 支 / 110 項。**待封存**
-- [x] ~~**C6a `api-account-lock-management`**~~ —— 已完成（**範圍比原記載小，見下**）
-- [x] ~~**C6b `ui-route-permission-guard`**~~ —— 已完成。`/members` 與 `/roles` 掛上 `RequirePermission`（先前完全沒守衛，只靠 sidebar 隱藏）；權限碼型別化為 `apps/web/src/lib/permission-codes.ts`；新增 `permission-codes-sync.spec.ts`（前端碼須存在於後端目錄、路由與 sidebar 宣告須一致）。
-  ⚠️ **`RequireRole` 有行為變更**：非 SUPERADMIN 存取 `/security/*` 從「靜默導回首頁」改為「就地顯示『沒有存取權限』並標出缺少的角色碼」。代價是洩漏了「這個頁面存在」，是知情取捨（design D3）——sidebar 本來就藏著它，而會手動輸入該網址的人已經知道它存在了。
-  ⏸ **待實機確認**：以非 SUPERADMIN 手動輸入 `/security/*` 與 `/members`，確認顯示說明而非彈回首頁（需 `pnpm dev`）。
-- [x] ~~**C6c `ui-permission-tree-legibility`**~~ —— 已完成。權限樹群組標題中文化（`permission-labels.ts`）、項目改顯示動作名、新增「安全管理」不可指派區塊（無 checkbox），並把「隱藏 vs disabled」寫成明文規則。守則加兩條到 `permission-codes-sync.spec.ts`（中文對照雙向比對、`SecurityController` 仍有 `@Roles(SUPERADMIN)`）。
-  ~~**範圍比藍本小**：不改 `PERMISSION_CATALOG` 的 `name`——本模板兩邊本來就一致~~ ⚠️ **那句話是錯的**：當時只比對了 `PERMISSION_CATALOG` 與 `MODULE_LABELS`，**沒看 sidebar 的 label**——sidebar 寫的是「會員管理」，而目錄寫「後台-帳號管理」，模板早就處在漂移狀態。已由 C6d 統一為「管理者帳號」（四處全改，含 `name`）。
-  ✅ 給 C6d 的提醒已執行：四處用字統一。守則擋得住「對照缺漏」，**擋不住「兩邊都在但用詞不同」**——這次正是靠人比對才發現的。
-  ⏸ **待實機確認**：權限樹的中文標題與不可指派區塊（需 `pnpm dev`）。
-- [x] ~~**C6d `ui-admin-orientation`**~~ —— 已完成。命名統一為「管理者帳號」（sidebar / 頁面標題 / 權限樹 / `PERMISSION_CATALOG` 四處）、sidebar 分組「使用者與權限」→「管理者與權限」、首頁拿掉佔位文字並新增 `ui-home` capability。
-  **範圍與藍本不同**：不新增前台會員管理——藍本的分組問題來自它有兩個帳號體系，本模板前台側只有 `ping`。首頁也不做營運摘要：模板沒有任何統計端點，硬做的數字是騙人的。
-  ⚠️ **待你執行**：`PERMISSION_CATALOG` 的 `name` 改了，**部署需重跑 `pnpm --filter @app/api db:seed`**。本機無法代跑——`hexagonal_express_db` 這個 dev 庫在這台機器上不存在（`prisma migrate status` 回 `P1003`），e2e 能跑是因為它自己建 `*_test` 庫。你的環境要先有 dev 庫（`pnpm docker:up` 或 `db:migrate`）才跑得了 seed。
-  **忘了跑的症狀**：權限樹群組標題顯示「管理者帳號」，項目名卻還是「後台-帳號管理-檢視」——項目名讀的是 DB 的值。
-  ⏸ **待實機確認**：sidebar 分組、四處用字一致、首頁（需 `pnpm dev`）。
-- **C6e 前台認證**——依藍本拆成兩支（合起來大到無法 review）：
-  - [x] ~~**C6e-1 `api-front-auth-account`**~~ —— 已完成。`users` 表（與 `members` 完全獨立）、`JwtPayload` 加 `side`、**前後台各用一組 secret**（忘記比對 side 時是 fail-closed）、`@FrontAuth()` + `FrontJwtAuthGuard`、四支端點（login/refresh/logout/me）、前台 seed 兩個帳號（已驗證/未驗證各一）。
-    e2e 驗到**雙向跨側隔離**（admin token 打前台 401、前台 token 打後台 401）。
-    **不做 `EmailVerifiedGuard`**：模板前台沒有任何功能可擋，那是為不存在的問題建設施（同 C3 不搬 `infra-endpoint` 的理由）。`emailVerifiedAt` 只存不判斷。
-    ⚠️ **待你執行三件事**：(1) `.env.example` 補四個鍵（見下）；(2) dev 庫 `db:migrate`；(3) `db:seed`。
-  - [x] ~~**C6e-2 `api-front-auth-registration`**~~ —— 已完成。`user_tokens` 表（單表帶 `purpose` enum，只存 sha256）、五支端點、IP + 信箱雙重節流、四個新環境變數。
-    **順帶補了一個真的缺口**：admin 的 `PrismaPasswordResetTokenRepository` 先前**完全沒有測試**，而 e2e 只測 `reset-password` 的失敗路徑——也就是說把 `hashToken` 拿掉、token 存明文，全部測試照樣綠。重構前先補了 8 條，並反向驗證它抓得到。
-    **兩條守則被這支撐大**：`swagger-sync` 的「成功狀態碼」原本寫死只認 2xx，導向端點（`verify-email` 回 302）永遠對不上契約——已把成功狀態的定義擴到含 3xx；`compose-files` 抓到 `APP_FRONT_URL` 未在 compose 釘死。
-    ⚠️ **待你執行**：`.env.example` 補四個變數（`APP_FRONT_URL` / `APP_FRONT_VERIFY_REDIRECT_PATH` / `EMAIL_VERIFICATION_EXPIRES_IN` / `FRONT_PASSWORD_RESET_EXPIRES_IN`）、dev 庫 `db:migrate`。
+⚠️ **`延後項目` 與 `已決議不做` 不一樣**：前者是「之後要做，等某個條件」；
+後者是「評估過決定不做」。混在一起的結果是同一個提案每隔一陣子被重新評估一次。
+`已決議不做` 的失效方向也跟別區相反——別區是條目過期，這裡是**理由死了條目還活著**。
 
-**共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。
+**`待辦` 與 `技術債` 不一樣**：技術債是既有實作欠下的、現在就在付成本；待辦是還沒做的新東西。
 
-**刻意不搬**：PostgreSQL 遷移、聊天/WebSocket、Redis io adapter、moderation / front-users 後台頁、metrics + chat audit 可觀測性、`gen:comments`（Postgres `COMMENT ON` 專屬）。
+---
+
 
 ## 待辦
+
+還沒開始、現在就可以動工的新工作。
 
 ### 從衍生專案再撈的（2026-09-06 盤點，nexus 多出三支 commit）
 
 - [x] **C2b `fix-viewless-module-permission`** — `BACKEND:ATTACHMENT:EDIT` 對任何角色都存不進去（前後端各有一個獨立的擋路者）。已修並封存。
 - [x] **PageHeader 共用元件**（nexus `43e2fc4`）：四支列表頁的頁首抽成 `components/PageHeader.tsx` + 5 條測試。純重構，DOM 與 class 零變化。
-      刻意**不加守則**擋「頁首必須用它」——明細頁與登入頁沒有這層結構，規則放寬到能容納它們就抓不到真正的偏差，而會誤報的守則會被繞過。判準寫進 `frontend.md`。**待封存**
+      刻意**不加守則**擋「頁首必須用它」——明細頁與登入頁沒有這層結構，規則放寬到能容納它們就抓不到真正的偏差，而會誤報的守則會被繞過。判準寫進 `frontend.md`。
 - [x] ~~**帳號鎖定頁版面**（nexus `e674a2a`）~~ —— C6a 已回補，且不必再手動對齊：本模板改用 `@/components/PageHeader`，衍生專案那三處偏差（內距、`<div>` 而非 `<header>`、字重）在元件裡沒有可以寫歪的地方。
 
 ### 從 C2 分出來的後續
@@ -65,6 +44,61 @@
 - [x] ~~**guard 層 5 處內嵌使用者文案**~~ —— **`centralize-exception-messages` 已完成，但實際是 24 處不是 5 處**。這條當初寫「5 處」是照著眼前看到的 guard 數，沒有實際掃過；真正盤點後是 19 處框架層 `HttpException`（六支 guard 12 處 + `LoginService` 4 + `ResetPasswordService` 1 + `redis.service` 2）加 5 處上傳訊息。**估算寫進 todo 時要標明是不是掃過的**，否則下一個人會拿它當範圍上限。
 
   處置：新增第二張表 `HttpMessages`（框架層 `HttpException` 用；`ResponseMessages` 的完整性由 `satisfies Record<ResponseCode, …>` 保證，混入非 `ResponseCode` 的鍵會破壞它），另加 `UploadRejectReasons` 收掉 `INVALID_UPLOAD: (reason) => reason` 這個恆等函式——它讓五個呼叫端各自寫文案而表裡什麼都沒記錄。守則掃描範圍擴到 `adapter/in/web` / `application/service` / `infrastructure`。對外行為零變更，e2e 165 條全綠。
+
+### 功能
+
+- [x] ~~**帳號鎖定管理 CRUD（`api-account-lock-management`）**~~ —— 已完成並 archive。
+  **實作範圍比這條原本記載的小，那是刻意的，不是做漏**：只做 `GET /api/admin/security/locks`。
+  - **不做 `DELETE /locks/:id`**（design D1）：與既有 `POST unlock-account` 是同一個動作，只差吃 id 還是 email，而列表本來就拿得到 email。兩支做同一件事的端點會各自演化，呼叫端選錯不會有人發現。
+  - **不做 `POST /locks`（手動鎖定）**（design D2）：管理員按「鎖定」的意圖是「擋住這個人」，拿到的卻是「N 分鐘後自己失效的封鎖」。停用帳號（`status=false`）才是對的工具——不是少一個功能，是給錯工具。
+  - 到期規則抽成 `domain/value-object/AccountLockPolicy.ts`，登入路徑與列表共用（D3）；回應帶 `lockEnabled`（D6）。
+  - **⏸ 待實機確認**：前端 `/security/account-locks` 的畫面（需 `pnpm dev`）——flag 關閉時的停用提示與空狀態文案、狀態過濾的網址同步、解鎖對話框對已到期列的補充說明。後端與資料層兩種 flag 狀態都已有 e2e 覆蓋。
+
+---
+
+## 技術債
+
+既有實作欠下的債，現在就在付成本。
+
+（目前沒有。外部相依卡住的那條在「延後項目」。）
+
+---
+
+## 待收尾的 change
+
+後端已封存、但仍有前端配合或 smoke test 未完成。
+
+（目前沒有。）
+
+---
+
+## 延後項目
+
+刻意延後的，**每條都要寫解除條件**。
+
+### 技術債（外部相依卡住，延後）
+
+> **處理原則**：卡在上游生態，不是本專案能單方面解決的。改動範圍大且會動搖 build baseline，要動請另開 change 並先確認條件已滿足，不要夾帶在功能開發裡。
+
+- **`moduleResolution: node`（node10）遷移 `nodenext`**：TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已對齊到 TS 6.0.2（與 web / 編輯器同版），`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音 + `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**——NestJS 裝飾器 metadata 要求 `@Body()` DTO 用 `import type`，但注入的 service 不能改否則 DI 壞掉，與 TS 版本無關、卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時消音會失效，屆時強制處理。
+
+---
+
+---
+
+## 已決議不做
+
+評估過、決定不做的事。**不要重複評估**——每條都寫理由與重提條件。
+
+⚠️ 這一區的失效方向跟別區相反：別區是條目過期，這裡是**理由死了條目還活著**。
+
+（目前沒有。決定不做某件事時寫進這裡，不要只留在對話或 commit message。）
+
+---
+
+## 注意事項
+
+長期提醒、觀察中的現象，以及 AI 做不到、需要人動手的操作。
 
 ### 需人工處理（AI 做不到）
 
@@ -122,24 +156,55 @@
 
 - **剩餘 77 個傳遞依賴漏洞**：2026-08-14 已把能直接控制的修完（overrides 機制修復 + js-yaml / vite / nodemailer 升級，85 → 77）。剩下的皆深埋在 `prisma` / `@nestjs/terminus` 等上游相依樹中（含 2 個 critical：`shell-quote`、`websocket-driver`），**刻意不加 override 強制提版**——相容風險大於收益，模板穩定性優先。追蹤方式：定期 `pnpm audit`，待上游更新後再跑一次升級；若某漏洞出現實際可利用的攻擊面，再單獨評估。
 
-### 功能
-
-- [x] ~~**帳號鎖定管理 CRUD（`api-account-lock-management`）**~~ —— 已完成並 archive。
-  **實作範圍比這條原本記載的小，那是刻意的，不是做漏**：只做 `GET /api/admin/security/locks`。
-  - **不做 `DELETE /locks/:id`**（design D1）：與既有 `POST unlock-account` 是同一個動作，只差吃 id 還是 email，而列表本來就拿得到 email。兩支做同一件事的端點會各自演化，呼叫端選錯不會有人發現。
-  - **不做 `POST /locks`（手動鎖定）**（design D2）：管理員按「鎖定」的意圖是「擋住這個人」，拿到的卻是「N 分鐘後自己失效的封鎖」。停用帳號（`status=false`）才是對的工具——不是少一個功能，是給錯工具。
-  - 到期規則抽成 `domain/value-object/AccountLockPolicy.ts`，登入路徑與列表共用（D3）；回應帶 `lockEnabled`（D6）。
-  - **⏸ 待實機確認**：前端 `/security/account-locks` 的畫面（需 `pnpm dev`）——flag 關閉時的停用提示與空狀態文案、狀態過濾的網址同步、解鎖對話框對已到期列的補充說明。後端與資料層兩種 flag 狀態都已有 e2e 覆蓋。
-
-### 技術債（外部相依卡住，延後）
-
-> **處理原則**：卡在上游生態，不是本專案能單方面解決的。改動範圍大且會動搖 build baseline，要動請另開 change 並先確認條件已滿足，不要夾帶在功能開發裡。
-
-- **`moduleResolution: node`（node10）遷移 `nodenext`**：TS 7.0 會移除 node10。**現狀處置（2026-07-14）**：api 已對齊到 TS 6.0.2（與 web / 編輯器同版），`tsconfig.json` 加 `ignoreDeprecations: "6.0"` 消音 + `rootDir: "."`（TS 6 起 `TS5011` 要求明示，否則 ts-jest 全掛）。真解 `nodenext` **實測 TS 5.9 與 6 皆爆 124 個 `TS1272`**——NestJS 裝飾器 metadata 要求 `@Body()` DTO 用 `import type`，但注入的 service 不能改否則 DI 壞掉，與 TS 版本無關、卡在 NestJS 上游。**條件**：等 NestJS 改善 nodenext 支援；TS 7 移除 node10 時消音會失效，屆時強制處理。
-
 ---
 
 ## 已完成
+
+（「從 nexus 回補模板」十支已全數完成並封存，仍完整保留在此，是因為底下的 ⚠️ 判斷被後續 change 引用；2026-09-21 章節重組時由「進行中」移入本區，狀態改了、判斷一字未動。）
+
+### 從 nexus-nest-backend 回補模板（2026-09-04 起，已全數完成）
+
+`/Users/alantsai/side_projects/nexus-nest-backend` 是本模板的衍生專案，已改為 PostgreSQL + 聊天/WebSocket。
+盤點後確認可回補的部分切成 10 支 change，依風險與相依排序：
+
+- [x] **C1 `platform-ai-workflow-backport`** — `.claude/skills/`（grill-me / pr-body / tidy-todo）、`.husky/pre-push`、PR/MR 模板（GitLab 側改 symlink）、`openspec/config.yaml`、lessons 合併 22 條（288 → 473 行）。守則 19 支 / 68 → 69 項。
+- [x] **C2 `platform-security-hardening`** — 帳號鎖定時效 + 三態 `checkLock`、大小寫繞過修補、CSP 不再全域關閉、`SWAGGER_ENABLED`、refresh token 效期 7 天→1 天。
+      **實作途中另外修掉三個既有缺陷**：鎖定回應 403/`FORBIDDEN` 與 spec 寫的 423/`ACCOUNT_LOCKED` 不符（**對外契約變更**）、`AccountLockedException` 是零呼叫端的死碼、`LoginService` 內嵌使用者文案違反 Hard Rule。
+      單元 330 條 / 守則 69 條 / e2e 160 條（151 → 160）。
+- [x] **C3 `platform-guardrail-backport`** — 回補四支守則（`guardrail-inventory` / `env-example-sync` / `public-surface` / `role-permission-cache`），守則 19 支 / 69 項 → **23 支 / 102 項**。
+      **順帶修掉一個活的 bug**：`UpdateRoleService` 改完角色權限不清成員快取，撤銷的權限最多 5 分鐘後才生效。
+      刻意不搬三項：`session-revocation`（守 WS 連線撤銷，模板無 WS 層）、`permission-catalog-sync`（同步前後端權限碼，模板前端還沒有 `lib/permission-codes.ts`，屬 C6b——**C6b 已完成，其中「權限碼同步」那半已回補為 `permission-codes-sync.spec.ts`；權限樹中文對照那半屬 C6c**）、`infra-endpoint` 裝飾器（為不存在的問題建設施）。
+- [x] **C4 `platform-container-single-entry`** — 修掉 `verify-ci.sh` 的 `down -v`（**修前實測證實會移除 `mysql-data` / `redis-data`**）、nginx 單一入口（api / web 不發布埠）+ `TRUST_PROXY: '1'`、容器個人覆寫改走 `.env.container` + 連線類在 compose 釘死、容器化 e2e（`pnpm test:e2e:docker`）。守則 23 支 / 102 → 106 項。
+      **實作中一個設計因實測而改**：原訂 `env_file` 指向 `apps/api/.env`，實際會讓**整個 compose 無法使用**（它的 env 解析器比 dotenv 嚴格），改用獨立的 `.env.container`。
+- [x] **C5 `platform-ci-dual-provider`** — GitLab 與 GitHub Actions 兩份並存（fork 的人刪一份），前置抽 composite action、版號取自 `.nvmrc` / `packageManager`。
+      新增 `ci-parity.spec.ts` 守住「兩份跑同一組檢查 + 同一條資料庫版本線」，**只剩一份時自動放行**。
+      **順帶修掉**：GitLab 的 `prepare-production` 原本只在推分支時才建置，改為 MR 也跑——`tsc --noEmit` 抓不到 build 階段的錯誤，只在 push 跑等於「PR 綠、合併完才紅」。守則 23 支 / 106 → 24 支 / 110 項。
+- [x] ~~**C6a `api-account-lock-management`**~~ —— 已完成（**範圍比原記載小，見下**）
+- [x] ~~**C6b `ui-route-permission-guard`**~~ —— 已完成。`/members` 與 `/roles` 掛上 `RequirePermission`（先前完全沒守衛，只靠 sidebar 隱藏）；權限碼型別化為 `apps/web/src/lib/permission-codes.ts`；新增 `permission-codes-sync.spec.ts`（前端碼須存在於後端目錄、路由與 sidebar 宣告須一致）。
+  ⚠️ **`RequireRole` 有行為變更**：非 SUPERADMIN 存取 `/security/*` 從「靜默導回首頁」改為「就地顯示『沒有存取權限』並標出缺少的角色碼」。代價是洩漏了「這個頁面存在」，是知情取捨（design D3）——sidebar 本來就藏著它，而會手動輸入該網址的人已經知道它存在了。
+  ⏸ **待實機確認**：以非 SUPERADMIN 手動輸入 `/security/*` 與 `/members`，確認顯示說明而非彈回首頁（需 `pnpm dev`）。
+- [x] ~~**C6c `ui-permission-tree-legibility`**~~ —— 已完成。權限樹群組標題中文化（`permission-labels.ts`）、項目改顯示動作名、新增「安全管理」不可指派區塊（無 checkbox），並把「隱藏 vs disabled」寫成明文規則。守則加兩條到 `permission-codes-sync.spec.ts`（中文對照雙向比對、`SecurityController` 仍有 `@Roles(SUPERADMIN)`）。
+  ~~**範圍比藍本小**：不改 `PERMISSION_CATALOG` 的 `name`——本模板兩邊本來就一致~~ ⚠️ **那句話是錯的**：當時只比對了 `PERMISSION_CATALOG` 與 `MODULE_LABELS`，**沒看 sidebar 的 label**——sidebar 寫的是「會員管理」，而目錄寫「後台-帳號管理」，模板早就處在漂移狀態。已由 C6d 統一為「管理者帳號」（四處全改，含 `name`）。
+  ✅ 給 C6d 的提醒已執行：四處用字統一。守則擋得住「對照缺漏」，**擋不住「兩邊都在但用詞不同」**——這次正是靠人比對才發現的。
+  ⏸ **待實機確認**：權限樹的中文標題與不可指派區塊（需 `pnpm dev`）。
+- [x] ~~**C6d `ui-admin-orientation`**~~ —— 已完成。命名統一為「管理者帳號」（sidebar / 頁面標題 / 權限樹 / `PERMISSION_CATALOG` 四處）、sidebar 分組「使用者與權限」→「管理者與權限」、首頁拿掉佔位文字並新增 `ui-home` capability。
+  **範圍與藍本不同**：不新增前台會員管理——藍本的分組問題來自它有兩個帳號體系，本模板前台側只有 `ping`。首頁也不做營運摘要：模板沒有任何統計端點，硬做的數字是騙人的。
+  ⚠️ **待你執行**：`PERMISSION_CATALOG` 的 `name` 改了，**部署需重跑 `pnpm --filter @app/api db:seed`**。本機無法代跑——`hexagonal_express_db` 這個 dev 庫在這台機器上不存在（`prisma migrate status` 回 `P1003`），e2e 能跑是因為它自己建 `*_test` 庫。你的環境要先有 dev 庫（`pnpm docker:up` 或 `db:migrate`）才跑得了 seed。
+  **忘了跑的症狀**：權限樹群組標題顯示「管理者帳號」，項目名卻還是「後台-帳號管理-檢視」——項目名讀的是 DB 的值。
+  ⏸ **待實機確認**：sidebar 分組、四處用字一致、首頁（需 `pnpm dev`）。
+- **C6e 前台認證**——依藍本拆成兩支（合起來大到無法 review）：
+  - [x] ~~**C6e-1 `api-front-auth-account`**~~ —— 已完成。`users` 表（與 `members` 完全獨立）、`JwtPayload` 加 `side`、**前後台各用一組 secret**（忘記比對 side 時是 fail-closed）、`@FrontAuth()` + `FrontJwtAuthGuard`、四支端點（login/refresh/logout/me）、前台 seed 兩個帳號（已驗證/未驗證各一）。
+    e2e 驗到**雙向跨側隔離**（admin token 打前台 401、前台 token 打後台 401）。
+    **不做 `EmailVerifiedGuard`**：模板前台沒有任何功能可擋，那是為不存在的問題建設施（同 C3 不搬 `infra-endpoint` 的理由）。`emailVerifiedAt` 只存不判斷。
+    ⚠️ **待你執行三件事**：(1) `.env.example` 補四個鍵（見下）；(2) dev 庫 `db:migrate`；(3) `db:seed`。
+  - [x] ~~**C6e-2 `api-front-auth-registration`**~~ —— 已完成。`user_tokens` 表（單表帶 `purpose` enum，只存 sha256）、五支端點、IP + 信箱雙重節流、四個新環境變數。
+    **順帶補了一個真的缺口**：admin 的 `PrismaPasswordResetTokenRepository` 先前**完全沒有測試**，而 e2e 只測 `reset-password` 的失敗路徑——也就是說把 `hashToken` 拿掉、token 存明文，全部測試照樣綠。重構前先補了 8 條，並反向驗證它抓得到。
+    **兩條守則被這支撐大**：`swagger-sync` 的「成功狀態碼」原本寫死只認 2xx，導向端點（`verify-email` 回 302）永遠對不上契約——已把成功狀態的定義擴到含 3xx；`compose-files` 抓到 `APP_FRONT_URL` 未在 compose 釘死。
+    ⚠️ **待你執行**：`.env.example` 補四個變數（`APP_FRONT_URL` / `APP_FRONT_VERIFY_REDIRECT_PATH` / `EMAIL_VERIFICATION_EXPIRES_IN` / `FRONT_PASSWORD_RESET_EXPIRES_IN`）、dev 庫 `db:migrate`。
+
+**共通適配成本**：nexus 是 PostgreSQL、模板是 MySQL/MariaDB，migration、compose service、healthcheck、`@prisma/adapter-*` 都要改回 MySQL 版。
+
+**刻意不搬**：PostgreSQL 遷移、聊天/WebSocket、Redis io adapter、moderation / front-users 後台頁、metrics + chat audit 可觀測性、`gen:comments`（Postgres `COMMENT ON` 專屬）。
 
 ### 2026-08-16 — 第三輪審查 4 項修復 + spec 補登
 

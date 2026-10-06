@@ -130,6 +130,39 @@ GitLab 那個 job 存在是因為它的 cache 模型需要一個明確的產生�
 ——它只砍 `node_modules` 的 volume 再重建，**不動 `mysql-data` / `redis-data`**。
 `docker:reset`（`down -v`）會移除專案的**所有** volume 含資料庫，之後得重跑 `docker:init`。
 
+#### 這套設計從哪來，以及衍生專案會繼承什麼
+
+容器化的形狀承自 `times-account-backend`（Laravel + MySQL）。**四件事是共通的設計**，
+fork 出去之後也該保持：
+
+- **Dockerfile 只給開發與驗證用，不是部署映像。** 單 stage、原始碼 bind mount、
+  刻意不 `COPY`——`COPY` 進去改一行就要重 build，而開發映像的重點正是不用重 build。
+  部署要的是相反的東西（最小、不可變、原始碼烘進去），兩者**要求相反**，不該是同一支。
+  部署映像屬於另一個 repo。
+- **連線類變數由 compose 的 `environment` 釘死**，蓋過開發者本機的設定。
+  不釘的話每個人為了跑容器都得去改自己的 `.env`。
+- **驗證環境與開發環境分開**（`--profile verify` 的 tmpfs DB）：對資料的要求相反，
+  開發要重啟保留、驗證要每次乾淨。
+- **反向代理作為單一入口**，`docker/nginx/default.conf`。
+
+**以下三樣是 monorepo + Node 的代價，不是容器化的標準做法。**
+本專案是模板，所以要寫明：**衍生專案會原封不動繼承它們**，
+而繼承的人應該知道自己付的是什麼代價，不要以為是必要的。
+
+1. **五個 `node_modules` 具名 volume**（上面第 2 點）。pnpm 的 workspace
+   `node_modules` 是 symlink 到根目錄的 `.pnpm` store，漏任一個就載到 host 的
+   macOS/arm64 產物。**單一語言、單一目錄的依賴（PHP 的 `vendor/`）一個都不需要。**
+2. **env 分成多份**（repo 根的基礎設施 + `apps/api/` 的應用設定）。
+   `dotenv.config()` 不帶路徑時解析的是 `process.cwd()`，而 `pnpm --filter @app/api`
+   的 cwd 是 `apps/api`——compose 要展開 `${...}` 的變數卻必須在 repo 根。
+   **單一 app repo 兩者天然重合，所以那邊只有一份。**
+3. **`docker/api.container.env` 的遮蔽掛載**。它是第 2 點的衍生物：
+   env 分家之後，才需要一個「隊友共用的容器基準」。
+
+三者是**一條鏈**而不是三個獨立決定——目錄結構逼出第 1、2 點，第 2 點再逼出第 3 點。
+要移除其中任何一樣，得先處理它上游的那個。
+
+
 要點：
 
 - **兩個品質 job 在 Merge Request 就觸發**（不像 `prepare-production` 只認分支推送）—— MR 正是最該擋下問題的時機。
